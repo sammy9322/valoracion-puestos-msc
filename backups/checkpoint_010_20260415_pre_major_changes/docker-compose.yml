@@ -1,0 +1,17 @@
+version: '3.8'
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: msc_postgres
+    restart: always
+    environment:
+      POSTGRES_USER: msc_admin
+      POSTGRES_PASSWORD: msc_password
+      POSTGRES_DB: valoracion_puestos_msc_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - msc_pgdata:/var/lib/postgresql/data
+
+volumes:
+  msc_pgdata:

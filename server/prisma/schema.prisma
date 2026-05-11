@@ -1,0 +1,266 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -------------------
+// USUARIOS Y ROLES (AUTH)
+// -------------------
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  nombre    String
+  rol       String   @default("EVALUADOR")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  evaluacionesAprobadas Evaluacion[]  @relation("EvaluacionesAprobadas")
+  evaluacionesCreadas   Evaluacion[]  @relation("EvaluacionesCreadas")
+  auditoriasLog         Auditoria[]
+  valorPuntoAprobado    ValorPunto[]  @relation("ValorPuntoAprobado")
+  valorPuntoCalculado   ValorPunto[]  @relation("ValorPuntoCalculado")
+}
+
+// -------------------
+// MODELO DE DATOS PRINCIPAL
+// -------------------
+model Puesto {
+  id                   String        @id @default(uuid())
+  nombre               String
+  codigo_clase_msc     String?
+  descripcion_funciones String
+  area                 String
+  reporta_a            String?
+  supervisa_a          String?
+  educacion_requerida  String?
+  experiencia_requerida String?
+  tipo_jornada         String?
+  condiciones_trabajo  String?
+  es_puesto_clave      Boolean       @default(false)
+  estado               String        @default("borrador")
+  eliminado            Boolean       @default(false)
+  fecha_eliminacion    DateTime?
+  fuente_manual_clases Boolean       @default(false)
+  org_id               String?
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  evaluaciones         Evaluacion[]
+  encuestas            EncuestaSalarios[]
+  asignaciones         AsignacionSalario[]
+  indices              IndiceSalarial[]
+}
+
+
+model Evaluacion {
+  id                        String   @id @default(uuid())
+  puesto                    Puesto   @relation(fields: [puesto_id], references: [id])
+  puesto_id                 String
+  periodo                   String
+
+  grado_dificultad          Int
+  puntos_dificultad         Int
+  justif_dificultad         String?
+  grado_supervision         Int
+  puntos_supervision        Int
+  justif_supervision        String?
+  grado_responsabilidad     Int
+  puntos_responsabilidad    Int
+  justif_responsabilidad    String?
+  grado_condiciones         Int
+  puntos_condiciones        Int
+  justif_condiciones        String?
+  grado_consecuencia_error  Int
+  puntos_consecuencia_error Int
+  justif_consecuencia_error String?
+  grado_requisitos          Int
+  puntos_requisitos         Int
+  justif_requisitos         String?
+
+  puntos_totales            Int
+
+  evaluador                 User      @relation("EvaluacionesCreadas", fields: [evaluador_id], references: [id])
+  evaluador_id              String
+  aprobado_por_user         User?     @relation("EvaluacionesAprobadas", fields: [aprobado_por], references: [id])
+  aprobado_por              String?
+
+  fecha_evaluacion          DateTime  @default(now())
+  fecha_aprobacion          DateTime?
+  version                   Int       @default(1)
+  estado                    String    @default("borrador")
+  
+  asignaciones              AsignacionSalario[]
+}
+
+model EncuestaSalarios {
+  id               String   @id @default(uuid())
+  puesto           Puesto   @relation(fields: [puesto_id], references: [id])
+  puesto_id        String
+  periodo          String
+  salario_minimo   Decimal   @db.Decimal(18, 2)
+  salario_promedio Decimal   @db.Decimal(18, 2)
+  salario_maximo   Decimal   @db.Decimal(18, 2)
+  mediana          Decimal   @db.Decimal(18, 2)
+  moda             Decimal   @db.Decimal(18, 2)
+  fuente           String?
+  fecha_encuesta   DateTime @default(now())
+}
+
+model ValorPunto {
+  id                    String   @id @default(uuid())
+  periodo               String
+  total_salarios        Decimal  @db.Decimal(18, 2)
+  total_puntos          Int
+  valor_punto_exacto    Decimal  @db.Decimal(18, 2)
+  valor_punto_aplicado  Decimal  @db.Decimal(18, 2)
+  puestos_clave_usados  Int
+  calculado_por_user    User     @relation("ValorPuntoCalculado", fields: [calculado_por], references: [id])
+  calculado_por         String
+  aprobado_por_user     User?    @relation("ValorPuntoAprobado", fields: [aprobado_por], references: [id])
+  aprobado_por          String?
+  fecha_vigencia_inicio DateTime
+  fecha_vigencia_fin    DateTime?
+  
+  asignaciones          AsignacionSalario[]
+}
+
+model AsignacionSalario {
+  id                    String      @id @default(uuid())
+  puesto                Puesto      @relation(fields: [puesto_id], references: [id])
+  puesto_id             String
+  evaluacion            Evaluacion  @relation(fields: [evaluacion_id], references: [id])
+  evaluacion_id         String
+  valorPunto            ValorPunto  @relation(fields: [valor_punto_id], references: [id])
+  valor_punto_id        String
+  
+  puntos_totales        Int
+  salario_calculado     Decimal     @db.Decimal(18, 2)
+  salario_ajustado      Decimal?    @db.Decimal(18, 2)
+  justif_ajuste         String?
+  salario_minimo_legal  Decimal     @db.Decimal(18, 2)
+  cumple_minimo_legal   Boolean
+  coherencia_jerarquica Boolean
+  alerta                String?
+  partida_presupuestaria String?
+  periodo               String
+  fecha_asignacion      DateTime    @default(now())
+}
+
+model IndiceSalarial {
+  id               String   @id @default(uuid())
+  puesto           Puesto   @relation(fields: [puesto_id], references: [id])
+  puesto_id        String
+  codigo_clase_msc String?
+  categoria        String
+  grado            String?
+  salario_vigente  Decimal  @db.Decimal(18, 2)
+  tipo_indice      String
+  area             String
+  periodo          String
+}
+
+model SalarioMinimoLegal {
+  id             String   @id @default(uuid())
+  categoria      String
+  monto          Decimal  @db.Decimal(18, 2)
+  periodo        String
+  decreto_mtss   String?
+  fecha_vigencia DateTime
+}
+
+model NormaLegal {
+  id             String    @id @default(uuid())
+  tipo           String
+  numero         String
+  nombre         String
+  articulo       String?
+  resumen        String?
+  url_fuente     String?
+  ambito         String
+  afecta_modulo  String?
+  fecha_vigencia DateTime?
+}
+
+model Auditoria {
+  id            String   @id @default(uuid())
+  tabla         String
+  registro_id   String
+  accion        String
+  datos_antes   Json?
+  datos_despues Json?
+  usuario       User?    @relation(fields: [usuario_id], references: [id])
+  usuario_id    String?
+  ip_origen     String?
+  timestamp     DateTime @default(now())
+}
+
+model IntegracionERP {
+  id             String   @id @default(uuid())
+  tipo_evento    String
+  modulo_destino String
+  payload        Json
+  estado         String    @default("pendiente")
+  respuesta_erp  Json?
+  timestamp      DateTime  @default(now())
+}
+
+// -------------------
+// MOTOR DE CATÁLOGO ENRIQUECIDO (LOCAL)
+// -------------------
+model ManualEnriquecido {
+  id                    String   @id @default(uuid())
+  cargo_id              String?  
+  nombre_oficial        String?  
+  nombre_pdf            String   
+  funciones             Json     
+  requisitos_academicos String?
+  requisitos_experiencia String?
+  area_sugerida         String?
+  clase_manual          String?
+  estrato               String?
+  version_label         String?
+  fecha_vinculacion     DateTime @default(now())
+
+  @@index([cargo_id])
+}
+
+model ManualHistorico {
+  id            String   @id @default(uuid())
+  version_label String
+  fecha_archivo DateTime @default(now())
+  data_json     Json   
+}
+
+// -------------------
+// CATÁLOGO DE PUESTOS (MANUAL MSC)
+// -------------------
+model CatalogoPuesto {
+  id                      String   @id @default(uuid())
+  nombre                  String
+  clase                   String
+  estrato                 String
+  naturaleza              String
+  cargo_contenido         String   
+  funciones               Json     
+  requisitos_academicos   String?
+  requisitos_experiencia String?
+  requisitos_supervision String?
+  requisitos_legales      String?
+  conocimientos_deseables Json     
+  condiciones_personales Json     
+  area                    String?  
+  version                 Int
+  fecha_importacion       DateTime @default(now())
+  es_vigente              Boolean  @default(false)
+  reemplazado_por         String?  
+
+  @@index([clase])
+  @@index([es_vigente])
+  @@index([version])
+  @@index([area])
+}
