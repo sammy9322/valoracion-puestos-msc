@@ -8,6 +8,7 @@ import WizardEvaluacion from './pages/WizardEvaluacion';
 import CalculoVP from './pages/CalculoVP';
 import Asignaciones from './pages/Asignaciones';
 import PanelAuditoria from './pages/PanelAuditoria';
+import ImportarManual from './pages/ImportarManual';
 import api from './services/api';
 
 const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -31,6 +32,7 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     { path: '/calculo-vp', icon: <Calculator size={16} />, label: 'Valor de Punto' },
     { path: '/asignaciones', icon: <BadgeDollarSign size={16} />, label: 'Asignación' },
     { path: '/auditoria', icon: <ClipboardList size={16} />, label: 'Auditoría' },
+    { path: '/importar-manual', icon: <BookOpen size={16} />, label: 'Manual MSC' },
   ];
 
   return (
@@ -221,6 +223,7 @@ const App = () => {
           <Route path="/calculo-vp" element={<CalculoVP />} />
           <Route path="/asignaciones" element={<Asignaciones />} />
           <Route path="/auditoria" element={<PanelAuditoria />} />
+          <Route path="/importar-manual" element={<ImportarManual />} />
         </Routes>
       </Layout>
     </BrowserRouter>

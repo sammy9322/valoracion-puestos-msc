@@ -81,6 +81,9 @@ const ImportarManual: React.FC = () => {
       });
 
       setPreview(res.data);
+      if (res.data.saved) {
+        setSuccess(res.data.message);
+      }
     } catch (e: any) {
       setError(e.response?.data?.error || 'Error al procesar el archivo');
     } finally {
@@ -222,22 +225,22 @@ const ImportarManual: React.FC = () => {
 
             <div className="grid grid-cols-3 gap-4 mb-6">
               <div className="bg-muted/50 p-4 rounded-lg text-center">
-                <p className="text-2xl font-semibold text-foreground">{preview.resumen.total_clases}</p>
+                <p className="text-2xl font-semibold text-foreground">{preview.preview.resumen.total_clases}</p>
                 <p className="text-xs text-muted-foreground">Clases detectadas</p>
               </div>
               <div className="bg-muted/50 p-4 rounded-lg text-center">
-                <p className="text-2xl font-semibold text-foreground">{preview.resumen.total_cargos}</p>
+                <p className="text-2xl font-semibold text-foreground">{preview.preview.resumen.total_cargos}</p>
                 <p className="text-xs text-muted-foreground">Cargos extraídos</p>
               </div>
               <div className="bg-muted/50 p-4 rounded-lg text-center">
-                <p className="text-2xl font-semibold text-foreground">{preview.resumen.estratos.length}</p>
+                <p className="text-2xl font-semibold text-foreground">{preview.preview.resumen.estratos.length}</p>
                 <p className="text-xs text-muted-foreground">Estratos ocupados</p>
               </div>
             </div>
 
             <div className="mb-6">
               <h4 className="text-sm font-medium text-muted-foreground mb-3">
-                Estratos encontrados: {preview.resumen.estratos.join(', ')}
+                Estratos encontrados: {preview.preview.resumen.estratos.join(', ')}
               </h4>
             </div>
 
@@ -251,7 +254,7 @@ const ImportarManual: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {preview.clases_preview.map((clase, idx) => (
+                  {preview.preview.clases_preview.map((clase: any, idx: number) => (
                     <tr key={idx} className="border-t">
                       <td className="p-3">{clase.nombre}</td>
                       <td className="p-3">
@@ -264,9 +267,9 @@ const ImportarManual: React.FC = () => {
               </table>
             </div>
             
-            {preview.clases_preview.length < preview.resumen.total_clases && (
+            {preview.preview.clases_preview.length < preview.preview.resumen.total_clases && (
               <p className="text-xs text-muted-foreground mt-3 text-center">
-                ...y {preview.resumen.total_clases - preview.clases_preview.length} clases más
+                ...y {preview.preview.resumen.total_clases - preview.preview.clases_preview.length} clases más
               </p>
             )}
           </div>

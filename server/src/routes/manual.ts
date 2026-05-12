@@ -34,13 +34,24 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
     // No guardar copia en disco local para evitar errores EROFS en serverless
     console.log(`=== Procesando: ${filename} (${buffer.length} bytes) ===`);
 
-    const resultado = await parseManual(buffer, filename);
+    let resultado;
+    try {
+      resultado = await parseManual(buffer, filename);
+    } catch (parseError: any) {
+      console.error('Error específico en parseManual:', parseError);
+      throw new Error(`Fallo en el motor de parseo: ${parseError.message}`);
+    }
     
     // Guardar directamente en la base de datos para evitar pérdida de datos en memoria (Serverless/Nodemon)
     let countVinculados = 0;
-    if (resultado.resumen.total_cargos > 0) {
-      const saveResult = await manualService.guardarCatalogoEnriquecido(resultado);
-      countVinculados = saveResult.count;
+    try {
+      if (resultado.resumen.total_cargos > 0) {
+        const saveResult = await manualService.guardarCatalogoEnriquecido(resultado);
+        countVinculados = saveResult.count;
+      }
+    } catch (dbError: any) {
+      console.error('Error al guardar en base de datos:', dbError);
+      throw new Error(`Error de persistencia: ${dbError.message}`);
     }
 
     console.log(`Parseo y guardado exitoso: ${resultado.resumen.total_clases} clases, ${resultado.resumen.total_cargos} cargos extraídos. Vinculados: ${countVinculados}`);
@@ -67,8 +78,8 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
       version: resultado.version
     });
   } catch (error: any) {
-    console.error('Error al parsear manual:', error);
-    res.status(500).json({ error: `Error al procesar: ${error?.message || 'desconocido'}` });
+    console.error('ERROR CRÍTICO EN UPLOAD:', error);
+    res.status(500).json({ error: error?.message || 'Error desconocido en el servidor' });
   }
 });
 
