@@ -31,11 +31,7 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
     const buffer = req.file.buffer;
     const filename = req.file.originalname;
 
-    // Guardar copia para diagnóstico
-    const fs = require('fs');
-    const path = require('path');
-    fs.writeFileSync(path.join(__dirname, '../../manual_diag.pdf'), buffer);
-
+    // No guardar copia en disco local para evitar errores EROFS en serverless
     console.log(`=== Procesando: ${filename} (${buffer.length} bytes) ===`);
 
     const resultado = await parseManual(buffer, filename);

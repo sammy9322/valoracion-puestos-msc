@@ -2,7 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'llama3'; // Configurable vía .env, por defecto usamos llama3 o el modelo que opencode esté sirviendo
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest'; 
+
+console.log(`[AI Service] Configurado con modelo: ${DEFAULT_MODEL} en ${OLLAMA_URL}`);
 
 export interface EvaluationSuggestion {
     dificultad: number;
@@ -83,9 +85,12 @@ Estructura requerida:
             
             return result as EvaluationSuggestion;
             
-        } catch (error) {
+        } catch (error: any) {
             console.error('[AI Agent Service] Error al consultar el modelo local:', error);
-            return null;
+            if (error.cause?.code === 'ECONNREFUSED' || error.message.includes('fetch')) {
+                throw new Error('Ollama no está ejecutándose en ' + OLLAMA_URL);
+            }
+            throw new Error(error.message || 'Error al comunicarse con la IA local');
         }
     }
 };

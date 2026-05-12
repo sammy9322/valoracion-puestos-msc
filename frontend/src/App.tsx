@@ -133,7 +133,7 @@ const Dashboard = () => {
           api.get('/calculos/vp').catch(() => ({ data: null }))
         ]);
         
-        const puestos = puestosRes.data;
+        const puestos = Array.isArray(puestosRes.data) ? puestosRes.data : [];
         const evaluados = puestos.filter((p: any) => p.estado === 'evaluado').length;
         const claves = puestos.filter((p: any) => p.es_puesto_clave).length;
         

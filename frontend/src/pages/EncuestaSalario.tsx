@@ -135,7 +135,7 @@ const EncuestaSalario: React.FC = () => {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-slate-100">
-                                    {data.map((puesto) => (
+                                    {(Array.isArray(data) ? data : []).map((puesto) => (
                                         <tr key={puesto.id} className="hover:bg-slate-50/50 transition-colors group">
                                             <td className="px-6 py-4">
                                                 <div className="font-bold text-foreground group-hover:text-primary transition-colors">{puesto.puesto_nombre}</div>

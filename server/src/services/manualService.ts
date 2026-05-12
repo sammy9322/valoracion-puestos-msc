@@ -45,7 +45,7 @@ export const manualService = {
         cargo_id: p.cargo_id ? String(p.cargo_id) : null,
         nombre_oficial: p.nombre_oficial,
         nombre_pdf: p.nombre,
-        funciones: JSON.stringify(p.funciones || []),
+        funciones: p.funciones || [],
         requisitos_academicos: p.requisitos?.academicos || '',
         requisitos_experiencia: p.requisitos?.experiencia || '',
         area_sugerida: p.area || '',
@@ -59,8 +59,8 @@ export const manualService = {
         data: recordsToInsert
       });
 
-      // 5. Actualizar caché local
-      fs.writeFileSync(MANUAL_PATH, JSON.stringify(manualData, null, 2));
+      // 5. Los datos ya están persistidos en la base de datos (Prisma/SQLite/Postgres)
+      // No escribir en archivo local para evitar errores EROFS
 
       return { success: true, count: recordsToInsert.length };
     } catch (error) {
@@ -80,7 +80,7 @@ export const manualService = {
       
       return data.map(p => ({
         ...p,
-        funciones: JSON.parse(p.funciones)
+        funciones: (typeof p.funciones === 'string') ? JSON.parse(p.funciones as string) : (p.funciones || [])
       }));
     } catch (error) {
       // Fallback a archivo si falla DB

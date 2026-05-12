@@ -63,7 +63,7 @@ const PanelAuditoria: React.FC = () => {
                         <tbody className="divide-y divide-slate-100">
                             {loading ? (
                                 <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground italic">Consultando registros de seguridad...</td></tr>
-                            ) : logs.map((log) => (
+                            ) : (Array.isArray(logs) ? logs : []).map((log) => (
                                 <tr key={log.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4 font-mono text-[11px] text-slate-500">
                                         <div className="flex items-center gap-2">

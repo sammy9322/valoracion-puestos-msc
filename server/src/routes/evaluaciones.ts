@@ -106,9 +106,9 @@ router.post('/suggest', async (req, res) => {
             return res.status(500).json({ error: 'El agente IA no pudo procesar la solicitud' });
         }
         res.json(suggestion);
-    } catch (error) {
+    } catch (error: any) {
         console.error('Error en ruta /suggest:', error);
-        res.status(500).json({ error: 'Error interno en sugerencia IA' });
+        res.status(500).json({ error: error.message || 'Error interno en sugerencia IA' });
     }
 });
 

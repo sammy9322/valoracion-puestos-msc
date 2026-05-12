@@ -149,6 +149,20 @@ const FichasPuestos: React.FC = () => {
                     exists.requisitos_experiencia = lp.requisitos_experiencia;
                     exists.estrato = lp.estrato;
                     exists.area = lp.area_sugerida;
+                } else {
+                    // Si no existe en Supabase, agregarlo como nuevo desde el PDF
+                    merged.push({
+                        id: lp.id || `local-${Math.random()}`,
+                        cargo: lp.nombre_pdf || lp.nombre_oficial,
+                        clase: lp.clase_manual || lp.clase,
+                        fuente: 'local',
+                        vinculado: false,
+                        funciones: Array.isArray(lp.funciones) ? lp.funciones.map((f: string) => `• ${f}`).join('\n') : lp.funciones,
+                        requisitos_academicos: lp.requisitos_academicos,
+                        requisitos_experiencia: lp.requisitos_experiencia,
+                        estrato: lp.estrato,
+                        area: lp.area_sugerida
+                    });
                 }
             });
 
@@ -272,10 +286,10 @@ const FichasPuestos: React.FC = () => {
         );
     };
 
-    const filteredPuestos = puestos.filter(p => 
-        p.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        p.area.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredPuestos = Array.isArray(puestos) ? puestos.filter(p => 
+        (p.nombre || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (p.area || '').toLowerCase().includes(searchTerm.toLowerCase())
+    ) : [];
 
     return (
         <div className="space-y-6">

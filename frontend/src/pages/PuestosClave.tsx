@@ -30,7 +30,7 @@ const PuestosClave: React.FC = () => {
         }
     };
 
-    const puestosClave = puestos.filter(p => p.es_puesto_clave);
+    const puestosClave = Array.isArray(puestos) ? puestos.filter(p => p.es_puesto_clave) : [];
 
     return (
         <div className="space-y-8">
@@ -89,7 +89,7 @@ const PuestosClave: React.FC = () => {
                         <div className="divide-y max-h-[600px] overflow-y-auto">
                             {loading ? (
                                 <div className="p-10 text-center text-muted-foreground italic">Cargando catálogo...</div>
-                            ) : puestos.map((puesto) => (
+                            ) : (Array.isArray(puestos) ? puestos : []).map((puesto) => (
                                 <div 
                                     key={puesto.id} 
                                     className={`p-4 flex items-center justify-between hover:bg-slate-50/80 transition-colors group ${puesto.es_puesto_clave ? 'bg-primary/5' : ''}`}

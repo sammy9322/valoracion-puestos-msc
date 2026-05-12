@@ -35,7 +35,7 @@ const WizardEvaluacion: React.FC = () => {
         if (!selectedPuestoDetails) return alert('Seleccione un puesto primero');
         setAiLoading(true);
         try {
-            const res = await api.post('/evaluaciones/suggest', selectedPuestoDetails);
+            const res = await api.post('/evaluaciones/suggest', selectedPuestoDetails, { timeout: 120000 });
             const suggestion = res.data;
             setEvaluacion(prev => ({
                 ...prev,
@@ -47,9 +47,9 @@ const WizardEvaluacion: React.FC = () => {
                 requisitos: suggestion.requisitos || 1, requisitos_just: suggestion.requisitos_just || ''
             }));
             alert('El Agente IA ha completado su sugerencia. Por favor, revise y ajuste si es necesario.');
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            alert('Error al obtener sugerencia del Agente IA');
+            alert(`Error del Agente IA: ${error.response?.data?.error || error.message || 'Desconocido'}`);
         } finally {
             setAiLoading(false);
         }
@@ -60,7 +60,7 @@ const WizardEvaluacion: React.FC = () => {
         const puestoIdParam = queryParams.get('puesto_id');
 
         api.get('/puestos').then(res => {
-            const availablePuestos = res.data.filter((p: any) => p.estado !== 'aprobado');
+            const availablePuestos = Array.isArray(res.data) ? res.data.filter((p: any) => p.estado !== 'aprobado') : [];
             setPuestos(availablePuestos);
             setLoading(false);
 
