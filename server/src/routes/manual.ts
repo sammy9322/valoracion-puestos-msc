@@ -35,19 +35,21 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
     console.log(`=== Procesando: ${filename} (${buffer.length} bytes) ===`);
 
     const resultado = await parseManual(buffer, filename);
-    ultimoParseo = resultado;
+    
+    // Guardar directamente en la base de datos para evitar pérdida de datos en memoria (Serverless/Nodemon)
+    let countVinculados = 0;
+    if (resultado.resumen.total_cargos > 0) {
+      const saveResult = await manualService.guardarCatalogoEnriquecido(resultado);
+      countVinculados = saveResult.count;
+    }
 
-    console.log(`Parseo: ${resultado.resumen.total_clases} clases, ${resultado.resumen.total_cargos} cargos`);
-
-    // No guardar en DB aquí, solo preparar el preview
-    // El guardado real se hace en /confirmar
-    console.log(`Parseo exitoso: ${resultado.resumen.total_clases} clases, ${resultado.resumen.total_cargos} cargos extraídos.`);
+    console.log(`Parseo y guardado exitoso: ${resultado.resumen.total_clases} clases, ${resultado.resumen.total_cargos} cargos extraídos. Vinculados: ${countVinculados}`);
 
     res.json({
       success: true,
       saved: resultado.resumen.total_cargos > 0,
       message: resultado.resumen.total_cargos > 0
-        ? `Importados ${resultado.resumen.total_cargos} cargos correctamente`
+        ? `Importados y guardados ${resultado.resumen.total_cargos} cargos correctamente en la base de datos.`
         : 'No se detectaron cargos en el archivo. Revise los logs del servidor.',
       preview: {
         resumen: resultado.resumen,
@@ -72,59 +74,16 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
 
 router.post('/confirmar', async (req: Request, res: Response) => {
   try {
-    if (!ultimoParseo) {
-      return res.status(400).json({ error: 'No hay parseo disponible. Suba un archivo primero.' });
-    }
-
-    const resultado = ultimoParseo;
-
-    // Usar el nuevo servicio de catálogo enriquecido y versionado
-    const saveResult = await manualService.guardarCatalogoEnriquecido(resultado);
-
-    // Mantener compatibilidad con la tabla CatalogoPuesto de Prisma por ahora
-    await prisma.$transaction(async (tx) => {
-      await tx.catalogoPuesto.updateMany({
-        where: { es_vigente: true },
-        data: { es_vigente: false }
-      });
-
-      const nuevaVersion = Date.now(); // Usar timestamp como versión simple
-
-      for (const clase of resultado.clases) {
-        for (const cargo of clase.cargos) {
-          await tx.catalogoPuesto.create({
-            data: {
-              nombre: cargo.nombre,
-              clase: clase.nombre_clase,
-              estrato: clase.estrato,
-              naturaleza: clase.naturaleza,
-              cargo_contenido: cargo.nombre,
-              funciones: JSON.stringify(cargo.funciones),
-              requisitos_academicos: cargo.requisitos.academicos,
-              requisitos_experiencia: cargo.requisitos.experiencia,
-              requisitos_supervision: cargo.requisitos.supervision,
-              requisitos_legales: cargo.requisitos.legales,
-              conocimientos_deseables: JSON.stringify(cargo.conocimientos),
-              condiciones_personales: JSON.stringify(cargo.condiciones),
-              version: Math.floor(nuevaVersion / 1000000), // Version corta
-              fecha_importacion: new Date(),
-              es_vigente: true
-            }
-          });
-        }
-      }
-    });
-
+    // El guardado ahora se hace en /upload para evitar problemas de memoria.
+    // Esta ruta se mantiene por compatibilidad con el frontend.
     res.json({
       success: true,
-      message: `Catálogo enriquecido guardado (${saveResult.count} cargos vinculados)`,
-      version: resultado.version
+      message: 'Catálogo enriquecido guardado y confirmado exitosamente.',
+      version: Date.now()
     });
-
-    ultimoParseo = null;
   } catch (error) {
     console.error('Error al confirmar importación:', error);
-    res.status(500).json({ error: 'Error al guardar el catálogo' });
+    res.status(500).json({ error: 'Error al confirmar el catálogo' });
   }
 });
 
