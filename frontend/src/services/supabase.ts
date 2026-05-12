@@ -9,6 +9,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
 
+export const getCargosPuesto = async () => {
+  const { data, error } = await supabase.from('v_catalogo_puestos').select('*');
+  if (error) throw error;
+  return data;
+};
+
 export const getSubprocesos = async () => {
   const { data, error } = await supabase.from('subprocesos').select('*');
   if (error) throw error;

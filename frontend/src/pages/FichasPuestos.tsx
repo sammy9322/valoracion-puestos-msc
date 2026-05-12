@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Filter, MoreVertical, Briefcase, FileText, CheckCircle, Check, Clock, X, Trash2, Target, Loader2, BookOpen, Upload, AlertCircle } from 'lucide-react';
 import api from '../services/api';
-import { supabase, getDepartamentos, getCargoDetails, getDepartmentByCargo } from '../services/supabase';
+import { supabase, getDepartamentos, getCargoDetails, getDepartmentByCargo, getCargosPuesto } from '../services/supabase';
 
 const FichasPuestos: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'puestos' | 'manual'>('puestos');

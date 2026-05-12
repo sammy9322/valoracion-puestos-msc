@@ -46,8 +46,43 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
     let countVinculados = 0;
     try {
       if (resultado.resumen.total_cargos > 0) {
+        // 1. Guardar en el nuevo motor enriquecido (para FichasPuestos)
         const saveResult = await manualService.guardarCatalogoEnriquecido(resultado);
         countVinculados = saveResult.count;
+
+        // 2. Mantener compatibilidad con la tabla CatalogoPuesto (para el resto del sistema)
+        await prisma.$transaction(async (tx) => {
+          await tx.catalogoPuesto.updateMany({
+            where: { es_vigente: true },
+            data: { es_vigente: false }
+          });
+
+          const nuevaVersion = Date.now(); 
+
+          for (const clase of resultado.clases) {
+            for (const cargo of clase.cargos) {
+              await tx.catalogoPuesto.create({
+                data: {
+                  nombre: cargo.nombre,
+                  clase: clase.nombre_clase,
+                  estrato: clase.estrato,
+                  naturaleza: clase.naturaleza,
+                  cargo_contenido: cargo.nombre,
+                  funciones: JSON.stringify(cargo.funciones),
+                  requisitos_academicos: cargo.requisitos.academicos,
+                  requisitos_experiencia: cargo.requisitos.experiencia,
+                  requisitos_supervision: cargo.requisitos.supervision,
+                  requisitos_legales: cargo.requisitos.legales,
+                  conocimientos_deseables: JSON.stringify(cargo.conocimientos),
+                  condiciones_personales: JSON.stringify(cargo.condiciones),
+                  version: Math.floor(nuevaVersion / 1000000), 
+                  fecha_importacion: new Date(),
+                  es_vigente: true
+                }
+              });
+            }
+          }
+        });
       }
     } catch (dbError: any) {
       console.error('Error al guardar en base de datos:', dbError);
