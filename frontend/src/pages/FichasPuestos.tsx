@@ -215,11 +215,23 @@ const FichasPuestos: React.FC = () => {
                 try {
                     const details = await getCargoDetails(supabaseId);
                     if (details) {
-                        // Sobreescritura IMPERATIVA: No usamos || para evitar datos dañados del PDF
-                        baseData.funciones = (details.naturaleza + '\n\n' + details.funciones_detalladas).trim();
-                        baseData.educacion = details.requisitos_educacion || '';
-                        baseData.experiencia = details.requisitos_experiencia || '';
-                        baseData.estrato = details.estrato || '';
+                        // Sobreescritura INTELIGENTE: Prioriza Supabase pero mantiene PDF si Supabase está vacío
+                        const realFunciones = (details.naturaleza + '\n\n' + details.funciones_detalladas).trim();
+                        if (realFunciones) {
+                            baseData.funciones = realFunciones;
+                        }
+                        
+                        if (details.requisitos_educacion) {
+                            baseData.educacion = details.requisitos_educacion;
+                        }
+                        
+                        if (details.requisitos_experiencia) {
+                            baseData.experiencia = details.requisitos_experiencia;
+                        }
+
+                        if (details.estrato) {
+                            baseData.estrato = details.estrato;
+                        }
                     }
                 } catch (err) {
                     console.warn('Detalles de Supabase no disponibles para el vínculo:', supabaseId);

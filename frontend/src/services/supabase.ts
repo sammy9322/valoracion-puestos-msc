@@ -54,10 +54,23 @@ export const getCargoDetails = async (cargoId: string) => {
     .eq('nombre', cargo.clase)
     .single();
 
-  // Formatear funciones como texto con viñetas
+  // Limpiar el estrato (quitar prefijo "Estrato ")
+  const estratoLimpio = (cargo.estrato || '').replace(/^Estrato\s+/i, '').trim();
+
+  // Formatear funciones como texto con viñetas, FILTRANDO GLOSARIO
   let funcionesTexto = '';
   if (cargoDetalle?.funciones && Array.isArray(cargoDetalle.funciones)) {
-    funcionesTexto = cargoDetalle.funciones.map((f: string) => `• ${f}`).join('\n');
+    // Filtramos líneas que parecen definiciones de glosario (contienen // o son muy genéricas)
+    const funcionesReales = cargoDetalle.funciones.filter((f: string) => {
+      if (f.includes('//')) return false;
+      if (f.includes('Reglamento del Estatuto')) return false;
+      if (f.length < 10) return false;
+      return true;
+    });
+    
+    if (funcionesReales.length > 0) {
+      funcionesTexto = funcionesReales.map((f: string) => `• ${f}`).join('\n');
+    }
   }
 
   // Extraer requisitos del campo JSONB 'detalle'
@@ -66,6 +79,7 @@ export const getCargoDetails = async (cargoId: string) => {
 
   return {
     ...cargo,
+    estrato: estratoLimpio,
     funciones_detalladas: funcionesTexto,
     requisitos_educacion: requisitos.academicos || '',
     requisitos_experiencia: requisitos.experiencia_laboral || '',
