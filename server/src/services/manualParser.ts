@@ -24,6 +24,7 @@ export interface CargoParsed {
   cargo_id?: string | null;
   nombre_oficial?: string;
   vinculado?: boolean;
+  original_pdf_data?: any;
 }
 
 export interface ClaseParsed {
@@ -176,6 +177,7 @@ export async function parseManual(file: Buffer, filename: string): Promise<Manua
     const result = await mammoth.extractRawText({ buffer: file });
     text = result.value;
   } else throw new Error(`Formato no soportado: ${ext}. Use PDF o DOCX.`);
+  
   let officialCargos: any[] = [];
   try {
     const { data } = await supabase.from('v_catalogo_puestos').select('*');
@@ -186,16 +188,18 @@ export async function parseManual(file: Buffer, filename: string): Promise<Manua
 
   const manualResult = parseText(text, officialCargos);
 
-  // Cotejo con Supabase (ahora solo para vincular IDs si no se hizo en parseText)
+  // 1. Vinculación Heurística Inicial
   if (officialCargos.length > 0) {
       const clean = (s: any) => (s ? String(s) : '').toLowerCase().trim().replace(/\s+/g, ' ');
       
+      const linkedCargoNames: Set<string> = new Set();
+      const linkedClaseNames: Set<string> = new Set();
+
       manualResult.clases.forEach(clase => {
         clase.cargos.forEach(cargo => {
           const target = clean(cargo.nombre);
           const claseTarget = clean(clase.nombre_clase);
           
-          // Lógica Secuencial (Esteroides OpenCode): Extraer ID secuencial de la clase
           const seqMatch = claseTarget.match(/\d+/);
           const seqManual = seqMatch ? seqMatch[0] : null;
 
@@ -203,13 +207,10 @@ export async function parseManual(file: Buffer, filename: string): Promise<Manua
             const cargoMatch = clean(oc.cargo) === target || target.includes(clean(oc.cargo)) || clean(oc.cargo).includes(target);
             if (!cargoMatch) return false;
 
-            // Si hay coincidencia de cargo, validamos la clase mediante su ID secuencial
             if (seqManual && oc.clase) {
               const dbSeqMatch = clean(oc.clase).match(/\d+/);
               const dbSeq = dbSeqMatch ? dbSeqMatch[0] : null;
-              if (dbSeq && seqManual !== dbSeq) {
-                return false; // Es el mismo cargo, pero de diferente nivel (ej: Operativo 1 vs Operativo 2)
-              }
+              if (dbSeq && seqManual !== dbSeq) return false;
             }
             return true;
           });
@@ -218,11 +219,77 @@ export async function parseManual(file: Buffer, filename: string): Promise<Manua
             cargo.cargo_id = match.cargo_id;
             cargo.nombre_oficial = match.cargo;
             cargo.vinculado = true;
+            linkedCargoNames.add(match.cargo);
+            linkedClaseNames.add(match.clase);
           } else {
             cargo.vinculado = false;
           }
         });
       });
+
+      // 2. Enriquecimiento Oficial (Senior Architect / Database Architect)
+      // Extraemos los detalles técnicos directamente de Supabase para los vinculados
+      if (linkedCargoNames.size > 0) {
+        try {
+          console.log(`[Enriquecedor] Obteniendo detalles oficiales para ${linkedCargoNames.size} cargos...`);
+          
+          // Fetch masivo de funciones y requisitos
+          const [resCargos, resClases] = await Promise.all([
+            supabase.from('cargos_puesto').select('nombre, funciones').in('nombre', Array.from(linkedCargoNames)),
+            supabase.from('clases_puesto').select('nombre, naturaleza, estrato, detalle').in('nombre', Array.from(linkedClaseNames))
+          ]);
+
+          const mapCargos = new Map(resCargos.data?.map(c => [clean(c.nombre), c]) || []);
+          const mapClases = new Map(resClases.data?.map(c => [clean(c.nombre), c]) || []);
+
+          manualResult.clases.forEach(clase => {
+            const officialClase = mapClases.get(clean(clase.nombre_clase));
+            
+            clase.cargos.forEach(cargo => {
+              if (cargo.vinculado && cargo.nombre_oficial) {
+                const officialCargo = mapCargos.get(clean(cargo.nombre_oficial));
+                
+                // Backup de datos del PDF para Auditoría (Comparación futura)
+                cargo.original_pdf_data = {
+                  funciones: [...cargo.funciones],
+                  requisitos: { ...cargo.requisitos }
+                };
+
+                // Sustitución por Fuente de Verdad (Supabase)
+                if (officialCargo?.funciones) {
+                  cargo.funciones = Array.isArray(officialCargo.funciones) 
+                    ? officialCargo.funciones 
+                    : [officialCargo.funciones];
+                }
+
+                if (officialClase) {
+                  const det = officialClase.detalle || {};
+                  const req = det.requisitos_minimos || {};
+                  
+                  cargo.requisitos = {
+                    academicos: req.academicos || cargo.requisitos.academicos,
+                    experiencia: req.experiencia_laboral || cargo.requisitos.experiencia,
+                    supervision: req.experiencia_supervision || cargo.requisitos.supervision,
+                    legales: req.legales || cargo.requisitos.legales
+                  };
+
+                  cargo.conocimientos = det.conocimientos_deseables || [];
+                  cargo.condiciones = det.condiciones_personales || [];
+                  
+                  // Forzar Estrato desde Supabase (Punto 2 del requerimiento)
+                  if (officialClase.estrato) {
+                    (clase as any).estrato = officialClase.estrato;
+                  }
+                }
+              }
+            });
+          });
+          console.log('[Enriquecedor] Sincronización con Supabase completada con éxito.');
+        } catch (err) {
+          console.error('[Enriquecedor] Error crítico en sincronización masiva:', err);
+        }
+      }
+
       manualResult.resumen.vinculados = manualResult.clases.reduce((acc, c) => 
         acc + c.cargos.filter(ca => ca.vinculado).length, 0);
     }
@@ -284,14 +351,22 @@ function parseText(text: string, officialCargos: any[] = []): ManualParseResult 
     let nombresCargosRaw: string[] = [];
     
     cargosRaw.split(/\n/).forEach(l => {
-      let line = l.trim();
-      if (line.length > 2) {
-        if (!/^(acta|art[ií]culo|sesi[oó]n|página|manual)/i.test(line)) {
-          line = line.replace(/\([^)]+\)/g, '').trim();
-          line = line.replace(/^[-•*]\s*/, '').trim();
-          if (line.length > 2 && line.length < 80 && !/^(Actividades|Funciones|Requisitos|Naturaleza)/i.test(line)) {
-             if (!nombresCargosRaw.includes(line)) nombresCargosRaw.push(line);
-          }
+      let line = l.trim().replace(/\s+/g, ' ');
+      
+      // FILTRO ANTI-RUIDO: Eliminar basura administrativa del PDF
+      const esBasura = 
+        line.length < 3 || 
+        line.length > 90 ||
+        /acta|art[ií]culo|sesi[oó]n|p[aá]gina|manual|acuerdo|N[º°\.]|fecha|\d{1,2}\s+de\s+(?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)/i.test(line) ||
+        /\d{4}\)/.test(line) || // Ej: "2012)"
+        /^\d+\)?$/.test(line) || // Ej: "54)"
+        /^[\d\.\s\-\,]+$/.test(line);
+
+      if (!esBasura) {
+        line = line.replace(/\([^)]+\)/g, '').trim(); // Eliminar paréntesis (notas)
+        line = line.replace(/^[-•*]\s*/, '').trim(); // Eliminar viñetas
+        if (line.length > 2 && !/^(Actividades|Funciones|Requisitos|Naturaleza)/i.test(line)) {
+           if (!nombresCargosRaw.includes(line)) nombresCargosRaw.push(line);
         }
       }
     });

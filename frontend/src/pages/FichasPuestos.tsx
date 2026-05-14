@@ -208,28 +208,31 @@ const FichasPuestos: React.FC = () => {
                 estrato: selectedItem.estrato || ''
             };
 
-            // Si es de Supabase, enriquecer con detalles técnicos si están disponibles
-            if (selectedItem.fuente === 'supabase') {
+            // Enriquecer obligatoriamente con Supabase si está vinculado (Punto 1 y 2 del requerimiento)
+            const supabaseId = selectedItem.fuente === 'supabase' ? selectedItem.id : selectedItem.cargo_id;
+            
+            if (supabaseId) {
                 try {
-                    const details = await getCargoDetails(selectedItem.id); // Corregido: pasar ID
+                    const details = await getCargoDetails(supabaseId);
                     if (details) {
-                        baseData.funciones = baseData.funciones || (details.naturaleza + '\n\n' + details.funciones_detalladas).trim();
-                        baseData.educacion = baseData.educacion || details.requisitos_educacion;
-                        baseData.experiencia = baseData.experiencia || details.requisitos_experiencia;
-                        baseData.estrato = baseData.estrato || details.estrato;
+                        // Sobreescritura IMPERATIVA: No usamos || para evitar datos dañados del PDF
+                        baseData.funciones = (details.naturaleza + '\n\n' + details.funciones_detalladas).trim();
+                        baseData.educacion = details.requisitos_educacion || '';
+                        baseData.experiencia = details.requisitos_experiencia || '';
+                        baseData.estrato = details.estrato || '';
                     }
                 } catch (err) {
-                    console.warn('Detalles de Supabase no encontrados, usando datos base');
-                }
-                
-                // Mapeo de departamento automático
-                const deptCode = await getDepartmentByCargo(selectedItem.cargo);
-                if (deptCode) {
-                    const dept = allDepartments.find(d => d.codigo === deptCode);
-                    if (dept) baseData.area = dept.nombre;
+                    console.warn('Detalles de Supabase no disponibles para el vínculo:', supabaseId);
                 }
             }
 
+            // Mapeo de departamento automático
+            const deptCode = await getDepartmentByCargo(selectedItem.cargo);
+            if (deptCode) {
+                const dept = allDepartments.find(d => d.codigo === deptCode);
+                if (dept) baseData.area = dept.nombre;
+            }
+            
             setFormData({
                 ...formData,
                 nombre: baseData.nombre,

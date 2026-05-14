@@ -225,6 +225,7 @@ model ManualEnriquecido {
   estrato               String?
   version_label         String?
   fecha_vinculacion     DateTime @default(now())
+  original_pdf_data     Json?    
 
   @@index([cargo_id])
 }

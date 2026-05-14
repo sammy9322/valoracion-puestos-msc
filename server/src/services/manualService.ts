@@ -51,7 +51,8 @@ export const manualService = {
         area_sugerida: p.area || '',
         clase_manual: p.clase,
         estrato: p.estrato,
-        version_label: versionLabel
+        version_label: versionLabel,
+        original_pdf_data: p.original_pdf_data || null
       }));
 
       // Inserción masiva en SQLite
