@@ -12,6 +12,7 @@ const FichasPuestos: React.FC = () => {
     const [manualPositions, setManualPositions] = useState<any[]>([]);
     const [allDepartments, setAllDepartments] = useState<any[]>([]);
     const [isMapping, setIsMapping] = useState(false);
+    const [puestoToDelete, setPuestoToDelete] = useState<string | null>(null);
     
     // Manual import state
     const [manualFile, setManualFile] = useState<File | null>(null);
@@ -221,13 +222,21 @@ const FichasPuestos: React.FC = () => {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        if (!window.confirm('¿Está seguro de eliminar esta ficha? Se realizará un borrado lógico auditable.')) return;
+    const handleDelete = (id: string) => {
+        setPuestoToDelete(id);
+    };
+
+    const executeDelete = async () => {
+        if (!puestoToDelete) return;
         try {
-            await api.delete(`/puestos/${id}`);
+            await api.delete(`/puestos/${puestoToDelete}`);
+            setPuestoToDelete(null);
             fetchPuestos();
-        } catch (error) {
-            alert('Error al eliminar');
+        } catch (error: any) {
+            const errorMsg = error.response?.data?.error || error.message || 'Error desconocido';
+            console.error('Error detallado al eliminar:', error.response?.data || error);
+            alert(`Error al eliminar: ${errorMsg}`);
+            setPuestoToDelete(null);
         }
     };
 
@@ -493,8 +502,13 @@ const FichasPuestos: React.FC = () => {
                                 </div>
                                 <div className="flex gap-1">
                                     <button 
-                                        onClick={() => handleDelete(puesto.id)}
-                                        className="text-slate-300 hover:text-destructive p-2 rounded-lg transition-colors"
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            handleDelete(puesto.id);
+                                        }}
+                                        className="text-slate-300 hover:text-destructive p-2 rounded-lg transition-colors relative z-20 cursor-pointer"
                                         title="Eliminar Puesto"
                                     >
                                         <Trash2 size={16} />
@@ -583,8 +597,19 @@ const FichasPuestos: React.FC = () => {
                                 </div>
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-bold uppercase text-muted-foreground">Área / Departamento</label>
-                                    <input required className="w-full bg-slate-50 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20" 
-                                        value={formData.area} onChange={e => setFormData({...formData, area: e.target.value})} />
+                                    <select 
+                                        required 
+                                        className="w-full bg-slate-50 border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 appearance-none" 
+                                        value={formData.area} 
+                                        onChange={e => setFormData({...formData, area: e.target.value})}
+                                    >
+                                        <option value="">-- Seleccione un área --</option>
+                                        {allDepartments.map((dept: any) => (
+                                            <option key={dept.codigo} value={dept.nombre}>
+                                                {dept.codigo} - {dept.nombre}
+                                            </option>
+                                        ))}
+                                    </select>
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
@@ -637,6 +662,34 @@ const FichasPuestos: React.FC = () => {
                 </div>
             )}
 
+            {/* Modal de Confirmación de Borrado */}
+            {puestoToDelete && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-background border rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200 p-6 text-center">
+                        <div className="w-16 h-16 bg-red-100 text-red-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <AlertCircle size={32} />
+                        </div>
+                        <h3 className="text-xl font-bold mb-2">¿Eliminar Ficha?</h3>
+                        <p className="text-sm text-muted-foreground mb-6">
+                            Esta acción realizará un borrado lógico auditable de la ficha seleccionada. ¿Está seguro de proceder?
+                        </p>
+                        <div className="flex gap-3">
+                            <button 
+                                onClick={() => setPuestoToDelete(null)}
+                                className="flex-1 px-4 py-2 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-lg font-medium transition-colors"
+                            >
+                                Cancelar
+                            </button>
+                            <button 
+                                onClick={executeDelete}
+                                className="flex-1 px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors"
+                            >
+                                Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
