@@ -40,18 +40,18 @@ export const getCargoDetails = async (cargoId: string) => {
     throw cargoError || new Error('Cargo no encontrado');
   }
 
-  // Buscar funciones específicas del cargo
+  // Buscar funciones específicas del cargo usando el ID (clave primaria) para evitar fallos por nombres duplicados
   const { data: cargoDetalle } = await supabase
     .from('cargos_puesto')
     .select('*')
-    .eq('nombre', cargo.cargo)
+    .eq('id', cargo.cargo_id)
     .single();
 
-  // Buscar detalle de la clase (naturaleza + requisitos)
+  // Buscar detalle de la clase (naturaleza + requisitos) usando el ID
   const { data: claseDetalle } = await supabase
     .from('clases_puesto')
     .select('*')
-    .eq('nombre', cargo.clase)
+    .eq('id', cargo.clase_id)
     .single();
 
   // Limpiar el estrato y añadir el grado (orden_clase)
