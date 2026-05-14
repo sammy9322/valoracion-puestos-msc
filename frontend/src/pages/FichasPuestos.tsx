@@ -117,16 +117,6 @@ const FichasPuestos: React.FC = () => {
                 .select('*')
                 .order('cargo', { ascending: true });
 
-            // 2. Obtener puestos del PDF Local (Enriquecimiento)
-            let localPositions: any[] = [];
-            try {
-                const res = await api.get('/manual/vigente');
-                localPositions = res.data?.catalogo || [];
-            } catch (err) {
-                console.warn('Manual local no disponible');
-            }
-
-            // 3. Motor de Vinculación del Catálogo: Unir fuentes evitando duplicados
             const merged: any[] = (supabasePositions || []).map((p: any) => ({
                 id: p.cargo_id.toString(),
                 cargo: p.cargo,
@@ -135,36 +125,6 @@ const FichasPuestos: React.FC = () => {
                 vinculado: true,
                 nombre_oficial: p.cargo
             }));
-
-            localPositions.forEach((lp: any) => {
-                const exists = merged.find(m => 
-                    (lp.cargo_id && m.id === lp.cargo_id.toString()) || 
-                    (lp.nombre_oficial && m.cargo.toLowerCase().trim() === lp.nombre_oficial.toLowerCase().trim()) ||
-                    (m.cargo.toLowerCase().trim() === lp.nombre_pdf?.toLowerCase().trim())
-                );
-                if (exists) {
-                    // Enriquecer registro de Supabase con datos frescos del PDF
-                    exists.funciones = Array.isArray(lp.funciones) ? lp.funciones.map((f: string) => `• ${f}`).join('\n') : lp.funciones;
-                    exists.requisitos_academicos = lp.requisitos_academicos;
-                    exists.requisitos_experiencia = lp.requisitos_experiencia;
-                    exists.estrato = lp.estrato;
-                    exists.area = lp.area_sugerida;
-                } else {
-                    // Si no existe en Supabase, agregarlo como nuevo desde el PDF
-                    merged.push({
-                        id: lp.id || `local-${Math.random()}`,
-                        cargo: lp.nombre_pdf || lp.nombre_oficial,
-                        clase: lp.clase_manual || lp.clase,
-                        fuente: 'local',
-                        vinculado: false,
-                        funciones: Array.isArray(lp.funciones) ? lp.funciones.map((f: string) => `• ${f}`).join('\n') : lp.funciones,
-                        requisitos_academicos: lp.requisitos_academicos,
-                        requisitos_experiencia: lp.requisitos_experiencia,
-                        estrato: lp.estrato,
-                        area: lp.area_sugerida
-                    });
-                }
-            });
 
             // Ordenar alfabéticamente
             merged.sort((a, b) => (a.cargo || '').localeCompare(b.cargo || '', 'es'));
@@ -202,46 +162,30 @@ const FichasPuestos: React.FC = () => {
             let baseData = {
                 nombre: selectedItem.cargo,
                 area: selectedItem.area || '',
-                funciones: Array.isArray(selectedItem.funciones) ? selectedItem.funciones.map((f:string) => `• ${f}`).join('\n') : (selectedItem.funciones || ''),
-                educacion: selectedItem.requisitos_academicos || '',
-                experiencia: selectedItem.requisitos_experiencia || '',
-                estrato: selectedItem.estrato || ''
+                funciones: '',
+                educacion: '',
+                experiencia: '',
+                estrato: ''
             };
 
-            // Enriquecer obligatoriamente con Supabase si está vinculado (Punto 1 y 2 del requerimiento)
-            const supabaseId = selectedItem.fuente === 'supabase' ? selectedItem.id : selectedItem.cargo_id;
+            // Extraer 100% desde Supabase
+            const supabaseId = selectedItem.id;
             
             if (supabaseId) {
                 try {
                     const details = await getCargoDetails(supabaseId);
                     if (details) {
-                        // Construir descripción combinada
                         const partes = [];
                         if (details.naturaleza) partes.push(details.naturaleza);
                         if (details.funciones_detalladas) partes.push(details.funciones_detalladas);
                         
-                        const mergedFunciones = partes.join('\n\n').trim();
-
-                        // Sobreescritura INTELIGENTE: Si Supabase tiene datos reales, los usamos.
-                        // Si no (porque los filtramos por basura), mantenemos lo que vino del Manual MSC (PDF).
-                        if (mergedFunciones) {
-                            baseData.funciones = mergedFunciones;
-                        }
-                        
-                        if (details.requisitos_educacion) {
-                            baseData.educacion = details.requisitos_educacion;
-                        }
-                        
-                        if (details.requisitos_experiencia) {
-                            baseData.experiencia = details.requisitos_experiencia;
-                        }
-
-                        if (details.estrato) {
-                            baseData.estrato = details.estrato;
-                        }
+                        baseData.funciones = partes.join('\n\n').trim();
+                        baseData.educacion = details.requisitos_educacion || '';
+                        baseData.experiencia = details.requisitos_experiencia || '';
+                        baseData.estrato = details.estrato || '';
                     }
                 } catch (err) {
-                    console.warn('Detalles de Supabase no disponibles para el vínculo:', supabaseId);
+                    console.warn('Detalles de Supabase no disponibles para:', supabaseId);
                 }
             }
 

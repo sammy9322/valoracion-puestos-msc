@@ -60,25 +60,10 @@ export const getCargoDetails = async (cargoId: string) => {
   const grado = cargo.orden_clase || '';
   const estratoCompleto = grado ? `${estratoBase} ${grado}` : estratoBase;
 
-  // Formatear funciones como texto con viñetas, FILTRANDO GLOSARIO Y CARGOS
+  // Formatear funciones como texto con viñetas
   let funcionesTexto = '';
   if (cargoDetalle?.funciones && Array.isArray(cargoDetalle.funciones)) {
-    // Filtramos líneas que parecen definiciones de glosario o simplemente nombres de cargos
-    const funcionesReales = cargoDetalle.funciones.filter((f: string) => {
-      const limpio = f.trim();
-      if (limpio.includes('//')) return false;
-      if (limpio.includes('Reglamento del Estatuto')) return false;
-      if (limpio.toLowerCase().includes('actividades generales por cargo')) return false;
-      // Si la línea es idéntica a un nombre de cargo (basura común en este dataset)
-      if (limpio.length < 10) return false;
-      // Filtro heurístico: si no empieza con un verbo de acción o es muy descriptivo legalmente
-      if (limpio.startsWith('Nombre con el que se conoce')) return false;
-      return true;
-    });
-    
-    if (funcionesReales.length > 0) {
-      funcionesTexto = funcionesReales.map((f: string) => `• ${f}`).join('\n');
-    }
+    funcionesTexto = cargoDetalle.funciones.map((f: string) => `• ${f}`).join('\n');
   }
 
   // Extraer requisitos del campo JSONB 'detalle'
