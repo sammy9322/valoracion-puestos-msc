@@ -215,10 +215,17 @@ const FichasPuestos: React.FC = () => {
                 try {
                     const details = await getCargoDetails(supabaseId);
                     if (details) {
-                        // Sobreescritura INTELIGENTE: Prioriza Supabase pero mantiene PDF si Supabase está vacío
-                        const realFunciones = (details.naturaleza + '\n\n' + details.funciones_detalladas).trim();
-                        if (realFunciones) {
-                            baseData.funciones = realFunciones;
+                        // Construir descripción combinada
+                        const partes = [];
+                        if (details.naturaleza) partes.push(details.naturaleza);
+                        if (details.funciones_detalladas) partes.push(details.funciones_detalladas);
+                        
+                        const mergedFunciones = partes.join('\n\n').trim();
+
+                        // Sobreescritura INTELIGENTE: Si Supabase tiene datos reales, los usamos.
+                        // Si no (porque los filtramos por basura), mantenemos lo que vino del Manual MSC (PDF).
+                        if (mergedFunciones) {
+                            baseData.funciones = mergedFunciones;
                         }
                         
                         if (details.requisitos_educacion) {

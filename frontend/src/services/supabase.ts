@@ -54,17 +54,25 @@ export const getCargoDetails = async (cargoId: string) => {
     .eq('nombre', cargo.clase)
     .single();
 
-  // Limpiar el estrato (quitar prefijo "Estrato ")
-  const estratoLimpio = (cargo.estrato || '').replace(/^Estrato\s+/i, '').trim();
+  // Limpiar el estrato y añadir el grado (orden_clase)
+  const estratoBase = (cargo.estrato || '').replace(/^Estrato\s+/i, '').trim();
+  // El grado viene de orden_clase (ej: Técnico 1, Profesional 4)
+  const grado = cargo.orden_clase || '';
+  const estratoCompleto = grado ? `${estratoBase} ${grado}` : estratoBase;
 
-  // Formatear funciones como texto con viñetas, FILTRANDO GLOSARIO
+  // Formatear funciones como texto con viñetas, FILTRANDO GLOSARIO Y CARGOS
   let funcionesTexto = '';
   if (cargoDetalle?.funciones && Array.isArray(cargoDetalle.funciones)) {
-    // Filtramos líneas que parecen definiciones de glosario (contienen // o son muy genéricas)
+    // Filtramos líneas que parecen definiciones de glosario o simplemente nombres de cargos
     const funcionesReales = cargoDetalle.funciones.filter((f: string) => {
-      if (f.includes('//')) return false;
-      if (f.includes('Reglamento del Estatuto')) return false;
-      if (f.length < 10) return false;
+      const limpio = f.trim();
+      if (limpio.includes('//')) return false;
+      if (limpio.includes('Reglamento del Estatuto')) return false;
+      if (limpio.toLowerCase().includes('actividades generales por cargo')) return false;
+      // Si la línea es idéntica a un nombre de cargo (basura común en este dataset)
+      if (limpio.length < 10) return false;
+      // Filtro heurístico: si no empieza con un verbo de acción o es muy descriptivo legalmente
+      if (limpio.startsWith('Nombre con el que se conoce')) return false;
       return true;
     });
     
@@ -79,11 +87,11 @@ export const getCargoDetails = async (cargoId: string) => {
 
   return {
     ...cargo,
-    estrato: estratoLimpio,
+    estrato: estratoCompleto,
     funciones_detalladas: funcionesTexto,
     requisitos_educacion: requisitos.academicos || '',
     requisitos_experiencia: requisitos.experiencia_laboral || '',
-    naturaleza: claseDetalle?.naturaleza || '',
+    naturaleza: (claseDetalle?.naturaleza || '').trim(),
   };
 };
 
