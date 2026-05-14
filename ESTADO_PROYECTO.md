@@ -1,29 +1,30 @@
 # Estado del Proyecto: Valoración de Puestos MSC
-**Última actualización:** 6 de mayo de 2026 (Sesión Nocturna)
+**Última actualización:** 14 de mayo de 2024 (Sesión: Saneamiento y Enriquecimiento Supabase)
 
-## 1. Resumen de la Intervención Reciente (Módulo de Evaluación Listo)
-Se ha completado la integración del **Módulo de Evaluación de Factores**. El sistema ahora permite evaluar puestos de manera asistida, con información contextual del manual visible en tiempo real y auditoría completa en el backend.
+## 1. Resumen de la Intervención Reciente (Soberanía de Datos Supabase)
+Se ha completado la transición hacia **Supabase como Fuente de Verdad Única**. El motor de importación ahora prioriza la información institucional oficial sobre el parseo del PDF, garantizando limpieza y validez legal.
 
 ## 2. Cambios Técnicos Realizados y Validados
-*   **Mapeo Inteligente (Refinado):** 
-    *   Se ampliaron las heurísticas en `supabase.ts` para detectar roles como Operadores, Inspectores y Gestores Sociales.
-    *   Mejorada la precisión para evitar falsos positivos en departamentos genéricos.
-*   **Asistente de Valoración (Enriquecido):**
-    *   **Panel de Referencia:** El `WizardEvaluacion.tsx` ahora muestra las funciones y requisitos oficiales al seleccionar un puesto.
-    *   **Guía de Grados:** Cada factor (1-5) incluye ahora descripciones de los grados basadas en la metodología MSC/MTSS.
-    *   **Pre-selección:** Soporte para parámetros de URL (`?puesto_id=...`) permitiendo saltar directamente de la ficha a la evaluación.
-*   **Integración y Flujo:**
-    *   Se añadió el botón **"Evaluar"** directamente en las tarjetas de la lista de puestos.
-    *   Se implementó el endpoint `GET /puestos/:id` para alimentar el asistente.
-*   **Seguridad y Auditoría:**
-    *   El backend ahora recalcula y valida los puntos totales.
-    *   Cada evaluación genera un registro automático en la tabla de **Auditoría**, vinculando al usuario y los datos creados.
+*   **Motor de Enriquecimiento Oficial (Backend):**
+    *   Sincronización masiva automática entre el PDF y Supabase mediante `cargo_id`.
+    *   Sustitución de funciones y requisitos "sucios" por datos oficiales de la base de datos.
+    *   Implementación de un **Filtro Anti-Ruido** que eliminó 30 registros basura (actas, fechas, acuerdos).
+*   **Interfaz de Fichas (Frontend):**
+    *   **Sobreescritura Imperativa:** El sistema ahora borra datos del PDF y fuerza el uso de Supabase al seleccionar puestos vinculados.
+    *   Eliminada la ambigüedad de datos mezclados en la creación de puestos.
+*   **Persistencia y Auditoría:**
+    *   Nuevo campo `original_pdf_data` en Prisma para conservar el historial del PDF sin afectar la operación.
+    *   Despliegue exitoso a **Producción (GitHub/Vercel)** con el catálogo saneado.
 
 ## 3. Estado de la Infraestructura
-*   **Frontend:** Interfaz de evaluación 100% operativa y conectada.
-*   **Backend:** Endpoints de evaluación y puestos estabilizados.
-*   **Datos:** 726 cargos disponibles para evaluación.
+*   **Catálogo Saneado:** 124 cargos reales disponibles (limpios de ruido administrativo).
+*   **Vinculación:** 91% de éxito en el mapeo automático a Supabase.
+*   **Base de Datos:** Migración Prisma aplicada y estable en Neon.
 
-## 4. Próximos Pasos (Mañana)
-*   **Pruebas de Campo:** Realizar la evaluación real de los primeros 5 puestos clave para validar el puntaje final.
-*   **Módulo de Cálculo de Valor de Punto (VP):** Iniciar la lógica para transformar puntos en propuestas salariales.
+## 4. Próximos Pasos (Checkpoint Mañana)
+*   **Validación de Puestos Clave:** Realizar la evaluación de los 11 puestos no vinculados para completar el 100% del catálogo.
+*   **Módulo de Cálculo de Valor de Punto (VP):** Iniciar la lógica para transformar puntos en propuestas salariales basándose en los datos limpios.
+*   **Interfaz de Comparación:** (Opcional) Crear una vista de auditoría para comparar PDF vs Supabase si se detectan cambios de manual.
+
+---
+**Check Point:** Todo el sistema está en producción y la base de datos está purgada de ruido administrativo.

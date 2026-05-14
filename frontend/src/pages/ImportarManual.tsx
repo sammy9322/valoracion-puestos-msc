@@ -17,11 +17,7 @@ interface ClasePreview {
 const ImportarManual: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [preview, setPreview] = useState<{
-    resumen: ResumenPreview;
-    clases_preview: ClasePreview[];
-    version: number;
-  } | null>(null);
+  const [preview, setPreview] = useState<any | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
   const [catalogoVigente, setCatalogoVigente] = useState<any>(null);
