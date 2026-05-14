@@ -578,7 +578,7 @@ const FichasPuestos: React.FC = () => {
                                         <option value="">-- Buscar puesto en el catálogo oficial --</option>
                                         {manualPositions.map((p: any) => (
                                             <option key={p.id} value={p.id}>
-                                                {p.vinculado ? '✅' : '📝'} {p.cargo} {p.vinculado ? `(${p.nombre_oficial})` : ''}
+                                                {p.cargo}
                                             </option>
                                         ))}
                                     </select>
