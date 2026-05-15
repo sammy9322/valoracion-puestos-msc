@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Search, Filter, MoreVertical, Briefcase, FileText, CheckCircle, Check, Clock, X, Trash2, Target, Loader2, BookOpen, Upload, AlertCircle } from 'lucide-react';
 import api from '../services/api';
 import { supabase, getDepartamentos, getCargoDetails, getCargosPuesto } from '../services/supabase';
+import { EXCLUDED_POSITIONS } from '../config/anomalies';
 
 const FichasPuestos: React.FC = () => {
     const [activeTab, setActiveTab] = useState<'puestos' | 'manual'>('puestos');
@@ -13,6 +14,7 @@ const FichasPuestos: React.FC = () => {
     const [allDepartments, setAllDepartments] = useState<any[]>([]);
     const [isMapping, setIsMapping] = useState(false);
     const [puestoToDelete, setPuestoToDelete] = useState<string | null>(null);
+    const [showAnomaliesModal, setShowAnomaliesModal] = useState(false);
     
     // Manual import state
     const [manualFile, setManualFile] = useState<File | null>(null);
@@ -118,19 +120,23 @@ const FichasPuestos: React.FC = () => {
                 .select('*')
                 .order('cargo', { ascending: true });
 
-            const merged: any[] = (supabasePositions || []).map((p: any) => ({
-                id: p.cargo_id.toString(),
-                cargo: p.cargo,
-                clase: p.clase,
-                fuente: 'supabase',
-                vinculado: true,
-                nombre_oficial: p.cargo
-            }));
+            const excludedIds = EXCLUDED_POSITIONS.map(p => p.id);
+
+            const merged: any[] = (supabasePositions || [])
+                .map((p: any) => ({
+                    id: p.cargo_id.toString(),
+                    cargo: p.cargo,
+                    clase: p.clase,
+                    fuente: 'supabase',
+                    vinculado: true,
+                    nombre_oficial: p.cargo
+                }))
+                .filter((p: any) => !excludedIds.includes(p.id));
 
             // Ordenar alfabéticamente
             merged.sort((a, b) => (a.cargo || '').localeCompare(b.cargo || '', 'es'));
             
-            console.log(`Catálogo vinculado: ${merged.length} puestos totales`);
+            console.log(`Catálogo vinculado: ${merged.length} puestos totales. (Excluidos: ${excludedIds.length})`);
             setManualPositions(merged);
 
             // Cargar departamentos para el mapeo
@@ -568,7 +574,18 @@ const FichasPuestos: React.FC = () => {
                         </div>
                         <form onSubmit={handleCreate} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                             <div className="bg-primary/5 p-4 rounded-xl border border-primary/10 mb-4">
-                                <label className="text-[10px] font-bold uppercase text-primary block mb-2">Seleccionar del Manual Institucional</label>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-[10px] font-bold uppercase text-primary block">Seleccionar del Manual Institucional</label>
+                                    {EXCLUDED_POSITIONS.length > 0 && (
+                                        <button 
+                                            type="button"
+                                            onClick={() => setShowAnomaliesModal(true)}
+                                            className="text-[10px] font-bold text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full hover:bg-amber-200 transition-colors flex items-center gap-1"
+                                        >
+                                            <AlertCircle size={10} /> Ver Anomalías ({EXCLUDED_POSITIONS.length})
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="relative">
                                     <select 
                                         className="w-full bg-background border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 appearance-none"
@@ -685,6 +702,45 @@ const FichasPuestos: React.FC = () => {
                                 className="flex-1 px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors"
                             >
                                 Eliminar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de Registro de Anomalías */}
+            {showAnomaliesModal && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-background border rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="flex items-center justify-between p-6 border-b bg-amber-50/50">
+                            <div className="flex items-center gap-2 text-amber-700">
+                                <AlertCircle size={20} />
+                                <h2 className="text-lg font-bold">Registro de Cuarentena (Anomalías)</h2>
+                            </div>
+                            <button onClick={() => setShowAnomaliesModal(false)} className="text-muted-foreground hover:text-foreground">
+                                <X size={20} />
+                            </button>
+                        </div>
+                        <div className="p-6 max-h-[60vh] overflow-y-auto space-y-4">
+                            <p className="text-sm text-slate-600 mb-4">
+                                Los siguientes puestos han sido excluidos automáticamente del catálogo para proteger la integridad de los datos, ya que presentan anomalías en la base de datos externa.
+                            </p>
+                            {EXCLUDED_POSITIONS.map(pos => (
+                                <div key={pos.id} className="bg-slate-50 border rounded-xl p-4">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <h4 className="font-bold text-slate-800">{pos.nombre}</h4>
+                                        <span className="text-[10px] font-bold bg-slate-200 text-slate-600 px-2 py-0.5 rounded-full">ID: {pos.id}</span>
+                                    </div>
+                                    <p className="text-xs font-semibold text-slate-500 mb-2">Clase: {pos.clase}</p>
+                                    <div className="bg-amber-100/50 text-amber-800 text-xs p-3 rounded-lg border border-amber-200">
+                                        <strong>Razón:</strong> {pos.razon}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <div className="p-4 border-t bg-slate-50 flex justify-end">
+                            <button onClick={() => setShowAnomaliesModal(false)} className="px-6 py-2 bg-slate-200 text-slate-700 hover:bg-slate-300 rounded-lg text-sm font-bold transition-colors">
+                                Entendido
                             </button>
                         </div>
                     </div>
