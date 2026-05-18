@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Build: v2 — forzar rebuild de serverless function
+// Build: v3 — motor rule-based multidimensional
 
 import express from 'express';
 import cors from 'cors';

@@ -83,58 +83,7 @@ const FACTOR_NAMES: Record<string, string> = {
   requisitos: 'Requisitos'
 };
 
-// ─── Rule-based evaluation engine ───────────────────────────
-
-interface RuleKeyword {
-  words: string[];
-  score: number;
-}
-
-const RULES: Record<string, RuleKeyword[]> = {
-  dificultad: [
-    { words: ['barrer', 'limpiar', 'cargar', 'archivar', 'repetitivo', 'simple', 'manual'], score: 1 },
-    { words: ['operativo', 'estandarizado', 'asistir', 'apoyar', 'tramitar', 'recibir', 'enviar'], score: 2 },
-    { words: ['analizar', 'evaluar', 'resolver', 'técnico', 'diagnosticar', 'coordinar', 'preparar'], score: 3 },
-    { words: ['planear', 'planificar', 'diseñar', 'implementar', 'proyecto', 'programa', 'departamento'], score: 4 },
-    { words: ['estratégico', 'dirección', 'política', 'directriz', 'alcaldía', 'institución', 'rector'], score: 5 },
-  ],
-  supervision: [
-    { words: ['no supervisa', 'sin personal', 'individual'], score: 1 },
-    { words: ['supervisión ocasional', 'apoya en supervisión'], score: 2 },
-    { words: ['supervisa', 'coordina equipo', 'grupo de trabajo', 'encargado'], score: 3 },
-    { words: ['jefe', 'jefatura', 'unidad', 'departamento', 'dirige personal'], score: 4 },
-    { words: ['dirección', 'gerencia', 'subdirección', 'área', 'director'], score: 5 },
-  ],
-  responsabilidad: [
-    { words: ['baja responsabilidad', 'sin valores', 'herramientas básicas'], score: 1 },
-    { words: ['materiales', 'equipo menor', 'herramientas'], score: 2 },
-    { words: ['información sensible', 'confidencial', 'datos', 'fondos fijos', 'custodia'], score: 3 },
-    { words: ['presupuesto', 'activos', 'valores', 'fondos', 'contratación'], score: 4 },
-    { words: ['gestión total', 'proceso clave', 'patrimonio', 'institucional', 'estratégico'], score: 5 },
-  ],
-  condiciones: [
-    { words: ['oficina', 'ambiente normal', 'escritorio', 'administrativo'], score: 1 },
-    { words: ['esfuerzo físico moderado', 'ambiente incómodo', 'bipedestación'], score: 2 },
-    { words: ['intemperie', 'clima', 'ruido', 'calor', 'vía pública', 'campo'], score: 3 },
-    { words: ['riesgo', 'accidente', 'químicos', 'altura', 'maquinaria'], score: 4 },
-    { words: ['alta peligrosidad', 'insalubridad', 'tóxico', 'peligro constante'], score: 5 },
-  ],
-  error: [
-    { words: ['error fácil', 'fácil de detectar', 'corregir', 'sin impacto'], score: 1 },
-    { words: ['retraso', 'demora', 'menor', 'interno'], score: 2 },
-    { words: ['afecta', 'servicio', 'departamento', 'cliente', 'usuario'], score: 3 },
-    { words: ['pérdida económica', 'legal', 'multa', 'sanción', 'significativo'], score: 4 },
-    { words: ['estabilidad', 'seguridad pública', 'institucional', 'crítico', 'nacional'], score: 5 },
-  ],
-};
-
-const REQUISITOS_RULES: { words: string[]; score: number }[] = [
-  { words: ['primaria', 'básica', 'alfabeto'], score: 1 },
-  { words: ['bachillerato', 'media', 'secundaria', 'técnico básico'], score: 2 },
-  { words: ['diplomado', 'técnico superior', 'parauniversitario'], score: 3 },
-  { words: ['licenciatura', 'universitario', 'bachillerato universitario', 'profesional'], score: 4 },
-  { words: ['maestría', 'master', 'magíster', 'especialización', 'doctorado', 'phd'], score: 5 },
-];
+// ─── Rule-based evaluation engine (multi-dimensional) ───────
 
 function normalizeText(text: string): string {
   return (text || '')
@@ -145,79 +94,301 @@ function normalizeText(text: string): string {
     .trim();
 }
 
-function scoreFromText(text: string, rules: RuleKeyword[]): { score: number; keywords: string[] } {
-  const normalized = normalizeText(text);
-  let maxScore = 1;
-  const matched: string[] = [];
+/** Tokenize text into sentences for structural analysis */
+function getSentences(text: string): string[] {
+  return (text || '')
+    .split(/[.!;\n]+/)
+    .map(s => s.trim())
+    .filter(s => s.length > 10);
+}
 
-  for (const rule of rules) {
-    for (const word of rule.words) {
-      if (normalized.includes(word)) {
-        if (rule.score > maxScore) maxScore = rule.score;
-        matched.push(word);
+/** Categorize verbs by complexity level */
+const VERB_LEVELS: Record<number, string[]> = {
+  1: ['barrer', 'limpiar', 'cargar', 'archivar', 'ordenar', 'etiquetar', 'copiar', 'escane', 'fotocopiar', 'doblar', 'empacar'],
+  2: ['operar', 'asistir', 'apoyar', 'tramitar', 'recibir', 'enviar', 'registrar', 'actualizar', 'ingresar', 'transcribir', 'atender', 'levantar', 'llenar'],
+  3: ['analizar', 'evaluar', 'resolver', 'diagnosticar', 'coordinar', 'preparar', 'supervisar', 'monitorear', 'elaborar', 'revisar', 'verificar', 'inspeccionar', 'concertar'],
+  4: ['planificar', 'planear', 'disenar', 'implementar', 'dirigir', 'organizar', 'programar', 'establecer', 'desarrollar', 'proponer', 'administrar', 'gestionar'],
+  5: ['formular', 'definir', 'liderar', 'conducir', 'dictar', 'aprobar', 'autorizar', 'normar', 'reglamentar', 'estratég'],
+};
+
+/** Scope indicators — what level the work affects */
+const SCOPE_INDICATORS: Record<number, string[]> = {
+  1: ['tarea', 'actividad', 'elemento', 'archivo', 'documento individual'],
+  2: ['procedimiento', 'proceso', 'tramite', 'expediente', 'caso'],
+  3: ['programa', 'proyecto', 'servicio', 'departamento', 'unidad'],
+  4: ['direccion', 'gerencia', 'division', 'institucion', 'municipalidad'],
+  5: ['politica', 'estrategia', 'rector', 'normativa', 'ley', 'reglamento', 'alcance nacional'],
+};
+
+/** Hierarchy indicators for supervision factor */
+const HIERARCHY_INDICATORS: Record<number, { patterns: string[]; weight: number }> = {
+  1: { patterns: ['sin personal a cargo', 'no supervisa', 'trabajo individual', 'funciones individuales', 'no tiene personal', 'personal a cargo no', 'sin supervision', 'tareas individuales'], weight: 2 },
+  2: { patterns: ['supervision ocasional', 'apoya supervision', 'coordina actividades', 'guia a companeros', 'colabora con equipo'], weight: 1.5 },
+  3: { patterns: ['coordina equipo', 'grupo de trabajo', 'encargado de grupo', 'supervisa personal', 'supervisa equipo', 'lidera grupo'], weight: 1.5 },
+  4: { patterns: ['jefe', 'jefatura', 'unidad', 'departamento', 'dirige personal', 'encargado de departamento', 'responsable de area', 'coordinador general'], weight: 1.5 },
+  5: { patterns: ['direccion', 'gerencia', 'subdireccion', 'director', 'gerente', 'subdirector', 'alta gerencia'], weight: 1.5 },
+};
+
+/** Responsibility scope indicators */
+const RESP_SCOPE: Record<number, { patterns: string[]; weight: number }> = {
+  1: { patterns: ['herramientas basicas', 'equipo basico', 'material de oficina', 'papeleria', 'baja responsabilidad'], weight: 1 },
+  2: { patterns: ['materiales', 'equipo menor', 'herramientas', 'activos menores', 'suministros', 'inventario basico'], weight: 1 },
+  3: { patterns: ['informacion sensible', 'confidencial', 'datos personales', 'fondos fijos', 'custodia', 'valores menores', 'documentacion reservada'], weight: 1.5 },
+  4: { patterns: ['presupuesto', 'activos', 'fondos', 'contratacion', 'recursos financieros', 'patrimonio municipal', 'licitacion', 'compras mayores'], weight: 1.5 },
+  5: { patterns: ['gestion total', 'proceso clave', 'decision estratégico', 'politica institucional', 'alto impacto', 'recursos institucionales'], weight: 2 },
+};
+
+/** Work conditions indicators */
+const COND_INDICATORS: Record<number, { patterns: string[]; weight: number }> = {
+  1: { patterns: ['oficina', 'ambiente normal', 'escritorio', 'administrativo', 'ambiente controlado', 'trabajo sedentario'], weight: 1 },
+  2: { patterns: ['esfuerzo fisico moderado', 'ambiente incomodo', 'bipedestacion', 'de pie', 'camina frecuentemente', 'levanta peso moderado'], weight: 1 },
+  3: { patterns: ['intemperie', 'clima', 'ruido', 'calor', 'via publica', 'campo', 'exterior', 'caminando largas distancias', 'ambiente variable'], weight: 1.5 },
+  4: { patterns: ['riesgo', 'accidente', 'quimicos', 'altura', 'maquinaria', 'sustancias', 'equipo peligroso', 'trabajo en altura'], weight: 1.5 },
+  5: { patterns: ['alta peligrosidad', 'insalubridad', 'toxicos', 'peligro constante', 'enfermedad profesional', 'ambiente extremo', 'radiacion'], weight: 2 },
+};
+
+/** Error impact indicators */
+const ERROR_IMPACT: Record<number, { patterns: string[]; weight: number }> = {
+  1: { patterns: ['error facil', 'facil de detectar', 'corregir', 'sin impacto', 'bajo impacto', 'minimo efecto'], weight: 1 },
+  2: { patterns: ['retraso', 'demora', 'menor', 'interno', 'proceso interno', 'reasignacion'], weight: 1 },
+  3: { patterns: ['afecta servicio', 'departamento', 'cliente', 'usuario', 'ciudadano', 'externo', 'interrumpe'], weight: 1.5 },
+  4: { patterns: ['perdida economica', 'perdida financiera', 'legal', 'multa', 'sancion', 'significativo', 'demanda', 'penal'], weight: 1.5 },
+  5: { patterns: ['estabilidad', 'seguridad publica', 'institucional', 'critico', 'nacional', 'reputacion', 'crisis', 'confianza publica', 'irreversible'], weight: 2 },
+};
+
+const EDUC_LEVELS: { patterns: string[]; score: number; label: string }[] = [
+  { patterns: ['primaria', 'basica', 'alfabeto', 'no requiere'], score: 1, label: 'educacion basica' },
+  { patterns: ['bachillerato', 'media', 'secundaria', 'tecnico basico', 'educacion diversificada'], score: 2, label: 'bachillerato' },
+  { patterns: ['diplomado', 'tecnico superior', 'parauniversitario', 'tecnico medio'], score: 3, label: 'tecnico superior' },
+  { patterns: ['licenciatura', 'universitario', 'bachillerato universitario', 'profesional', 'grado universitario'], score: 4, label: 'licenciatura' },
+  { patterns: ['maestria', 'master', 'magister', 'especializacion', 'doctorado', 'phd', 'posgrado'], score: 5, label: 'maestria/doctorado' },
+];
+
+// ─── Dimensional analysis helpers ────────────────────────────
+
+interface DimensionScore {
+  score: number;
+  evidence: string[];
+}
+
+function scoreByLevels(
+  text: string,
+  levels: Record<number, { patterns: string[]; weight: number }>,
+  baseScore: number = 1,
+): DimensionScore {
+  const normalized = normalizeText(text);
+  let maxScore = baseScore;
+  const matchedEvidence: string[] = [];
+
+  for (let grade = 1; grade <= 5; grade++) {
+    const level = levels[grade];
+    if (!level) continue;    
+    for (const pattern of level.patterns) {
+      if (normalized.includes(pattern)) {
+        const effective = grade * level.weight;
+        if (effective > maxScore) maxScore = effective;
+        matchedEvidence.push(pattern);
       }
     }
   }
 
-  if (text.length > 500) maxScore = Math.max(maxScore, 2);
-  if (text.length > 1500) maxScore = Math.max(maxScore, 3);
-
-  return { score: maxScore, keywords: [...new Set(matched)] };
+  const finalGrade = Math.min(5, Math.round(maxScore));
+  return { score: finalGrade, evidence: [...new Set(matchedEvidence)].slice(0, 5) };
 }
 
-function evaluateFactor(funciones: string, procText: string | undefined, rules: RuleKeyword[]): { grado: number; keywords: string[]; procKeywords: string[] } {
-  const funcRes = scoreFromText(funciones, rules);
-  if (!procText) return { grado: funcRes.score, keywords: funcRes.keywords, procKeywords: [] };
+function scoreByVerbs(text: string): DimensionScore {
+  const normalized = normalizeText(text);
+  let maxVerbScore = 1;
+  const found: string[] = [];
 
-  const procRes = scoreFromText(procText, rules);
-  const combined = Math.max(funcRes.score, procRes.score);
+  for (let level = 1; level <= 5; level++) {
+    const verbs = VERB_LEVELS[level];
+    for (const verb of verbs) {
+      if (normalized.includes(verb)) {
+        if (level > maxVerbScore) maxVerbScore = level;
+        found.push(verb);
+      }
+    }
+  }
 
-  return { grado: combined, keywords: funcRes.keywords, procKeywords: procRes.keywords };
+  return { score: maxVerbScore, evidence: [...new Set(found)].slice(0, 5) };
 }
 
-function evaluateRequisitos(educacion: string): { grado: number; keyword: string } {
+function scoreByScope(text: string): DimensionScore {
+  const normalized = normalizeText(text);
+  let maxScope = 1;
+  const found: string[] = [];
+
+  for (let level = 1; level <= 5; level++) {
+    const terms = SCOPE_INDICATORS[level];
+    for (const term of terms) {
+      if (normalized.includes(term)) {
+        if (level > maxScope) maxScope = level;
+        found.push(term);
+      }
+    }
+  }
+
+  return { score: maxScope, evidence: [...new Set(found)].slice(0, 5) };
+}
+
+function scoreByStructure(text: string): number {
+  const sentences = getSentences(text);
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+
+  let score = 1;
+
+  if (wordCount > 800) score = Math.max(score, 3);
+  else if (wordCount > 400) score = Math.max(score, 2);
+
+  if (sentences.length >= 6) score = Math.max(score, 2);
+  if (sentences.length >= 12) score = Math.max(score, 3);
+
+  const hasBullets = (text.match(/- /g) || []).length >= 3;
+  if (hasBullets && wordCount > 300) score = Math.max(score, 3);
+
+  const hasMultipleSections = sentences.filter(s => s.length > 80).length >= 3;
+  if (hasMultipleSections) score = Math.max(score, 2);
+
+  return Math.min(5, score);
+}
+
+function scoreRequisitos(educacion: string): { grado: number; keyword: string; evidence: string } {
   const normalized = normalizeText(educacion);
   let maxScore = 1;
   let matched = 'educacion basica';
 
-  for (const rule of REQUISITOS_RULES) {
-    for (const word of rule.words) {
-      if (normalized.includes(word)) {
-        if (rule.score > maxScore) {
-          maxScore = rule.score;
-          matched = word;
+  for (const level of EDUC_LEVELS) {
+    for (const pattern of level.patterns) {
+      if (normalized.includes(pattern)) {
+        if (level.score > maxScore) {
+          maxScore = level.score;
+          matched = level.label;
         }
       }
     }
   }
 
-  return { grado: maxScore, keyword: matched };
+  return { grado: maxScore, keyword: matched, evidence: matched };
 }
 
-function generateJustification(factorKey: string, grado: number, keywords: string[], procKeywords: string[], puestoNombre: string, procCount?: number): string {
-  let parts: string[] = [];
+// ─── Factor-specific evaluators ──────────────────────────────
 
-  if (keywords.length > 0) {
-    parts.push(`La descripcion oficial del puesto "${puestoNombre}" contiene los terminos: ${keywords.slice(0, 3).join(', ')}`);
-  }
-  if (procKeywords.length > 0) {
-    const src = procCount ? `${procCount} procedimientos asociados` : 'procedimientos asociados';
-    parts.push(`en ${src} se identificaron: ${procKeywords.slice(0, 3).join(', ')}`);
-  }
+function evaluateDificultad(text: string): { grado: number; keywords: string[]; justification: string } {
+  const verbDim = scoreByVerbs(text);
+  const scopeDim = scoreByScope(text);
+  const structDim = scoreByStructure(text);
+  const kwDim = scoreByLevels(text, {
+    1: { patterns: ['simple', 'repetitivo', 'manual', 'rutina', 'elemental'], weight: 1 },
+    2: { patterns: ['operativo', 'estandarizado', 'asistir', 'apoyar', 'tramitar', 'programado'], weight: 1 },
+    3: { patterns: ['tecnico', 'analisis', 'diagnostico', 'evaluacion', 'resolucion', 'coordinacion'], weight: 1.2 },
+    4: { patterns: ['planificacion', 'planeamiento', 'programa', 'proyecto', 'diseño', 'implementacion'], weight: 1.3 },
+    5: { patterns: ['estrategico', 'direccion', 'politica', 'directriz', 'institucion', 'rector'], weight: 1.5 },
+  });
 
-  if (parts.length > 0) {
-    return `${parts.join(', ')}, lo cual corresponde a Grado ${grado} segun la rubrica MSC.`;
-  }
+  const rawScore = Math.round(
+    0.35 * verbDim.score +
+    0.30 * scopeDim.score +
+    0.10 * structDim +
+    0.25 * kwDim.score
+  );
 
-  const defaultJustifications: Record<string, string[]> = {
-    dificultad: ['Tareas basicas sin evidencia de mayor complejidad.', '', 'La extension y contenido de las funciones sugiere un nivel tecnico medio.', 'La descripcion incluye funciones de planificacion y coordinacion.', 'Se identifican funciones de direccion estrategica.'],
-    supervision: ['No se encontro evidencia de personal a cargo.', '', 'Se mencionan labores de coordinacion.', 'El puesto incluye responsabilidades de jefatura.', 'El puesto tiene alcance directivo.'],
-    responsabilidad: ['No se evidencia manejo de valores o informacion sensible.', '', 'Se menciona custodia o manejo de datos.', 'El puesto maneja presupuestos o activos.', 'Responsabilidad total sobre procesos clave.'],
-    condiciones: ['Ambiente de oficina segun las funciones descritas.', '', 'Se mencionan condiciones de campo o esfuerzo fisico.', 'Exposicion a riesgos laborales.', 'Condiciones de alta peligrosidad.'],
-    error: ['Errores de bajo impacto institucional.', '', 'El error afectaria el servicio.', 'El error causaria perdidas economicas o legales.', 'El error comprometeria la estabilidad institucional.'],
-    requisitos: ['Educacion basica requerida.', 'Bachillerato o tecnico basico.', 'Diplomado o tecnico superior.', 'Licenciatura o nivel universitario.', 'Maestria o especializacion avanzada.']
-  };
-  return defaultJustifications[factorKey]?.[grado - 1] || `Asignado Grado ${grado} segun analisis de las funciones del puesto "${puestoNombre}".`;
+  const grado = Math.max(1, Math.min(5, Math.round(rawScore)));
+
+  const verbEvidence = verbDim.evidence.slice(0, 2);
+  const scopeEvidence = scopeDim.evidence.slice(0, 2);
+  const allKeywords = [...verbEvidence, ...scopeEvidence, ...kwDim.evidence];
+  const uniqueKeywords = [...new Set(allKeywords)];
+
+  let just = `Analisis de dificultad: `;
+  if (verbEvidence.length > 0) just += `las funciones utilizan verbos como "${verbEvidence.join(', ')}" `;
+  if (scopeEvidence.length > 0) just += `y el alcance del trabajo abarca "${scopeEvidence.join(', ')}". `;
+  just += `La descripcion tiene una extension de ${text.split(/\s+/).filter(Boolean).length} palabras con ${getSentences(text).length} ideas distintas. `;
+  just += `En conjunto, la evidencia corresponde a un nivel de complejidad Grado ${grado} segun la rubrica MSC.`;
+
+  return { grado, keywords: uniqueKeywords, justification: just };
+}
+
+function evaluateSupervision(text: string): { grado: number; keywords: string[]; justification: string } {
+  const hierarchyDim = scoreByLevels(text, HIERARCHY_INDICATORS, 1);
+  const verbDim = scoreByVerbs(text);
+
+  let rawScore = Math.round(0.6 * hierarchyDim.score + 0.4 * verbDim.score);
+  if (rawScore < 1) rawScore = 1;
+  const grado = Math.max(1, Math.min(5, rawScore));
+
+  const ev = hierarchyDim.evidence;
+
+  let just = `Analisis de supervision: `;
+  if (ev.length > 0) {
+    just += `Se identificaron indicadores de supervision: "${ev.slice(0, 3).join(', ')}". `;
+  } else {
+    just += `No se encontraron indicadores de personal a cargo en la descripcion de funciones. `;
+  }
+  just += `Con base en la evidencia, el nivel de supervision corresponde a Grado ${grado} segun la rubrica MSC.`;
+
+  return { grado, keywords: ev, justification: just };
+}
+
+function evaluateResponsabilidad(text: string): { grado: number; keywords: string[]; justification: string } {
+  const respDim = scoreByLevels(text, RESP_SCOPE, 1);
+  const scopeDim = scoreByScope(text);
+
+  let rawScore = Math.round(0.6 * respDim.score + 0.4 * scopeDim.score);
+  if (rawScore < 1) rawScore = 1;
+  const grado = Math.max(1, Math.min(5, rawScore));
+
+  const ev = respDim.evidence;
+
+  let just = `Analisis de responsabilidad: `;
+  if (ev.length > 0) {
+    just += `El puesto describe responsabilidades sobre "${ev.slice(0, 3).join(', ')}". `;
+  } else {
+    just += `No se describen responsabilidades especificas sobre valores, informacion o activos. `;
+  }
+  just += `El nivel de responsabilidad corresponde a Grado ${grado} segun la rubrica MSC.`;
+
+  return { grado, keywords: ev, justification: just };
+}
+
+function evaluateCondiciones(text: string): { grado: number; keywords: string[]; justification: string } {
+  const condDim = scoreByLevels(text, COND_INDICATORS, 1);
+
+  let rawScore = condDim.score;
+  if (rawScore < 1) rawScore = 1;
+  const grado = Math.max(1, Math.min(5, rawScore));
+
+  const ev = condDim.evidence;
+
+  let just = `Analisis de condiciones de trabajo: `;
+  if (ev.length > 0) {
+    just += `Se describen condiciones como "${ev.slice(0, 3).join(', ')}". `;
+  } else {
+    just += `Las funciones se desarrollan en condiciones tipicas de oficina. `;
+  }
+  just += `El nivel de exposicion corresponde a Grado ${grado} segun la rubrica MSC.`;
+
+  return { grado, keywords: ev, justification: just };
+}
+
+function evaluateError(text: string): { grado: number; keywords: string[]; justification: string } {
+  const errDim = scoreByLevels(text, ERROR_IMPACT, 1);
+
+  let rawScore = errDim.score;
+  if (rawScore < 1) rawScore = 1;
+  const grado = Math.max(1, Math.min(5, rawScore));
+
+  const ev = errDim.evidence;
+
+  let just = `Analisis de consecuencia del error: `;
+  if (ev.length > 0) {
+    just += `El impacto de un error se describe como "${ev.slice(0, 3).join(', ')}". `;
+  } else {
+    just += `No se describe explicitamente el impacto de errores en las funciones. `;
+  }
+  just += `La consecuencia del error corresponde a Grado ${grado} segun la rubrica MSC.`;
+
+  return { grado, keywords: ev, justification: just };
 }
 
 function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult {
@@ -226,23 +397,39 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
   const puestoNombre = puesto.nombre || '';
   const procCount = procText ? procText.split('---').filter(s => s.includes(':')).length : 0;
 
-  const factors: (keyof EvaluationSuggestion)[] = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error'];
+  const evaluators = [
+    { key: 'dificultad' as const, fn: evaluateDificultad },
+    { key: 'supervision' as const, fn: evaluateSupervision },
+    { key: 'responsabilidad' as const, fn: evaluateResponsabilidad },
+    { key: 'condiciones' as const, fn: evaluateCondiciones },
+    { key: 'error' as const, fn: evaluateError },
+  ];
 
   const result: any = {};
   const factorKeywords: FactorKeywordDetail[] = [];
 
-  for (const factor of factors) {
-    const { grado, keywords, procKeywords } = evaluateFactor(funciones, procText, RULES[factor]);
-    result[factor] = grado;
-    result[`${factor}_just`] = generateJustification(factor, grado, keywords, procKeywords, puestoNombre, procCount || undefined);
-    factorKeywords.push({ factor, keywords, procKeywords, grado });
+  for (const { key, fn } of evaluators) {
+    const funcRes = fn(funciones);
+    result[key] = funcRes.grado;
+    result[`${key}_just`] = funcRes.justification;
+
+    let procKeywords: string[] = [];
+    if (procText) {
+      const procRes = fn(procText);
+      if (procRes.grado > funcRes.grado) {
+        result[key] = Math.min(5, funcRes.grado + Math.round((procRes.grado - funcRes.grado) * 0.5));
+        procKeywords = procRes.keywords;
+      }
+    }
+
+    factorKeywords.push({ factor: key, keywords: funcRes.keywords, procKeywords, grado: result[key] });
   }
 
-  const { grado: reqGrado, keyword: reqKeyword } = evaluateRequisitos(educacion);
+  const { grado: reqGrado, evidence: reqEvidence } = scoreRequisitos(educacion);
   result.requisitos = reqGrado;
-  result.requisitos_just = reqKeyword
-    ? `El requisito de "${reqKeyword}" en la descripcion del puesto corresponde a Grado ${reqGrado} segun la escala de formacion academica MSC.`
-    : generateJustification('requisitos', reqGrado, [], [], puestoNombre);
+  result.requisitos_just = reqEvidence && reqEvidence !== 'educacion basica'
+    ? `Analisis de requisitos: el puesto requiere "${reqEvidence}", lo cual corresponde a Grado ${reqGrado} segun la escala de formacion academica MSC.`
+    : `Analisis de requisitos: se requiere "${reqEvidence}", asignando Grado ${reqGrado} segun la rubrica MSC.`;
 
   const evaluated = validateAndCalculate(result, puesto.id, 'rule-based');
   evaluated.factorKeywords = factorKeywords;
