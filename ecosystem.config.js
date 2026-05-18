@@ -2,7 +2,7 @@ module.exports = {
   apps: [
     {
       name: 'msc-server',
-      script: 'npm.cmd',
+      script: 'npm',
       args: 'run dev',
       cwd: './server',
       interpreter: 'none',
@@ -12,7 +12,7 @@ module.exports = {
     },
     {
       name: 'msc-frontend',
-      script: 'npm.cmd',
+      script: 'npm',
       args: 'run dev',
       cwd: './frontend',
       interpreter: 'none',

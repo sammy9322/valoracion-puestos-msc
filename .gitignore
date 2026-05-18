@@ -34,3 +34,20 @@ Thumbs.db
 
 # Backups
 backups/
+*_backup/
+
+# Agent/AI tool files
+.agent/
+.claude/
+.cursor/
+
+# Debug artifacts
+scratch/
+*.debug.*
+debug_*.txt
+pdf_debug.txt
+
+# Test files (PDFs in server root)
+server/*.pdf
+server/*.txt
+!server/README.md
