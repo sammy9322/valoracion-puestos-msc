@@ -458,7 +458,7 @@ class ReportGenerator {
     this.doc.text('Versión del informe:', MARGIN, this.y);
     this.y += 10;
     this.doc.fontSize(9).font('Helvetica').fillColor('#1e293b');
-    this.doc.text(`v${evaluacion.version || 1}.0 — Generado automáticamente`, MARGIN, this.y);
+    this.doc.text(`v${evaluacion.version || '28aa2ac'} — Generado automáticamente`, MARGIN, this.y);
     this.y += 20;
 
     this.doc.fontSize(7).font('Helvetica-Oblique').fillColor('#94a3b8');
@@ -487,8 +487,11 @@ class ReportGenerator {
       'Responsabilidad (200 pts máx.), Condiciones de Trabajo (100 pts máx.), Consecuencia del Error (150 pts máx.), ' +
       'y Requisitos (200 pts máx.). La puntuación máxima posible es de 1000 puntos. ' +
       'Cada factor se califica en una escala del 1 al 5, donde 1 representa el nivel mínimo y 5 el nivel máximo. ' +
-      'El análisis fue realizado por el Agente Evaluador IA, que aplica un proceso sistemático de revisión de ' +
-      'la descripción de funciones, identificación de evidencia textual, y comparación contra la rúbrica de grados predefinida.' +
+      'El análisis fue realizado por el Agente Evaluador IA, que aplica un proceso sistématico de evaluación técnica ' +
+      'considerando: (a) la naturaleza y complejidad de las funciones descritas, (b) el contexto organizacional del puesto, ' +
+      '(c) el nivel de autonomía y juicio requerido, y (d) el impacto de sus decisiones en la institución. ' +
+      'Cada grado asignado se sustenta con evidencia textual de la descripción de funciones y, cuando están disponibles, ' +
+      'de los procedimientos operativos asociados al área del puesto.' +
       (procedimientos
         ? ` Para este análisis se incorporaron ${procedimientos.totalProcedimientos} procedimientos operativos asociados al área del puesto como contexto adicional, permitiendo una evaluación más precisa de las tareas reales que ejecuta el puesto.`
         : '');

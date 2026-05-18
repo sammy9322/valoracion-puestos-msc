@@ -175,7 +175,8 @@ router.post('/ai-evaluate', async (req, res) => {
             totalPuntos: result.totalPuntos,
             analisis: result.data,
             procedimientosCount: result.procedimientosCount || 0,
-            factorKeywords: result.factorKeywords || []
+            factorKeywords: result.factorKeywords || [],
+            build_version: '28aa2ac-fix-pdf-llm-proc'
         });
 
     } catch (error: any) {
