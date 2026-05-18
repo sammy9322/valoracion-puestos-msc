@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Build: v4 — exclusion contextual por oracion (riesgo+control interno)
+// Build: v5 — detalle tecnico por factor en PDF
 
 import express from 'express';
 import cors from 'cors';

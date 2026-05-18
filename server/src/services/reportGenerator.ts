@@ -216,27 +216,25 @@ class ReportGenerator {
   private addFactorsTable(evaluacion: any): void {
     this.checkPage(120);
 
-    const colWidths = [160, 55, 55, 280];
-    const headerHeight = 24;
+    const colWidths = [180, 50, 50, 70];
+    const headerHeight = 22;
+    const rowH = 22;
 
     const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
 
-    const drawHeader = () => {
-      let hx = MARGIN;
-      ['Factor', 'Grado', 'Puntos', 'Justificación'].forEach((text, i) => {
-        this.doc.fillColor('#1e40af');
-        this.doc.rect(hx, this.y, colWidths[i], headerHeight).fill();
-        this.doc.fillColor('#ffffff');
-        this.doc.lineWidth(0.5).strokeColor('#cbd5e1');
-        this.doc.rect(hx, this.y, colWidths[i], headerHeight).stroke();
-        this.doc.fontSize(8).font('Helvetica-Bold');
-        this.doc.text(text, hx + 4, this.y + 7, { width: colWidths[i] - 8, align: 'left' });
-        hx += colWidths[i];
-      });
-      this.y += headerHeight;
-    };
 
-    drawHeader();
+    let hx = MARGIN;
+    ['Factor', 'Grado', 'Pts', '%'].forEach((text, i) => {
+      this.doc.fillColor('#1e40af');
+      this.doc.rect(hx, this.y, colWidths[i], headerHeight).fill();
+      this.doc.fillColor('#ffffff');
+      this.doc.lineWidth(0.5).strokeColor('#cbd5e1');
+      this.doc.rect(hx, this.y, colWidths[i], headerHeight).stroke();
+      this.doc.fontSize(8).font('Helvetica-Bold');
+      this.doc.text(text, hx + 4, this.y + 6, { width: colWidths[i] - 8, align: 'left' });
+      hx += colWidths[i];
+    });
+    this.y += headerHeight;
 
     let total = 0;
     let pageFactorIdx = 0;
@@ -245,46 +243,33 @@ class ReportGenerator {
       const display = FACTOR_DISPLAY[factor];
       const grado = evaluacion[display.gradoField] || 1;
       const puntos = POINTS_MAP[factor][grado] || 0;
-      const just = evaluacion[display.justField] || '';
       total += puntos;
 
-      const justH = Math.max(22, this.doc.heightOfString(just, { width: colWidths[3] - 8, align: 'left' }) + 8);
-      const cellH = Math.max(22, justH);
       const isEven = pageFactorIdx % 2 === 0;
+      const bgColor = isEven ? '#f8fafc' : '#ffffff';
 
-      if (this.y + cellH > MAX_Y - 10) {
+      if (this.y + rowH > MAX_Y - 10) {
         this.doc.addPage();
         this.y = MARGIN;
-        this.addSectionTitle('Análisis por Factor (continuación)');
+        this.addSectionTitle('Resumen por Factor (continuación)');
         this.y += 8;
-        drawHeader();
       }
 
       let cx = MARGIN;
-      const colTexts = [display.label, `Grado ${grado}`, `${puntos} pts`];
-      const colColors = ['#f8fafc', '#ffffff'];
-      const bgColor = isEven ? '#f8fafc' : '#ffffff';
+      const rowData = [display.label, `G${grado}`, `${puntos}`, `${Math.round(puntos / 200 * 100)}%`];
 
-      for (let i = 0; i < 3; i++) {
+      for (let i = 0; i < colWidths.length; i++) {
         this.doc.fillColor(bgColor);
-        this.doc.rect(cx, this.y, colWidths[i], cellH).fill();
+        this.doc.rect(cx, this.y, colWidths[i], rowH).fill();
         this.doc.fillColor('#1e293b');
         this.doc.lineWidth(0.5).strokeColor('#cbd5e1');
-        this.doc.rect(cx, this.y, colWidths[i], cellH).stroke();
+        this.doc.rect(cx, this.y, colWidths[i], rowH).stroke();
         this.doc.fontSize(7.5).font('Helvetica');
-        this.doc.text(colTexts[i], cx + 4, this.y + (cellH - 10) / 2, { width: colWidths[i] - 8, align: 'left' });
+        this.doc.text(rowData[i], cx + 4, this.y + (rowH - 10) / 2, { width: colWidths[i] - 8, align: 'left' });
         cx += colWidths[i];
       }
 
-      this.doc.fillColor(bgColor);
-      this.doc.rect(cx, this.y, colWidths[3], cellH).fill();
-      this.doc.fillColor('#1e293b');
-      this.doc.lineWidth(0.5).strokeColor('#cbd5e1');
-      this.doc.rect(cx, this.y, colWidths[3], cellH).stroke();
-      this.doc.fontSize(7.5).font('Helvetica');
-      this.doc.text(just, cx + 4, this.y + 3, { width: colWidths[3] - 8, align: 'left' });
-
-      this.y += cellH;
+      this.y += rowH;
       pageFactorIdx++;
     }
 
@@ -308,9 +293,76 @@ class ReportGenerator {
     }
   }
 
+  private addFactorDetail(evaluacion: any): void {
+    this.checkPage(80);
+    this.addSectionTitle('5. Detalle Técnico por Factor');
+
+    const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
+    const GRADES_DESC: Record<string, string[]> = {
+      dificultad: ['Tareas simples y repetitivas', 'Tareas variadas estandarizadas', 'Analisis y juicio tecnico', 'Alta complejidad y planeacion', 'Direccion estrategica'],
+      supervision: ['No ejerce supervision', 'Supervision ocasional', 'Supervision de grupo operativo', 'Jefatura de unidad', 'Direccion de area mayor'],
+      responsabilidad: ['Baja responsabilidad', 'Responsabilidad moderada', 'Custodia de info sensible', 'Responsabilidad por presupuestos', 'Gestion de proceso clave'],
+      condiciones: ['Oficina normal', 'Esfuerzo moderado', 'Exposicion climatica o ruido', 'Riesgo de accidentes', 'Alta peligrosidad'],
+      error: ['Error facil de corregir', 'Retrasos menores', 'Afecta otros deptos', 'Perdidas economicas/legales', 'Compromete estabilidad'],
+      requisitos: ['Educacion basica', 'Bachillerato / Tecnico', 'Diplomado / Tecnico sup.', 'Licenciatura', 'Maestria / Doctorado'],
+    };
+
+    for (const factor of FACTORS) {
+      const display = FACTOR_DISPLAY[factor];
+      const grado = evaluacion[display.gradoField] || 1;
+      const puntos = POINTS_MAP[factor][grado] || 0;
+      const just = evaluacion[display.justField] || '';
+      const desc = GRADES_DESC[factor]?.[grado - 1] || '';
+
+      this.checkPage(60);
+
+      this.doc.fontSize(8.5).font('Helvetica');
+      const justOpts = { width: CONTENT_WIDTH - 16, align: 'justify' as const, lineGap: 2 };
+      const justH = this.doc.heightOfString(just, justOpts);
+
+      const boxY = this.y;
+      const boxH = 54 + justH;
+
+      // Box border
+      this.doc.fillColor('#f1f5f9');
+      this.doc.rect(MARGIN, boxY, CONTENT_WIDTH, boxH).fill();
+      this.doc.fillColor('#cbd5e1');
+      this.doc.lineWidth(1);
+      this.doc.rect(MARGIN, boxY, CONTENT_WIDTH, boxH).stroke();
+
+      // Header stripe
+      this.doc.fillColor('#1e3a5f');
+      this.doc.rect(MARGIN, boxY, CONTENT_WIDTH, 28).fill();
+
+      // Factor title
+      this.doc.fontSize(9).font('Helvetica-Bold').fillColor('#ffffff');
+      this.doc.text(display.label, MARGIN + 8, boxY + 6);
+
+      // Grade badge
+      const badgeColors = ['#64748b', '#3b82f6', '#0ea5e9', '#8b5cf6', '#059669'];
+      this.doc.fillColor(badgeColors[grado - 1] || '#64748b');
+      this.doc.rect(MARGIN + CONTENT_WIDTH - 80, boxY + 4, 72, 20).fill();
+      this.doc.fillColor('#ffffff');
+      this.doc.fontSize(9).font('Helvetica-Bold');
+      this.doc.text(`Grado ${grado}`, MARGIN + CONTENT_WIDTH - 76, boxY + 7, { width: 64, align: 'center' });
+
+      // Points line
+      this.doc.fontSize(8).font('Helvetica').fillColor('#475569');
+      const pointsText = `${puntos} pts — ${desc}`;
+      this.doc.text(pointsText, MARGIN + 8, boxY + 32, { width: CONTENT_WIDTH - 16, align: 'left' });
+
+      // Justification
+      this.doc.fontSize(8.5).font('Helvetica').fillColor('#1e293b');
+      const justY = boxY + 46;
+      this.doc.text(just, MARGIN + 8, justY, justOpts);
+
+      this.y = boxY + boxH + 8;
+    }
+  }
+
   private addConclusion(evaluacion: any, totalPuntos: number, procedimientos?: ProcedimientosContext): void {
     this.checkPage(120);
-    this.addSectionTitle('5. Conclusión y Dictamen Técnico');
+    this.addSectionTitle('6. Conclusión y Dictamen Técnico');
 
     const porcentaje = Math.round((totalPuntos / 1000) * 100);
     const clase = getClaseSugerida(totalPuntos);
@@ -504,8 +556,10 @@ class ReportGenerator {
       this.addProcedimientosBlock(procedimientos);
     }
 
-    this.addSectionTitle('4. Análisis por Factor');
+    this.addSectionTitle('4. Resumen de Puntuación');
     this.addFactorsTable(evaluacion);
+
+    this.addFactorDetail(evaluacion);
 
     this.addConclusion(evaluacion, totalPuntos, procedimientos);
 
