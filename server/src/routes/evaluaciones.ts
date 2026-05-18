@@ -117,6 +117,8 @@ router.post('/ai-evaluate', async (req, res) => {
             });
         }
 
+        const fp = (k: string) => result.factorPoints?.[k] ?? (POINTS_MAP as any)[k][(result.data as any)[k]];
+
         const evaluacion = await prisma.evaluacion.create({
             data: {
                 puesto_id: puesto.id,
@@ -124,27 +126,27 @@ router.post('/ai-evaluate', async (req, res) => {
                 evaluador_id: user.id,
 
                 grado_dificultad: Number(result.data.dificultad),
-                puntos_dificultad: POINTS_MAP.dificultad[result.data.dificultad],
+                puntos_dificultad: fp('dificultad'),
                 justif_dificultad: result.data.dificultad_just || '',
 
                 grado_supervision: Number(result.data.supervision),
-                puntos_supervision: POINTS_MAP.supervision[result.data.supervision],
+                puntos_supervision: fp('supervision'),
                 justif_supervision: result.data.supervision_just || '',
 
                 grado_responsabilidad: Number(result.data.responsabilidad),
-                puntos_responsabilidad: POINTS_MAP.responsabilidad[result.data.responsabilidad],
+                puntos_responsabilidad: fp('responsabilidad'),
                 justif_responsabilidad: result.data.responsabilidad_just || '',
 
                 grado_condiciones: Number(result.data.condiciones),
-                puntos_condiciones: POINTS_MAP.condiciones[result.data.condiciones],
+                puntos_condiciones: fp('condiciones'),
                 justif_condiciones: result.data.condiciones_just || '',
 
                 grado_consecuencia_error: Number(result.data.error),
-                puntos_consecuencia_error: POINTS_MAP.error[result.data.error],
+                puntos_consecuencia_error: fp('error'),
                 justif_consecuencia_error: result.data.error_just || '',
 
                 grado_requisitos: Number(result.data.requisitos),
-                puntos_requisitos: POINTS_MAP.requisitos[result.data.requisitos],
+                puntos_requisitos: fp('requisitos'),
                 justif_requisitos: result.data.requisitos_just || '',
 
                 puntos_totales: result.totalPuntos,

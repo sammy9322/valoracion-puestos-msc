@@ -68,6 +68,7 @@ export interface AIEvaluationResult {
   motor: 'llm' | 'rule-based';
   procedimientosCount?: number;
   factorKeywords?: FactorKeywordDetail[];
+  factorPoints?: Record<string, number>;
 }
 
 export function getEngineStatus(): { ollamaAvailable: boolean; activeEngine: 'llm' | 'rule-based' } {
@@ -352,6 +353,38 @@ function evaluateRequisitos(educacion: string): { grado: number; keyword: string
   return { grado: maxScore, keyword: matched, evidence: matched };
 }
 
+function gradeFromCoverage(cov: number[]): number {
+  let best = 1, bestScore = -1;
+  for (let g = 1; g <= 5; g++) {
+    const others = [1, 2, 3, 4, 5].filter(x => x !== g).map(x => cov[x]);
+    const avgNoise = others.reduce((a, b) => a + b, 0) / others.length;
+    const penalty = cov[g] < 0.2 ? 0.5 : 1;
+    const score = cov[g] * (1 - 0.4 * avgNoise) * penalty;
+    if (score > bestScore) { bestScore = score; best = g; }
+  }
+  return best;
+}
+
+function continuousPoints(cov: number[], maxPts: number): number {
+  const total = cov[1] + cov[2] + cov[3] + cov[4] + cov[5];
+  if (total === 0) return 0;
+  const weighted = (1*cov[1] + 2*cov[2] + 3*cov[3] + 4*cov[4] + 5*cov[5]) / total;
+  const clamped = Math.max(1, Math.min(5, weighted));
+  return maxPts * (clamped - 1) / 4;
+}
+
+function mergeCov(c1: number[], c2: number[]): number[] {
+  return c1.map((v, i) => v * 0.7 + c2[i] * 0.3);
+}
+
+function mergeMatched(m1: Record<number, string[]>, m2: Record<number, string[]>): Record<number, string[]> {
+  const merged: Record<number, string[]> = {};
+  for (let g = 1; g <= 5; g++) {
+    merged[g] = [...new Set([...(m1[g] || []), ...(m2[g] || [])])].slice(0, 4);
+  }
+  return merged;
+}
+
 function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult {
   const funciones = puesto.descripcion_funciones || '';
   const educacion = puesto.educacion_requerida || '';
@@ -365,46 +398,50 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
     { key: 'error', profiles: ERROR_PROFILES, label: 'Consecuencia del Error', maxPts: 150 },
   ];
 
-  function continuousPoints(cov: number[], maxPts: number): number {
-    const total = cov[1] + cov[2] + cov[3] + cov[4] + cov[5];
-    if (total === 0) return 0;
-    const weighted = (1*cov[1] + 2*cov[2] + 3*cov[3] + 4*cov[4] + 5*cov[5]) / total;
-    const clamped = Math.max(1, Math.min(5, weighted));
-    return maxPts * (clamped - 1) / 4;
-  }
-
   const result: any = {};
   let continuousTotal = 0;
+  const factorPoints: Record<string, number> = {};
 
   for (const { key, profiles, label, maxPts } of configs) {
     const funcEval = evaluateByProfile(funciones, profiles, label, 'las funciones del puesto');
-    result[key] = funcEval.grado;
-    let just = funcEval.justification;
     let cov = funcEval.details.coverage;
+    let matched = funcEval.details.matched;
+    let degree = funcEval.grado;
+    let source = 'las funciones del puesto';
 
     if (procText) {
       const procEval = evaluateByProfile(procText, profiles, label, 'los procedimientos asociados');
-      if (procEval.grado > funcEval.grado) {
-        const boost = Math.min(5, funcEval.grado + Math.round((procEval.grado - funcEval.grado) * 0.5));
-        result[key] = boost;
-        cov = procEval.details.coverage;
-        just = buildRubricJustification(label, procEval.details, profiles.find(p => p.grade === procEval.grado)?.desc || '', 'las funciones del puesto y los procedimientos operativos', true);
-      }
+      cov = mergeCov(funcEval.details.coverage, procEval.details.coverage);
+      matched = mergeMatched(funcEval.details.matched, procEval.details.matched);
+      degree = gradeFromCoverage(cov);
+      source = 'las funciones del puesto y los procedimientos asociados';
     }
 
-    continuousTotal += continuousPoints(cov, maxPts);
-    result[`${key}_just`] = just;
+    const mergedScore: RubricScore = {
+      grade: degree, coverage: cov,
+      gradedCoverage: funcEval.details.gradedCoverage, matched,
+    };
+
+    result[key] = degree;
+    result[`${key}_just`] = buildRubricJustification(label, mergedScore, profiles.find(p => p.grade === degree)?.desc || '', source, !!procText);
+
+    const pts = continuousPoints(cov, maxPts);
+    continuousTotal += pts;
+    factorPoints[key] = Math.round(pts);
   }
 
   const { grado: reqGrado, evidence: reqEvidence } = evaluateRequisitos(educacion);
   result.requisitos = reqGrado;
-  continuousTotal += 200 * (Math.max(1, Math.min(5, reqGrado)) - 1) / 4;
+  const reqPts = 200 * (Math.max(1, Math.min(5, reqGrado)) - 1) / 4;
+  continuousTotal += reqPts;
+  factorPoints.requisitos = Math.round(reqPts);
   result.requisitos_just = reqEvidence && reqEvidence !== 'educacion basica'
     ? `Evaluacion de Requisitos: el puesto requiere "${reqEvidence}", lo cual corresponde a Grado ${reqGrado} segun la escala de formacion academica MSC.`
     : `Evaluacion de Requisitos: se requiere "${reqEvidence}", asignando Grado ${reqGrado} segun la rubrica MSC.`;
 
   const evaluated = validateAndCalculate(result, puesto.id, 'rule-based');
   evaluated.totalPuntos = Math.round(continuousTotal);
+  evaluated.factorPoints = factorPoints;
   if (procCount) evaluated.procedimientosCount = procCount;
   return evaluated;
 }

@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Build: v7 — puntaje continuo desde weighted coverage
+// Build: v8 — coverage mergeado (funciones+procedimientos) + puntaje continuo por factor en DB
 
 import express from 'express';
 import cors from 'cors';
