@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles, CheckCircle2, AlertTriangle, Info, ShieldAlert, FileText, Save, Download, RotateCcw, Loader2, Target, Thermometer, GraduationCap, Briefcase } from 'lucide-react';
 import api from '../services/api';
-import { getEstratoCompleto, EstratoResult } from '../constants/categorias';
+import { getEstratoCompleto } from '../constants/categorias';
+import type { EstratoResult } from '../constants/categorias';
 
 const FACTORS_CONFIG = [
   { key: 'dificultad', label: 'Dificultad de Funciones', icon: Target, points: [0, 40, 80, 120, 160, 200], desc: 'Complejidad de las tareas, iniciativa y juicio requerido.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica y decisiones críticas.'] },
