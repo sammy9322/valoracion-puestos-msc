@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Build: v9 — solo mergea proc si coverage>0, build_version en response, debug info
+// Build: v10 — procContribution x factor, badges, justificacion siempre menciona procs
 
 import express from 'express';
 import cors from 'cors';

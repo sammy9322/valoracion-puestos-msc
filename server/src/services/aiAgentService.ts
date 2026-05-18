@@ -4,7 +4,7 @@ import { enrich as enrichProc } from './procedimientosService';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
-export const BUILD_VERSION = 'v8';
+export const BUILD_VERSION = 'v10';
 
 let ollamaAvailable = false;
 
@@ -71,6 +71,7 @@ export interface AIEvaluationResult {
   factorKeywords?: FactorKeywordDetail[];
   factorPoints?: Record<string, number>;
   buildVersion?: string;
+  procContribution?: string[];
 }
 
 export function getEngineStatus(): { ollamaAvailable: boolean; activeEngine: 'llm' | 'rule-based' } {
@@ -403,6 +404,7 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
   const result: any = {};
   let continuousTotal = 0;
   const factorPoints: Record<string, number> = {};
+  const procContribution: string[] = [];
 
   for (const { key, profiles, label, maxPts } of configs) {
     const funcEval = evaluateByProfile(funciones, profiles, label, 'las funciones del puesto');
@@ -410,6 +412,7 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
     let matched = funcEval.details.matched;
     let degree = funcEval.grado;
     let source = 'las funciones del puesto';
+    let procMerged = false;
 
     if (procText) {
       const procEval = evaluateByProfile(procText, profiles, label, 'los procedimientos asociados');
@@ -419,6 +422,8 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
         matched = mergeMatched(funcEval.details.matched, procEval.details.matched);
         degree = gradeFromCoverage(cov);
         source = 'las funciones del puesto y los procedimientos asociados';
+        procMerged = true;
+        procContribution.push(key);
       }
     }
 
@@ -427,8 +432,12 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
       gradedCoverage: funcEval.details.gradedCoverage, matched,
     };
 
+    let just = buildRubricJustification(label, mergedScore, profiles.find(p => p.grade === degree)?.desc || '', source, procMerged);
+    if (procText && !procMerged) {
+      just += ' Se revisaron los procedimientos operativos asociados al area, pero no aportaron indicadores adicionales para este factor.';
+    }
     result[key] = degree;
-    result[`${key}_just`] = buildRubricJustification(label, mergedScore, profiles.find(p => p.grade === degree)?.desc || '', source, !!procText && source.includes('procedimientos'));
+    result[`${key}_just`] = just;
 
     const pts = continuousPoints(cov, maxPts);
     continuousTotal += pts;
@@ -448,6 +457,7 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
   evaluated.totalPuntos = Math.round(continuousTotal);
   evaluated.factorPoints = factorPoints;
   evaluated.buildVersion = BUILD_VERSION;
+  evaluated.procContribution = procContribution;
   if (procCount) evaluated.procedimientosCount = procCount;
   return evaluated;
 }

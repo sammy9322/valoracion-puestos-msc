@@ -179,6 +179,7 @@ router.post('/ai-evaluate', async (req, res) => {
             procedimientosCount: result.procedimientosCount || 0,
             buildVersion: BUILD_VERSION,
             factorPoints: result.factorPoints || {},
+            procContribution: result.procContribution || [],
             motor: result.motor,
             debug: {
                 procedimientosEncontrados: result.procedimientosCount || 0,

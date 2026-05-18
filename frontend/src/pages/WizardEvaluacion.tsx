@@ -44,6 +44,7 @@ const WizardEvaluacion: React.FC = () => {
 
   const [analisis, setAnalisis] = useState<AIAnalysis>({});
   const [procedimientosCount, setProcedimientosCount] = useState(0);
+  const [procContribution, setProcContribution] = useState<string[]>([]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -61,6 +62,10 @@ const WizardEvaluacion: React.FC = () => {
   const handlePuestoSelect = useCallback(async (id: string) => {
     setSelectedPuestoId(id);
     setAnalisis({});
+    setFactorPoints({});
+    setTotalPuntos(0);
+    setProcedimientosCount(0);
+    setProcContribution([]);
     setPageState('select');
     setAiError(null);
     setSavedEvaluacionId(null);
@@ -105,6 +110,7 @@ const WizardEvaluacion: React.FC = () => {
       setTotalPuntos(res.data.totalPuntos || 0);
       setFactorPoints(res.data.factorPoints || {});
       setProcedimientosCount(res.data.procedimientosCount || 0);
+      setProcContribution(res.data.procContribution || []);
       setPageState('result');
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message || 'Error al comunicarse con el agente IA';
@@ -150,6 +156,8 @@ const WizardEvaluacion: React.FC = () => {
     setAnalisis({});
     setFactorPoints({});
     setTotalPuntos(0);
+    setProcedimientosCount(0);
+    setProcContribution([]);
     setPageState('select');
     setAiError(null);
     setSavedEvaluacionId(null);
@@ -276,6 +284,11 @@ const WizardEvaluacion: React.FC = () => {
                           <div>
                             <h4 className="text-sm font-bold text-foreground">Factor {idx + 1}: {factor.label}</h4>
                             <p className="text-[10px] text-muted-foreground">{factor.desc}</p>
+                            {procContribution.includes(factor.key) && (
+                              <span className="inline-flex items-center gap-0.5 mt-0.5 text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded leading-tight">
+                                <FileText size={10} /> Proc
+                              </span>
+                            )}
                           </div>
                         </div>
                         <div className="text-right">
@@ -344,10 +357,15 @@ const WizardEvaluacion: React.FC = () => {
               </div>
 
               {procedimientosCount > 0 && (
-                <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl px-4 py-3 flex items-center gap-3 text-xs text-indigo-800">
-                  <FileText size={16} className="text-indigo-500 shrink-0" />
+                <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl px-4 py-3 flex items-start gap-3 text-xs text-indigo-800">
+                  <FileText size={16} className="text-indigo-500 shrink-0 mt-0.5" />
                   <span>
                     Evaluación basada en las funciones oficiales y <strong>{procedimientosCount} procedimiento{procedimientosCount !== 1 ? 's' : ''} operativo{procedimientosCount !== 1 ? 's' : ''}</strong> asociados al área del puesto.
+                    {procContribution.length > 0 ? (
+                      <> Los procedimientos aportaron evidencia adicional en los factores: <strong>{procContribution.map(k => FACTORS_CONFIG.find(f => f.key === k)?.label || k).join(', ')}</strong>.</>
+                    ) : (
+                      <> No se encontraron indicadores adicionales en los procedimientos para modificar la asignación.</>
+                    )}
                   </span>
                 </div>
               )}
