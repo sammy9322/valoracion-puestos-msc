@@ -357,40 +357,54 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
   const educacion = puesto.educacion_requerida || '';
   const procCount = procText ? procText.split('---').filter(s => s.includes(':')).length : 0;
 
-  const configs: { key: keyof EvaluationSuggestion; profiles: GradeProfile[]; label: string }[] = [
-    { key: 'dificultad', profiles: DIFICULTAD_PROFILES, label: 'Dificultad de Funciones' },
-    { key: 'supervision', profiles: SUPERVISION_PROFILES, label: 'Supervision Ejercida' },
-    { key: 'responsabilidad', profiles: RESP_PROFILES, label: 'Responsabilidad' },
-    { key: 'condiciones', profiles: COND_PROFILES, label: 'Condiciones de Trabajo' },
-    { key: 'error', profiles: ERROR_PROFILES, label: 'Consecuencia del Error' },
+  const configs: { key: keyof EvaluationSuggestion; profiles: GradeProfile[]; label: string; maxPts: number }[] = [
+    { key: 'dificultad', profiles: DIFICULTAD_PROFILES, label: 'Dificultad de Funciones', maxPts: 200 },
+    { key: 'supervision', profiles: SUPERVISION_PROFILES, label: 'Supervision Ejercida', maxPts: 150 },
+    { key: 'responsabilidad', profiles: RESP_PROFILES, label: 'Responsabilidad', maxPts: 200 },
+    { key: 'condiciones', profiles: COND_PROFILES, label: 'Condiciones de Trabajo', maxPts: 100 },
+    { key: 'error', profiles: ERROR_PROFILES, label: 'Consecuencia del Error', maxPts: 150 },
   ];
 
-  const result: any = {};
+  function continuousPoints(cov: number[], maxPts: number): number {
+    const total = cov[1] + cov[2] + cov[3] + cov[4] + cov[5];
+    if (total === 0) return 0;
+    const weighted = (1*cov[1] + 2*cov[2] + 3*cov[3] + 4*cov[4] + 5*cov[5]) / total;
+    const clamped = Math.max(1, Math.min(5, weighted));
+    return maxPts * (clamped - 1) / 4;
+  }
 
-  for (const { key, profiles, label } of configs) {
+  const result: any = {};
+  let continuousTotal = 0;
+
+  for (const { key, profiles, label, maxPts } of configs) {
     const funcEval = evaluateByProfile(funciones, profiles, label, 'las funciones del puesto');
     result[key] = funcEval.grado;
     let just = funcEval.justification;
+    let cov = funcEval.details.coverage;
 
     if (procText) {
       const procEval = evaluateByProfile(procText, profiles, label, 'los procedimientos asociados');
       if (procEval.grado > funcEval.grado) {
         const boost = Math.min(5, funcEval.grado + Math.round((procEval.grado - funcEval.grado) * 0.5));
         result[key] = boost;
+        cov = procEval.details.coverage;
         just = buildRubricJustification(label, procEval.details, profiles.find(p => p.grade === procEval.grado)?.desc || '', 'las funciones del puesto y los procedimientos operativos', true);
       }
     }
 
+    continuousTotal += continuousPoints(cov, maxPts);
     result[`${key}_just`] = just;
   }
 
   const { grado: reqGrado, evidence: reqEvidence } = evaluateRequisitos(educacion);
   result.requisitos = reqGrado;
+  continuousTotal += 200 * (Math.max(1, Math.min(5, reqGrado)) - 1) / 4;
   result.requisitos_just = reqEvidence && reqEvidence !== 'educacion basica'
     ? `Evaluacion de Requisitos: el puesto requiere "${reqEvidence}", lo cual corresponde a Grado ${reqGrado} segun la escala de formacion academica MSC.`
     : `Evaluacion de Requisitos: se requiere "${reqEvidence}", asignando Grado ${reqGrado} segun la rubrica MSC.`;
 
   const evaluated = validateAndCalculate(result, puesto.id, 'rule-based');
+  evaluated.totalPuntos = Math.round(continuousTotal);
   if (procCount) evaluated.procedimientosCount = procCount;
   return evaluated;
 }

@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Build: v6 — rubric coverage engine (comparacion por perfiles)
+// Build: v7 — puntaje continuo desde weighted coverage
 
 import express from 'express';
 import cors from 'cors';
