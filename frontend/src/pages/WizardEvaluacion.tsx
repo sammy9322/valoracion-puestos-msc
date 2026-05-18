@@ -5,15 +5,19 @@ import { getEstratoCompleto } from '../constants/categorias';
 import type { EstratoResult } from '../constants/categorias';
 
 const FACTORS_CONFIG = [
-  { key: 'dificultad', label: 'Dificultad de Funciones', icon: Target, points: [0, 40, 80, 120, 160, 200], desc: 'Complejidad de las tareas, iniciativa y juicio requerido.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica y decisiones críticas.'] },
-  { key: 'supervision', label: 'Supervisión Ejercida', icon: Briefcase, points: [0, 30, 60, 90, 120, 150], desc: 'Cantidad y nivel de personal bajo su cargo.', grades: ['', 'No ejerce supervisión.', 'Supervisión ocasional.', 'Supervisión de grupo operativo.', 'Jefatura de unidad.', 'Dirección de área mayor.'] },
-  { key: 'responsabilidad', label: 'Responsabilidad', icon: ShieldAlert, points: [0, 40, 80, 120, 160, 200], desc: 'Responsabilidad por valores, equipo o información.', grades: ['', 'Baja responsabilidad.', 'Responsabilidad moderada.', 'Custodia de información sensible.', 'Responsabilidad por presupuestos.', 'Gestión de proceso clave.'] },
-  { key: 'condiciones', label: 'Condiciones de Trabajo', icon: Thermometer, points: [0, 20, 40, 60, 80, 100], desc: 'Exposición a riesgos y esfuerzo físico.', grades: ['', 'Oficina normal.', 'Esfuerzo moderado.', 'Exposición climática o ruido.', 'Riesgo de accidentes.', 'Alta peligrosidad.'] },
-  { key: 'error', label: 'Consecuencia del Error', icon: AlertTriangle, points: [0, 30, 60, 90, 120, 150], desc: 'Gravedad del daño institucional por error.', grades: ['', 'Error fácil de corregir.', 'Retrasos menores.', 'Afecta otros departamentos.', 'Pérdidas económicas/legales.', 'Compromete estabilidad.'] },
-  { key: 'requisitos', label: 'Requisitos', icon: GraduationCap, points: [0, 40, 80, 120, 160, 200], desc: 'Nivel académico y experiencia requerida.', grades: ['', 'Educación básica.', 'Bachillerato / Técnico.', 'Diplomado / Técnico superior.', 'Bachillerato / Licenciatura.', 'Maestría / Especialización.'] }
+  { key: 'dificultad', label: 'Dificultad de Funciones', icon: Target, points: [0, 40, 80, 120, 160, 200], maxPts: 200, desc: 'Complejidad de las tareas, iniciativa y juicio requerido.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica y decisiones críticas.'] },
+  { key: 'supervision', label: 'Supervisión Ejercida', icon: Briefcase, points: [0, 30, 60, 90, 120, 150], maxPts: 150, desc: 'Cantidad y nivel de personal bajo su cargo.', grades: ['', 'No ejerce supervisión.', 'Supervisión ocasional.', 'Supervisión de grupo operativo.', 'Jefatura de unidad.', 'Dirección de área mayor.'] },
+  { key: 'responsabilidad', label: 'Responsabilidad', icon: ShieldAlert, points: [0, 40, 80, 120, 160, 200], maxPts: 200, desc: 'Responsabilidad por valores, equipo o información.', grades: ['', 'Baja responsabilidad.', 'Responsabilidad moderada.', 'Custodia de información sensible.', 'Responsabilidad por presupuestos.', 'Gestión de proceso clave.'] },
+  { key: 'condiciones', label: 'Condiciones de Trabajo', icon: Thermometer, points: [0, 20, 40, 60, 80, 100], maxPts: 100, desc: 'Exposición a riesgos y esfuerzo físico.', grades: ['', 'Oficina normal.', 'Esfuerzo moderado.', 'Exposición climática o ruido.', 'Riesgo de accidentes.', 'Alta peligrosidad.'] },
+  { key: 'error', label: 'Consecuencia del Error', icon: AlertTriangle, points: [0, 30, 60, 90, 120, 150], maxPts: 150, desc: 'Gravedad del daño institucional por error.', grades: ['', 'Error fácil de corregir.', 'Retrasos menores.', 'Afecta otros departamentos.', 'Pérdidas económicas/legales.', 'Compromete estabilidad.'] },
+  { key: 'requisitos', label: 'Requisitos', icon: GraduationCap, points: [0, 40, 80, 120, 160, 200], maxPts: 200, desc: 'Nivel académico y experiencia requerida.', grades: ['', 'Educación básica.', 'Bachillerato / Técnico.', 'Diplomado / Técnico superior.', 'Bachillerato / Licenciatura.', 'Maestría / Especialización.'] }
 ];
 
 const POINTS_MAP: Record<string, number[]> = Object.fromEntries(FACTORS_CONFIG.map(f => [f.key, f.points]));
+
+function linearPts(grado: number, maxPts: number): number {
+  return Math.round(maxPts * (Math.max(1, Math.min(5, grado)) - 1) / 4);
+}
 
 interface FactorState {
   grado: number;
@@ -35,6 +39,7 @@ const WizardEvaluacion: React.FC = () => {
   const [aiError, setAiError] = useState<string | null>(null);
   const [savedEvaluacionId, setSavedEvaluacionId] = useState<string | null>(null);
   const [totalPuntos, setTotalPuntos] = useState(0);
+  const [factorPoints, setFactorPoints] = useState<Record<string, number>>({});
   const [editingFactor, setEditingFactor] = useState<string | null>(null);
 
   const [analisis, setAnalisis] = useState<AIAnalysis>({});
@@ -52,17 +57,6 @@ const WizardEvaluacion: React.FC = () => {
       }
     });
   }, []);
-
-  useEffect(() => {
-    let total = 0;
-    for (const factor of FACTORS_CONFIG) {
-      const a = analisis[factor.key];
-      if (a) {
-        total += factor.points[a.grado];
-      }
-    }
-    setTotalPuntos(total);
-  }, [analisis]);
 
   const handlePuestoSelect = useCallback(async (id: string) => {
     setSelectedPuestoId(id);
@@ -108,6 +102,8 @@ const WizardEvaluacion: React.FC = () => {
       }
       setAnalisis(newAnalisis);
       setSavedEvaluacionId(res.data.evaluacion.id);
+      setTotalPuntos(res.data.totalPuntos || 0);
+      setFactorPoints(res.data.factorPoints || {});
       setProcedimientosCount(res.data.procedimientosCount || 0);
       setPageState('result');
     } catch (error: any) {
@@ -152,6 +148,8 @@ const WizardEvaluacion: React.FC = () => {
 
   const handleReset = () => {
     setAnalisis({});
+    setFactorPoints({});
+    setTotalPuntos(0);
     setPageState('select');
     setAiError(null);
     setSavedEvaluacionId(null);
@@ -159,12 +157,23 @@ const WizardEvaluacion: React.FC = () => {
   };
 
   const handleGradeChange = (factorKey: string, grado: number) => {
+    const factor = FACTORS_CONFIG.find(f => f.key === factorKey);
+    if (!factor) return;
+
+    const base: Record<string, number> = { ...factorPoints };
+    if (Object.keys(base).length === 0) {
+      for (const f of FACTORS_CONFIG) {
+        const a = analisis[f.key];
+        if (a) base[f.key] = linearPts(a.grado, f.maxPts);
+      }
+    }
+    base[factorKey] = linearPts(grado, factor.maxPts);
+    setFactorPoints(base);
+    setTotalPuntos(Object.values(base).reduce((s, v) => s + v, 0));
+
     setAnalisis(prev => ({
       ...prev,
-      [factorKey]: {
-        ...prev[factorKey],
-        grado
-      }
+      [factorKey]: { ...prev[factorKey], grado }
     }));
   };
 
@@ -270,7 +279,7 @@ const WizardEvaluacion: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-lg font-black text-foreground">{factor.points[a.grado]} <span className="text-xs font-medium text-muted-foreground">pts</span></p>
+                          <p className="text-lg font-black text-foreground">{(factorPoints[factor.key] ?? factor.points[a.grado])} <span className="text-xs font-medium text-muted-foreground">pts</span></p>
                           {isEditing ? (
                             <button onClick={() => setEditingFactor(null)} className="text-[10px] text-primary font-bold hover:underline">Cerrar</button>
                           ) : (
@@ -299,7 +308,7 @@ const WizardEvaluacion: React.FC = () => {
                                 }`}
                               >
                                 <div>G{g}</div>
-                                <div className="text-[10px] font-normal">{factor.points[g]} pts</div>
+                                <div className="text-[10px] font-normal">{linearPts(g, factor.maxPts)} pts</div>
                               </button>
                             ))}
                           </div>
