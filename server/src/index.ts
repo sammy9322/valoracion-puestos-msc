@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Build: v5 — detalle tecnico por factor en PDF
+// Build: v6 — rubric coverage engine (comparacion por perfiles)
 
 import express from 'express';
 import cors from 'cors';

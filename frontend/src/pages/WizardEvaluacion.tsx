@@ -39,7 +39,6 @@ const WizardEvaluacion: React.FC = () => {
 
   const [analisis, setAnalisis] = useState<AIAnalysis>({});
   const [procedimientosCount, setProcedimientosCount] = useState(0);
-  const [factorKeywords, setFactorKeywords] = useState<Record<string, {keywords: string[], procKeywords: string[]}>>({});
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -68,7 +67,6 @@ const WizardEvaluacion: React.FC = () => {
   const handlePuestoSelect = useCallback(async (id: string) => {
     setSelectedPuestoId(id);
     setAnalisis({});
-    setFactorKeywords({});
     setPageState('select');
     setAiError(null);
     setSavedEvaluacionId(null);
@@ -111,12 +109,6 @@ const WizardEvaluacion: React.FC = () => {
       setAnalisis(newAnalisis);
       setSavedEvaluacionId(res.data.evaluacion.id);
       setProcedimientosCount(res.data.procedimientosCount || 0);
-      const fkMap: Record<string, {keywords: string[], procKeywords: string[]}> = {};
-      const fkList = res.data.factorKeywords || [];
-      for (const item of fkList) {
-        fkMap[item.factor] = { keywords: item.keywords || [], procKeywords: item.procKeywords || [] };
-      }
-      setFactorKeywords(fkMap);
       setPageState('result');
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message || 'Error al comunicarse con el agente IA';
@@ -160,7 +152,6 @@ const WizardEvaluacion: React.FC = () => {
 
   const handleReset = () => {
     setAnalisis({});
-    setFactorKeywords({});
     setPageState('select');
     setAiError(null);
     setSavedEvaluacionId(null);
@@ -291,21 +282,6 @@ const WizardEvaluacion: React.FC = () => {
                       {a.justificacion && !isEditing && (
                         <div className="bg-indigo-50/70 border border-indigo-100/70 rounded-lg px-3 py-2 text-xs text-indigo-800 leading-relaxed mb-2">
                           <span className="font-semibold">Análisis IA:</span> {a.justificacion}
-                        </div>
-                      )}
-
-                      {!isEditing && factorKeywords[factor.key] && (
-                        <div className="flex gap-2 mb-2">
-                          {factorKeywords[factor.key].keywords.length > 0 && (
-                            <span className="text-[10px] bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                              {factorKeywords[factor.key].keywords.length} kw en funciones
-                            </span>
-                          )}
-                          {factorKeywords[factor.key].procKeywords.length > 0 && (
-                            <span className="text-[10px] bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded-full font-medium">
-                              {factorKeywords[factor.key].procKeywords.length} kw en procedimientos
-                            </span>
-                          )}
                         </div>
                       )}
 
