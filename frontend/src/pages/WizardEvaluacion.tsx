@@ -38,6 +38,7 @@ const WizardEvaluacion: React.FC = () => {
   const [editingFactor, setEditingFactor] = useState<string | null>(null);
 
   const [analisis, setAnalisis] = useState<AIAnalysis>({});
+  const [procedimientosCount, setProcedimientosCount] = useState(0);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -107,6 +108,7 @@ const WizardEvaluacion: React.FC = () => {
       }
       setAnalisis(newAnalisis);
       setSavedEvaluacionId(res.data.evaluacion.id);
+      setProcedimientosCount(res.data.procedimientosCount || 0);
       setPageState('result');
     } catch (error: any) {
       const msg = error.response?.data?.error || error.message || 'Error al comunicarse con el agente IA';
@@ -332,6 +334,15 @@ const WizardEvaluacion: React.FC = () => {
                 )}
               </div>
 
+              {procedimientosCount > 0 && (
+                <div className="bg-indigo-50/80 border border-indigo-100 rounded-xl px-4 py-3 flex items-center gap-3 text-xs text-indigo-800">
+                  <FileText size={16} className="text-indigo-500 shrink-0" />
+                  <span>
+                    Evaluación basada en las funciones oficiales y <strong>{procedimientosCount} procedimiento{procedimientosCount !== 1 ? 's' : ''} operativo{procedimientosCount !== 1 ? 's' : ''}</strong> asociados al área del puesto.
+                  </span>
+                </div>
+              )}
+
               <div className="flex gap-3">
                 <button
                   onClick={handleSave}
@@ -424,6 +435,12 @@ const WizardEvaluacion: React.FC = () => {
                         → {estrato.alternativaNoProhibida.nombre}
                       </span>
                     )}
+                  </div>
+                )}
+                {procedimientosCount > 0 && (
+                  <div className="mt-2 text-[10px] text-indigo-600 flex items-center gap-1.5 bg-indigo-50/50 px-2 py-1.5 rounded border border-indigo-100">
+                    <FileText size={11} />
+                    <span>{procedimientosCount} procedimiento{procedimientosCount !== 1 ? 's' : ''} operativo{procedimientosCount !== 1 ? 's' : ''} asociado{procedimientosCount !== 1 ? 's' : ''}</span>
                   </div>
                 )}
               </div>

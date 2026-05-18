@@ -138,25 +138,26 @@ class ReportGenerator {
   }
 
   private addFunctionsBlock(label: string, text: string): void {
-    const textH = this.doc.heightOfString(text || 'No especificado', { width: CONTENT_WIDTH, align: 'justify' });
+    const opts = { width: CONTENT_WIDTH, align: 'justify' as const, lineGap: 3 };
+    const textH = this.doc.heightOfString(text || 'No especificado', opts);
     this.checkPage(textH + 40);
     this.doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
     this.doc.text(label, MARGIN, this.y);
     this.y += 11;
     this.doc.fontSize(9).font('Helvetica').fillColor('#1e293b');
-    this.doc.text(text || 'No especificado', MARGIN, this.y, { width: CONTENT_WIDTH, align: 'justify', lineGap: 3 });
+    this.doc.text(text || 'No especificado', MARGIN, this.y, opts);
     this.y += textH + 8;
   }
 
   private addProcedimientosBlock(procedimientos: ProcedimientosContext): void {
     this.addSectionTitle('4. Contexto Operativo (Procedimientos Asociados)');
 
+    const procIntro = `Se identificaron ${procedimientos.totalProcedimientos} procedimientos asociados al area del puesto. El analisis de factores se realizo considerando tanto la descripcion oficial como las actividades detalladas en estos procedimientos.`;
+    const procOpts = { width: CONTENT_WIDTH, align: 'justify' as const, lineGap: 2 };
+    const procIntroH = this.doc.heightOfString(procIntro, procOpts);
     this.doc.fontSize(9).font('Helvetica').fillColor('#475569');
-    this.doc.text(
-      `Se identificaron ${procedimientos.totalProcedimientos} procedimientos asociados al area del puesto. El analisis de factores se realizo considerando tanto la descripcion oficial como las actividades detalladas en estos procedimientos.`,
-      MARGIN, this.y, { width: CONTENT_WIDTH, align: 'justify', lineGap: 2 }
-    );
-    this.y += this.doc.heightOfString('...', { width: CONTENT_WIDTH }) + 12;
+    this.doc.text(procIntro, MARGIN, this.y, procOpts);
+    this.y += procIntroH + 12;
 
     for (const proc of procedimientos.procedimientos) {
       this.checkPage(60);
@@ -270,7 +271,17 @@ class ReportGenerator {
     this.doc.fontSize(10).font('Helvetica-Bold').fillColor('#1e40af');
     this.doc.text(`TOTAL`, MARGIN + 4, this.y, { width: colWidths[0] + colWidths[1] + colWidths[2], align: 'right' });
     this.doc.text(`${total} / 1000 pts`, MARGIN + colWidths[0] + colWidths[1] + 4, this.y, { width: colWidths[2], align: 'left' });
-    this.y += 22;
+    this.y += 16;
+
+    const procCtx: any = (evaluacion as any)._procedimientos;
+    if (procCtx) {
+      this.doc.fontSize(7).font('Helvetica-Oblique').fillColor('#64748b');
+      this.doc.text(
+        `* Analisis basado en las funciones oficiales del puesto y ${procCtx.totalProcedimientos} procedimientos operativos asociados al area.`,
+        MARGIN, this.y, { width: CONTENT_WIDTH, align: 'left' }
+      );
+      this.y += 16;
+    }
   }
 
   private addConclusion(evaluacion: any, totalPuntos: number, procedimientos?: ProcedimientosContext): void {
@@ -361,8 +372,9 @@ class ReportGenerator {
 
     const dictamen = `${dictamenBase}${dictamenClase}${dictamenMotor}${dictamenProc}`;
     this.doc.fontSize(9).font('Helvetica').fillColor('#1e293b');
-    this.doc.text(dictamen, MARGIN, this.y, { width: CONTENT_WIDTH, align: 'justify', lineGap: 3 });
-    this.y += this.doc.heightOfString(dictamen, { width: CONTENT_WIDTH, align: 'justify' }) + 12;
+    const dictOpts = { width: CONTENT_WIDTH, align: 'justify' as const, lineGap: 3 };
+    this.doc.text(dictamen, MARGIN, this.y, dictOpts);
+    this.y += this.doc.heightOfString(dictamen, dictOpts) + 12;
 
     this.doc.fontSize(9).font('Helvetica-Bold').fillColor('#1e3a5f');
     this.doc.text('Recomendaciones:', MARGIN, this.y);
@@ -456,8 +468,9 @@ class ReportGenerator {
       (procedimientos
         ? ` Para este análisis se incorporaron ${procedimientos.totalProcedimientos} procedimientos operativos asociados al área del puesto como contexto adicional, permitiendo una evaluación más precisa de las tareas reales que ejecuta el puesto.`
         : '');
-    const lines = this.doc.heightOfString(metodologiaText, { width: CONTENT_WIDTH, align: 'justify' });
-    this.doc.text(metodologiaText, MARGIN, this.y, { width: CONTENT_WIDTH, align: 'justify', lineGap: 3 });
+    const metOpts = { width: CONTENT_WIDTH, align: 'justify' as const, lineGap: 3 };
+    const lines = this.doc.heightOfString(metodologiaText, metOpts);
+    this.doc.text(metodologiaText, MARGIN, this.y, metOpts);
     this.y += lines + 12;
 
     if (procedimientos) {

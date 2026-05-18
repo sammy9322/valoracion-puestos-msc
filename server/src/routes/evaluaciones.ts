@@ -173,7 +173,8 @@ router.post('/ai-evaluate', async (req, res) => {
             success: true,
             evaluacion,
             totalPuntos: result.totalPuntos,
-            analisis: result.data
+            analisis: result.data,
+            procedimientosCount: result.procedimientosCount || 0
         });
 
     } catch (error: any) {

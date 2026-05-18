@@ -59,6 +59,7 @@ export interface AIEvaluationResult {
   puesto_id: string;
   analisis_completo: boolean;
   motor: 'llm' | 'rule-based';
+  procedimientosCount?: number;
 }
 
 export function getEngineStatus(): { ollamaAvailable: boolean; activeEngine: 'llm' | 'rule-based' } {
@@ -385,16 +386,21 @@ export const aiAgentService = {
         if (procCtx) {
           puesto = { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procCtx.textoCompleto}` };
         }
+        let result: AIEvaluationResult;
         if (ollamaAvailable) {
           try {
             const prompt = buildPrompt(puesto);
             const raw = await callOllama(prompt);
-            return validateAndCalculate(raw, puesto.id, 'llm');
+            result = validateAndCalculate(raw, puesto.id, 'llm');
           } catch (error: any) {
             console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
+            result = ruleBasedEvaluation(puesto);
           }
+        } else {
+          result = ruleBasedEvaluation(puesto);
         }
-        return ruleBasedEvaluation(puesto);
+        if (procCtx) result.procedimientosCount = procCtx.totalProcedimientos;
+        return result;
     },
 
     async suggestEvaluation(puesto: any): Promise<EvaluationSuggestion | null> {
