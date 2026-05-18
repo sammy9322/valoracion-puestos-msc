@@ -164,6 +164,40 @@ const EDUC_LEVELS: { patterns: string[]; score: number; label: string }[] = [
   { patterns: ['maestria', 'master', 'magister', 'especializacion', 'doctorado', 'phd', 'posgrado'], score: 5, label: 'maestria/doctorado' },
 ];
 
+// ─── Context-aware exclusion rules ──────────────────────────
+
+const CONTEXT_EXCLUSIONS: Record<string, string[]> = {
+  riesgo: ['control interno', 'metodologia', 'valoracion', 'matriz', 'gestion de riesgo', 'evaluacion de riesgo'],
+  coordina: ['actividades', 'tareas', 'procesos', 'programas'],
+  tecnico: ['comite', 'mesa', 'reunion', 'asistencia', 'apoyo tecnico'],
+  evaluacion: ['desempeno', 'rendimiento', 'personal', 'clima laboral'],
+};
+
+function sentenceIncludesTerm(sentence: string, term: string): boolean {
+  return sentence.includes(term);
+}
+
+function matchesInSentence(
+  normalizedText: string,
+  pattern: string,
+  exclusions?: string[],
+): boolean {
+  const sentences = normalizedText
+    .split(/[.!;\n]+/)
+    .map(s => s.trim())
+    .filter(Boolean);
+
+  for (const sentence of sentences) {
+    if (sentence.includes(pattern)) {
+      if (exclusions && exclusions.some(ex => sentence.includes(ex))) {
+        continue;
+      }
+      return true;
+    }
+  }
+  return false;
+}
+
 // ─── Dimensional analysis helpers ────────────────────────────
 
 interface DimensionScore {
@@ -175,6 +209,7 @@ function scoreByLevels(
   text: string,
   levels: Record<number, { patterns: string[]; weight: number }>,
   baseScore: number = 1,
+  exclusions?: Record<string, string[]>,
 ): DimensionScore {
   const normalized = normalizeText(text);
   let maxScore = baseScore;
@@ -182,9 +217,10 @@ function scoreByLevels(
 
   for (let grade = 1; grade <= 5; grade++) {
     const level = levels[grade];
-    if (!level) continue;    
+    if (!level) continue;
     for (const pattern of level.patterns) {
-      if (normalized.includes(pattern)) {
+      const patternExclusions = exclusions?.[pattern];
+      if (matchesInSentence(normalized, pattern, patternExclusions)) {
         const effective = grade * level.weight;
         if (effective > maxScore) maxScore = effective;
         matchedEvidence.push(pattern);
@@ -352,13 +388,13 @@ function evaluateResponsabilidad(text: string): { grado: number; keywords: strin
 }
 
 function evaluateCondiciones(text: string): { grado: number; keywords: string[]; justification: string } {
-  const condDim = scoreByLevels(text, COND_INDICATORS, 1);
+  const condDim = scoreByLevels(text, COND_INDICATORS, 1, CONTEXT_EXCLUSIONS);
 
   let rawScore = condDim.score;
   if (rawScore < 1) rawScore = 1;
   const grado = Math.max(1, Math.min(5, rawScore));
 
-  const ev = condDim.evidence;
+  const ev = condDim.evidence.filter(k => k !== 'riesgo' || !CONTEXT_EXCLUSIONS.riesgo?.some(ex => text.toLowerCase().includes(ex)));
 
   let just = `Analisis de condiciones de trabajo: `;
   if (ev.length > 0) {

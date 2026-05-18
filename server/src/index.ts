@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Build: v3 — motor rule-based multidimensional
+// Build: v4 — exclusion contextual por oracion (riesgo+control interno)
 
 import express from 'express';
 import cors from 'cors';
