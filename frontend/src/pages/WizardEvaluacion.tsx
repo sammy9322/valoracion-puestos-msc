@@ -1,6 +1,7 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sparkles, CheckCircle2, AlertTriangle, Info, ShieldAlert, FileText, Save, Download, RotateCcw, Loader2, Target, Thermometer, GraduationCap, Briefcase } from 'lucide-react';
 import api from '../services/api';
+import { getEstratoCompleto, EstratoResult } from '../constants/categorias';
 
 const FACTORS_CONFIG = [
   { key: 'dificultad', label: 'Dificultad de Funciones', icon: Target, points: [0, 40, 80, 120, 160, 200], desc: 'Complejidad de las tareas, iniciativa y juicio requerido.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica y decisiones críticas.'] },
@@ -166,6 +167,7 @@ const WizardEvaluacion: React.FC = () => {
 
   const totalMax = FACTORS_CONFIG.reduce((sum, f) => sum + f.points[5], 0);
   const porcentaje = totalMax > 0 ? Math.round((totalPuntos / totalMax) * 100) : 0;
+  const estrato = useMemo<EstratoResult | null>(() => getEstratoCompleto(totalPuntos), [totalPuntos]);
 
   if (loading) {
     return <div className="p-20 text-center animate-pulse text-muted-foreground font-medium">Cargando catálogo de puestos...</div>;
@@ -184,6 +186,9 @@ const WizardEvaluacion: React.FC = () => {
             {pageState === 'select' || pageState === 'evaluating' ? '—' : `${totalPuntos}`}
             <span className="text-sm font-medium text-muted-foreground">/{totalMax}</span>
           </p>
+          {estrato && (
+            <p className="text-[11px] font-bold text-muted-foreground mt-1 leading-tight">{estrato.clase.nombre}</p>
+          )}
         </div>
       </div>
 
@@ -303,11 +308,27 @@ const WizardEvaluacion: React.FC = () => {
                 );
               })}
 
-              <div className="bg-primary/5 border border-primary/10 rounded-xl p-5 flex items-center justify-between">
+              <div className="bg-primary/5 border border-primary/10 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <p className="text-xs font-bold text-muted-foreground uppercase">Puntuación Total</p>
                   <p className="text-2xl font-black text-primary">{totalPuntos} <span className="text-sm font-medium text-muted-foreground">/ {totalMax} pts ({porcentaje}%)</span></p>
                 </div>
+                {estrato && (
+                  <div className={`inline-flex flex-wrap items-center gap-1.5 px-3 py-2 rounded-lg border text-xs font-bold ${estrato.clase.color}`}>
+                    {estrato.esProhibida && (
+                      <span className="text-[10px] bg-red-100 text-red-700 px-1.5 py-0.5 rounded font-bold">PROHIB.</span>
+                    )}
+                    <span>{estrato.clase.nombre}</span>
+                    <span className="text-muted-foreground font-medium">·</span>
+                    <span>{estrato.clase.serie}</span>
+                    {estrato.alternativaNoProhibida && (
+                      <>
+                        <span className="text-muted-foreground font-medium mx-0.5">→</span>
+                        <span className="text-muted-foreground">{estrato.alternativaNoProhibida.nombre}</span>
+                      </>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-3">
@@ -394,6 +415,16 @@ const WizardEvaluacion: React.FC = () => {
                 <p className="text-[10px] text-indigo-600 mt-1">
                   {totalPuntos} puntos asignados. Revise el desglose por factor en el panel principal.
                 </p>
+                {estrato && (
+                  <div className={`mt-2 text-[10px] font-bold px-2 py-1 rounded border ${estrato.clase.color}`}>
+                    {estrato.clase.nombre}
+                    {estrato.esProhibida && estrato.alternativaNoProhibida && (
+                      <span className="text-muted-foreground font-normal ml-1">
+                        → {estrato.alternativaNoProhibida.nombre}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -53,14 +53,38 @@ export const ESTRATOS_MUNICIPALES: ClaseMunicipal[] = [
 
 /**
  * Encuentra el estrato mas cercano por puntaje sin excederlo.
+ * Prefiere clases sin "(Prohib.)" cuando hay empate.
  */
 export const getEstratoSugerido = (puntos: number): ClaseMunicipal | null => {
       if (!puntos) return null;
 
-      // Filtramos y ordenamos por puntos de forma descendente para encontrar el mas alto posible que no exceda el puntaje
       const candidatos = [...ESTRATOS_MUNICIPALES]
           .filter(e => e.puntos <= puntos)
-          .sort((a, b) => b.puntos - a.puntos);
+          .sort((a, b) => {
+            if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+            return a.nombre.includes('(Prohib.)') ? 1 : -1;
+          });
 
       return candidatos.length > 0 ? candidatos[0] : null;
 };
+
+export type EstratoResult = {
+  clase: ClaseMunicipal;
+  esProhibida: boolean;
+  alternativaNoProhibida: ClaseMunicipal | null;
+};
+
+export function getEstratoCompleto(puntos: number): EstratoResult | null {
+  const clase = getEstratoSugerido(puntos);
+  if (!clase) return null;
+  return {
+    clase,
+    esProhibida: clase.nombre.includes('(Prohib.)'),
+    alternativaNoProhibida: getClaseNoProhibida(clase)
+  };
+}
+
+function getClaseNoProhibida(prohibida: ClaseMunicipal): ClaseMunicipal | null {
+  const baseName = prohibida.nombre.replace(/\s*\(Prohib\.\)\s*$/, '');
+  return ESTRATOS_MUNICIPALES.find(e => e.nombre === baseName && !e.nombre.includes('(Prohib.)')) || null;
+}
