@@ -372,7 +372,7 @@ const WizardEvaluacion: React.FC = () => {
         </div>
 
         <aside className="lg:w-80 space-y-4">
-          <div className="bg-card border rounded-xl p-5 sticky top-8 space-y-4">
+          <div className="bg-card border rounded-xl p-5 space-y-4">
             <h3 className="text-sm font-bold text-foreground flex items-center gap-2 border-b pb-3">
               <Info size={16} className="text-primary" /> Información del Puesto
             </h3>
