@@ -309,8 +309,8 @@ function buildPrompt(puesto: any): string {
 
   return `
 Eres el EVALUADOR TECNICO OFICIAL del sistema de valoracion de puestos de la Municipalidad de San Carlos.
-Tu analisis es objetivo, vinculante y debe basarse EXCLUSIVAMENTE en la descripcion de funciones y requisitos del puesto.
-Aplicas la metodologia MSC (Manual de Clases) de Puntos por Factores.
+Tu analisis es objetivo, vinculante y constituye un documento oficial con implicaciones administrativas y legales.
+Debes basarte EXCLUSIVAMENTE en la descripcion de funciones y requisitos del puesto, aplicando la metodologia MSC (Manual de Clases) de Puntos por Factores con rigor tecnico y profesional.
 
 === DATOS DEL PUESTO A EVALUAR ===
 Nombre del puesto: ${sanitizeInput(puesto.nombre) || 'No especificado'}
@@ -329,24 +329,30 @@ Cada factor se califica del 1 (minimo) al 5 (maximo).
 
 ${gradeTable}
 
-=== METODOLOGIA DE ANALISIS OBJETIVO ===
-Para CADA factor:
-1. LEE la descripcion de funciones completa.
-2. IDENTIFICA palabras clave, verbos de accion, y responsabilidades mencionadas.
-3. COMPARA con la escala de grados del factor.
-4. SELECCIONA el grado que MEJOR se ajusta a la evidencia textual.
-5. JUSTIFICA citando textualmente la parte de las funciones que respalda tu decision.
+=== METODOLOGIA DE ANALISIS TECNICO ===
+Para CADA factor, realiza un analisis multidimensional:
+
+1. **Naturaleza del trabajo**: Evalua la complejidad intrinseca de las funciones descritas. Considera si las tareas son operativas, tecnicas, analiticas, de coordinacion, de planificacion o estrategicas. No te limites a buscar palabras clave; evalua el nivel de juicio, iniciativa y autonomia requerido.
+
+2. **Contexto organizacional**: Considera la ubicacion del puesto en la estructura (a quien reporta, que areas coordina) y su impacto en los procesos institucionales. Evalua el alcance de sus decisiones y responsabilidades.
+
+3. **Evidencia textual especifica**: Identifica y CITA textualmente las partes de la descripcion que demuestren el nivel del factor. La justificacion debe hacer referencia directa a fragmentos de las funciones.
+
+4. **Asignacion del grado**: Selecciona el grado que MEJOR refleje la totalidad de la evidencia. Si hay elementos de multiples grados, prevalece el nivel predominante descrito. Cada grado debe estar plenamente justificado con evidencia textual.
 
 === INSTRUCCIONES CRITICAS ===
-- Eres la fuente de verdad objetiva. No hay intervencion humana.
+- Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
 - Cada grado debe ser un numero entero entre 1 y 5.
-- Cada justificacion debe citar evidencia TEXTUAL de la descripcion de funciones.
-- Las justificaciones deben ser maximo 2 oraciones, citando funciones especificas.
-- Si no hay evidencia clara, asigna el grado mas conservador.
+- Cada justificacion debe tener entre 2 y 4 oraciones, citando fragmentos especificos de las funciones en comillas.
+- No justifiques con palabras sueltas; explica POR QUE ese fragmento demuestra el nivel asignado.
+- Si no hay evidencia clara, asigna el grado mas conservador (1).
 - Devuelve UNICAMENTE el objeto JSON, sin texto adicional ni codigo.
 
+=== EJEMPLO DE JUSTIFICACION TECNICA ADECUADA ===
+"dificultad_just": "Las funciones describen que el puesto 'analiza y evalua informacion tecnica para la toma de decisiones departamentales', lo cual evidencia un nivel de analisis y juicio profesional (Grado 3). Adicionalmente, se menciona 'coordina la ejecucion de programas operativos', lo que requiere planificacion de alcance medio. No se identifican funciones de diseno estrategico o direccion institucional que justifiquen un nivel superior."
+
 === FORMATO JSON REQUERIDO ===
-{ "dificultad": <1-5>, "dificultad_just": "<justificacion>", "supervision": <1-5>, "supervision_just": "<justificacion>", "responsabilidad": <1-5>, "responsabilidad_just": "<justificacion>", "condiciones": <1-5>, "condiciones_just": "<justificacion>", "error": <1-5>, "error_just": "<justificacion>", "requisitos": <1-5>, "requisitos_just": "<justificacion>" }
+{ "dificultad": <1-5>, "dificultad_just": "<justificacion tecnica>", "supervision": <1-5>, "supervision_just": "<justificacion tecnica>", "responsabilidad": <1-5>, "responsabilidad_just": "<justificacion tecnica>", "condiciones": <1-5>, "condiciones_just": "<justificacion tecnica>", "error": <1-5>, "error_just": "<justificacion tecnica>", "requisitos": <1-5>, "requisitos_just": "<justificacion tecnica>" }
 `;
 }
 

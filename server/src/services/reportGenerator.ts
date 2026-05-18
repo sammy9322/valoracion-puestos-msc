@@ -127,18 +127,21 @@ class ReportGenerator {
   }
 
   private addField(label: string, value: string): void {
-    const textH = this.doc.heightOfString(value || 'No especificado', { width: CONTENT_WIDTH, align: 'justify' });
+    this.doc.fontSize(10).font('Helvetica').fillColor('#1e293b');
+    const valueOpts = { width: CONTENT_WIDTH, align: 'justify' as const };
+    const textH = this.doc.heightOfString(value || 'No especificado', valueOpts);
     this.checkPage(textH + 30);
     this.doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
     this.doc.text(label, MARGIN, this.y);
     this.y += 11;
     this.doc.fontSize(10).font('Helvetica').fillColor('#1e293b');
-    this.doc.text(value || 'No especificado', MARGIN, this.y, { width: CONTENT_WIDTH, align: 'justify' });
+    this.doc.text(value || 'No especificado', MARGIN, this.y, valueOpts);
     this.y += textH + 6;
   }
 
   private addFunctionsBlock(label: string, text: string): void {
     const opts = { width: CONTENT_WIDTH, align: 'justify' as const, lineGap: 3 };
+    this.doc.fontSize(9).font('Helvetica').fillColor('#1e293b');
     const textH = this.doc.heightOfString(text || 'No especificado', opts);
     this.checkPage(textH + 40);
     this.doc.fontSize(9).font('Helvetica-Bold').fillColor('#475569');
@@ -150,46 +153,63 @@ class ReportGenerator {
   }
 
   private addProcedimientosBlock(procedimientos: ProcedimientosContext): void {
-    this.addSectionTitle('4. Contexto Operativo (Procedimientos Asociados)');
+    this.addSectionTitle('3. Contexto Operativo (Procedimientos Asociados)');
 
-    const procIntro = `Se identificaron ${procedimientos.totalProcedimientos} procedimientos asociados al area del puesto. El analisis de factores se realizo considerando tanto la descripcion oficial como las actividades detalladas en estos procedimientos.`;
-    const procOpts = { width: CONTENT_WIDTH, align: 'justify' as const, lineGap: 2 };
-    const procIntroH = this.doc.heightOfString(procIntro, procOpts);
     this.doc.fontSize(9).font('Helvetica').fillColor('#475569');
-    this.doc.text(procIntro, MARGIN, this.y, procOpts);
-    this.y += procIntroH + 12;
+    const sopts = { width: CONTENT_WIDTH, align: 'justify' as const, lineGap: 2 };
+    const procIntro = `Se identificaron ${procedimientos.totalProcedimientos} procedimientos asociados al area del puesto. A continuacion se detalla cada procedimiento con su proposito, alcance, pasos y politicas operativas. El analisis de factores considero tanto la descripcion oficial como las actividades descritas en estos procedimientos.`;
+    const introH = this.doc.heightOfString(procIntro, sopts);
+    this.checkPage(introH + 30);
+    this.doc.text(procIntro, MARGIN, this.y, sopts);
+    this.y += introH + 12;
 
     for (const proc of procedimientos.procedimientos) {
-      this.checkPage(60);
+      this.checkPage(50);
       this.doc.fontSize(9).font('Helvetica-Bold').fillColor('#1e3a5f');
       this.doc.text(`${proc.nombre} (${proc.codigo})`, MARGIN, this.y);
       this.y += 12;
 
+      this.doc.fontSize(8).font('Helvetica').fillColor('#475569');
+
       if (proc.proposito) {
-        this.doc.fontSize(8).font('Helvetica').fillColor('#475569');
         const ppOpts = { width: CONTENT_WIDTH, align: 'justify' as const };
         const ppH = this.doc.heightOfString(`Proposito: ${proc.proposito}`, ppOpts);
         this.doc.text(`Proposito: ${proc.proposito}`, MARGIN, this.y, ppOpts);
         this.y += ppH + 4;
       }
 
+      if (proc.alcance) {
+        const alcOpts = { width: CONTENT_WIDTH, align: 'justify' as const };
+        const alcH = this.doc.heightOfString(`Alcance: ${proc.alcance}`, alcOpts);
+        this.doc.text(`Alcance: ${proc.alcance}`, MARGIN, this.y, alcOpts);
+        this.y += alcH + 4;
+      }
+
       const pasosProc = procedimientos.pasos.filter((p: any) => p.procedimiento_codigo === proc.codigo);
       if (pasosProc.length > 0) {
         this.doc.fontSize(8).font('Helvetica-Oblique').fillColor('#334155');
-        for (const paso of pasosProc.slice(0, 12)) {
+        for (const paso of pasosProc) {
           this.checkPage(20);
           const pasoOpts = { width: CONTENT_WIDTH - 10, align: 'justify' as const };
           const pasoH = this.doc.heightOfString(`  - ${paso.descripcion}`, pasoOpts);
           this.doc.text(`  - ${paso.descripcion}`, MARGIN, this.y, pasoOpts);
           this.y += pasoH + 2;
         }
-        if (pasosProc.length > 12) {
-          this.doc.text(`  ... y ${pasosProc.length - 12} pasos adicionales`, MARGIN, this.y);
-          this.y += 10;
+      }
+
+      const politicasProc = procedimientos.politicas.filter((p: any) => p.procedimiento_codigo === proc.codigo);
+      if (politicasProc.length > 0) {
+        this.doc.fontSize(8).font('Helvetica-Oblique').fillColor('#92400e');
+        for (const pol of politicasProc) {
+          this.checkPage(20);
+          const polOpts = { width: CONTENT_WIDTH - 10, align: 'justify' as const };
+          const polH = this.doc.heightOfString(`  * Politica: ${pol.politica}`, polOpts);
+          this.doc.text(`  * Politica: ${pol.politica}`, MARGIN, this.y, polOpts);
+          this.y += polH + 2;
         }
       }
 
-      this.y += 4;
+      this.y += 6;
     }
   }
 
@@ -481,7 +501,7 @@ class ReportGenerator {
       this.addProcedimientosBlock(procedimientos);
     }
 
-    this.addSectionTitle('3. Análisis por Factor');
+    this.addSectionTitle('4. Análisis por Factor');
     this.addFactorsTable(evaluacion);
 
     this.addConclusion(evaluacion, totalPuntos, procedimientos);
