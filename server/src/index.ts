@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+// Build: v2 — forzar rebuild de serverless function
 
 import express from 'express';
 import cors from 'cors';
