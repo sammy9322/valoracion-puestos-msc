@@ -174,7 +174,8 @@ router.post('/ai-evaluate', async (req, res) => {
             evaluacion,
             totalPuntos: result.totalPuntos,
             analisis: result.data,
-            procedimientosCount: result.procedimientosCount || 0
+            procedimientosCount: result.procedimientosCount || 0,
+            factorKeywords: result.factorKeywords || []
         });
 
     } catch (error: any) {

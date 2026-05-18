@@ -52,6 +52,13 @@ export interface EvaluationSuggestion {
     requisitos_just: string;
 }
 
+export interface FactorKeywordDetail {
+  factor: string;
+  keywords: string[];
+  procKeywords: string[];
+  grado: number;
+}
+
 export interface AIEvaluationResult {
   success: boolean;
   data: EvaluationSuggestion;
@@ -60,6 +67,7 @@ export interface AIEvaluationResult {
   analisis_completo: boolean;
   motor: 'llm' | 'rule-based';
   procedimientosCount?: number;
+  factorKeywords?: FactorKeywordDetail[];
 }
 
 export function getEngineStatus(): { ollamaAvailable: boolean; activeEngine: 'llm' | 'rule-based' } {
@@ -137,30 +145,34 @@ function normalizeText(text: string): string {
     .trim();
 }
 
-function evaluateFactor(text: string, rules: RuleKeyword[]): { grado: number; keywords: string[] } {
+function scoreFromText(text: string, rules: RuleKeyword[]): { score: number; keywords: string[] } {
   const normalized = normalizeText(text);
   let maxScore = 1;
-  let matchedKeywords: string[] = [];
+  const matched: string[] = [];
 
   for (const rule of rules) {
     for (const word of rule.words) {
       if (normalized.includes(word)) {
-        if (rule.score > maxScore) {
-          maxScore = rule.score;
-        }
-        matchedKeywords.push(word);
+        if (rule.score > maxScore) maxScore = rule.score;
+        matched.push(word);
       }
     }
   }
 
-  if (text.length > 500) {
-    maxScore = Math.max(maxScore, 2);
-  }
-  if (text.length > 1500) {
-    maxScore = Math.max(maxScore, 3);
-  }
+  if (text.length > 500) maxScore = Math.max(maxScore, 2);
+  if (text.length > 1500) maxScore = Math.max(maxScore, 3);
 
-  return { grado: maxScore, keywords: [...new Set(matchedKeywords)] };
+  return { score: maxScore, keywords: [...new Set(matched)] };
+}
+
+function evaluateFactor(funciones: string, procText: string | undefined, rules: RuleKeyword[]): { grado: number; keywords: string[]; procKeywords: string[] } {
+  const funcRes = scoreFromText(funciones, rules);
+  if (!procText) return { grado: funcRes.score, keywords: funcRes.keywords, procKeywords: [] };
+
+  const procRes = scoreFromText(procText, rules);
+  const combined = Math.max(funcRes.score, procRes.score);
+
+  return { grado: combined, keywords: funcRes.keywords, procKeywords: procRes.keywords };
 }
 
 function evaluateRequisitos(educacion: string): { grado: number; keyword: string } {
@@ -182,10 +194,21 @@ function evaluateRequisitos(educacion: string): { grado: number; keyword: string
   return { grado: maxScore, keyword: matched };
 }
 
-function generateJustification(factorKey: string, grado: number, keywords: string[], puestoNombre: string): string {
+function generateJustification(factorKey: string, grado: number, keywords: string[], procKeywords: string[], puestoNombre: string, procCount?: number): string {
+  let parts: string[] = [];
+
   if (keywords.length > 0) {
-    return `La descripcion del puesto "${puestoNombre}" contiene los terminos: ${keywords.slice(0, 3).join(', ')}, lo cual corresponde a Grado ${grado} segun la rubrica MSC.`;
+    parts.push(`La descripcion oficial del puesto "${puestoNombre}" contiene los terminos: ${keywords.slice(0, 3).join(', ')}`);
   }
+  if (procKeywords.length > 0) {
+    const src = procCount ? `${procCount} procedimientos asociados` : 'procedimientos asociados';
+    parts.push(`en ${src} se identificaron: ${procKeywords.slice(0, 3).join(', ')}`);
+  }
+
+  if (parts.length > 0) {
+    return `${parts.join(', ')}, lo cual corresponde a Grado ${grado} segun la rubrica MSC.`;
+  }
+
   const defaultJustifications: Record<string, string[]> = {
     dificultad: ['Tareas basicas sin evidencia de mayor complejidad.', '', 'La extension y contenido de las funciones sugiere un nivel tecnico medio.', 'La descripcion incluye funciones de planificacion y coordinacion.', 'Se identifican funciones de direccion estrategica.'],
     supervision: ['No se encontro evidencia de personal a cargo.', '', 'Se mencionan labores de coordinacion.', 'El puesto incluye responsabilidades de jefatura.', 'El puesto tiene alcance directivo.'],
@@ -197,28 +220,34 @@ function generateJustification(factorKey: string, grado: number, keywords: strin
   return defaultJustifications[factorKey]?.[grado - 1] || `Asignado Grado ${grado} segun analisis de las funciones del puesto "${puestoNombre}".`;
 }
 
-function ruleBasedEvaluation(puesto: any): AIEvaluationResult {
+function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult {
   const funciones = puesto.descripcion_funciones || '';
   const educacion = puesto.educacion_requerida || '';
   const puestoNombre = puesto.nombre || '';
+  const procCount = procText ? procText.split('---').filter(s => s.includes(':')).length : 0;
 
   const factors: (keyof EvaluationSuggestion)[] = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error'];
 
   const result: any = {};
+  const factorKeywords: FactorKeywordDetail[] = [];
 
   for (const factor of factors) {
-    const { grado, keywords } = evaluateFactor(funciones, RULES[factor]);
+    const { grado, keywords, procKeywords } = evaluateFactor(funciones, procText, RULES[factor]);
     result[factor] = grado;
-    result[`${factor}_just`] = generateJustification(factor, grado, keywords, puestoNombre);
+    result[`${factor}_just`] = generateJustification(factor, grado, keywords, procKeywords, puestoNombre, procCount || undefined);
+    factorKeywords.push({ factor, keywords, procKeywords, grado });
   }
 
   const { grado: reqGrado, keyword: reqKeyword } = evaluateRequisitos(educacion);
   result.requisitos = reqGrado;
   result.requisitos_just = reqKeyword
     ? `El requisito de "${reqKeyword}" en la descripcion del puesto corresponde a Grado ${reqGrado} segun la escala de formacion academica MSC.`
-    : generateJustification('requisitos', reqGrado, [], puestoNombre);
+    : generateJustification('requisitos', reqGrado, [], [], puestoNombre);
 
-  return validateAndCalculate(result, puesto.id, 'rule-based');
+  const evaluated = validateAndCalculate(result, puesto.id, 'rule-based');
+  evaluated.factorKeywords = factorKeywords;
+  if (procCount) evaluated.procedimientosCount = procCount;
+  return evaluated;
 }
 
 // ─── LLM engine ─────────────────────────────────────────────
@@ -383,21 +412,22 @@ export const aiAgentService = {
 
     async evaluate(puesto: any): Promise<AIEvaluationResult> {
         const procCtx = await enrichProc(puesto).catch(() => null);
-        if (procCtx) {
-          puesto = { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procCtx.textoCompleto}` };
-        }
+        const procText = procCtx ? procCtx.textoCompleto : undefined;
         let result: AIEvaluationResult;
         if (ollamaAvailable) {
           try {
-            const prompt = buildPrompt(puesto);
+            const enrichedPuesto = procText
+              ? { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}` }
+              : puesto;
+            const prompt = buildPrompt(enrichedPuesto);
             const raw = await callOllama(prompt);
             result = validateAndCalculate(raw, puesto.id, 'llm');
           } catch (error: any) {
             console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
-            result = ruleBasedEvaluation(puesto);
+            result = ruleBasedEvaluation(puesto, procText);
           }
         } else {
-          result = ruleBasedEvaluation(puesto);
+          result = ruleBasedEvaluation(puesto, procText);
         }
         if (procCtx) result.procedimientosCount = procCtx.totalProcedimientos;
         return result;
@@ -405,21 +435,22 @@ export const aiAgentService = {
 
     async suggestEvaluation(puesto: any): Promise<EvaluationSuggestion | null> {
         const procCtx = await enrichProc(puesto).catch(() => null);
-        if (procCtx) {
-          puesto = { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procCtx.textoCompleto}` };
-        }
+        const procText = procCtx ? procCtx.textoCompleto : undefined;
         if (!ollamaAvailable) {
-          const result = ruleBasedEvaluation(puesto);
+          const result = ruleBasedEvaluation(puesto, procText);
           return result.data;
         }
 
         try {
-            const prompt = buildPrompt(puesto);
+            const enrichedPuesto = procText
+              ? { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}` }
+              : puesto;
+            const prompt = buildPrompt(enrichedPuesto);
             const raw = await callOllama(prompt);
             return raw as EvaluationSuggestion;
         } catch (error: any) {
             console.warn('[AI Service] Error en suggestEvaluation, usando rule-based:', error.message);
-            const result = ruleBasedEvaluation(puesto);
+            const result = ruleBasedEvaluation(puesto, procText);
             return result.data;
         }
     }

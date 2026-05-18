@@ -167,8 +167,10 @@ class ReportGenerator {
 
       if (proc.proposito) {
         this.doc.fontSize(8).font('Helvetica').fillColor('#475569');
-        this.doc.text(`Proposito: ${proc.proposito}`, MARGIN, this.y, { width: CONTENT_WIDTH, align: 'justify' });
-        this.y += this.doc.heightOfString(proc.proposito, { width: CONTENT_WIDTH }) + 4;
+        const ppOpts = { width: CONTENT_WIDTH, align: 'justify' as const };
+        const ppH = this.doc.heightOfString(`Proposito: ${proc.proposito}`, ppOpts);
+        this.doc.text(`Proposito: ${proc.proposito}`, MARGIN, this.y, ppOpts);
+        this.y += ppH + 4;
       }
 
       const pasosProc = procedimientos.pasos.filter((p: any) => p.procedimiento_codigo === proc.codigo);
@@ -176,8 +178,10 @@ class ReportGenerator {
         this.doc.fontSize(8).font('Helvetica-Oblique').fillColor('#334155');
         for (const paso of pasosProc.slice(0, 12)) {
           this.checkPage(20);
-          this.doc.text(`  - ${paso.descripcion}`, MARGIN, this.y, { width: CONTENT_WIDTH - 10, align: 'justify' });
-          this.y += this.doc.heightOfString(paso.descripcion, { width: CONTENT_WIDTH - 10 }) + 2;
+          const pasoOpts = { width: CONTENT_WIDTH - 10, align: 'justify' as const };
+          const pasoH = this.doc.heightOfString(`  - ${paso.descripcion}`, pasoOpts);
+          this.doc.text(`  - ${paso.descripcion}`, MARGIN, this.y, pasoOpts);
+          this.y += pasoH + 2;
         }
         if (pasosProc.length > 12) {
           this.doc.text(`  ... y ${pasosProc.length - 12} pasos adicionales`, MARGIN, this.y);
