@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../db';
 import { aiAgentService, POINTS_MAP } from '../services/aiAgentService';
 import { generateEvaluationReport } from '../services/reportGenerator';
+import { enrich as enrichProc } from '../services/procedimientosService';
 
 const router = Router();
 
@@ -247,7 +248,8 @@ router.get('/:id/report', async (req, res) => {
             return res.status(404).json({ error: 'Evaluación no encontrada' });
         }
 
-        const doc = generateEvaluationReport(evaluacion);
+        const procCtx = await enrichProc(evaluacion.puesto).catch(() => undefined);
+        const doc = generateEvaluationReport(evaluacion, procCtx ?? undefined);
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="informe-evaluacion-${evaluacion.puesto.nombre.replace(/\s+/g, '-').toLowerCase()}.pdf"`);

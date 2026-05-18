@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+import { enrich as enrichProc } from './procedimientosService';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
@@ -380,6 +381,10 @@ export const aiAgentService = {
     getEngineStatus,
 
     async evaluate(puesto: any): Promise<AIEvaluationResult> {
+        const procCtx = await enrichProc(puesto).catch(() => null);
+        if (procCtx) {
+          puesto = { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procCtx.textoCompleto}` };
+        }
         if (ollamaAvailable) {
           try {
             const prompt = buildPrompt(puesto);
@@ -393,6 +398,10 @@ export const aiAgentService = {
     },
 
     async suggestEvaluation(puesto: any): Promise<EvaluationSuggestion | null> {
+        const procCtx = await enrichProc(puesto).catch(() => null);
+        if (procCtx) {
+          puesto = { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procCtx.textoCompleto}` };
+        }
         if (!ollamaAvailable) {
           const result = ruleBasedEvaluation(puesto);
           return result.data;
