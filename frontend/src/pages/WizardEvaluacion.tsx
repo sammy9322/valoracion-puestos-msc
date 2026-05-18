@@ -315,7 +315,7 @@ const WizardEvaluacion: React.FC = () => {
                   onClick={handleSave}
                   className="flex-1 py-3 bg-green-600 hover:bg-green-700 text-white font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-200"
                 >
-                  <Save size={16} /> {pageState === 'saving' ? 'Guardando...' : 'Guardar Evaluación'}
+                  <Save size={16} /> Guardar Evaluación
                 </button>
                 <button
                   onClick={handleDownloadReport}
