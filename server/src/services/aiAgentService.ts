@@ -4,6 +4,7 @@ import { enrich as enrichProc } from './procedimientosService';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
+export const BUILD_VERSION = 'v8';
 
 let ollamaAvailable = false;
 
@@ -69,6 +70,7 @@ export interface AIEvaluationResult {
   procedimientosCount?: number;
   factorKeywords?: FactorKeywordDetail[];
   factorPoints?: Record<string, number>;
+  buildVersion?: string;
 }
 
 export function getEngineStatus(): { ollamaAvailable: boolean; activeEngine: 'llm' | 'rule-based' } {
@@ -388,7 +390,7 @@ function mergeMatched(m1: Record<number, string[]>, m2: Record<number, string[]>
 function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult {
   const funciones = puesto.descripcion_funciones || '';
   const educacion = puesto.educacion_requerida || '';
-  const procCount = procText ? procText.split('---').filter(s => s.includes(':')).length : 0;
+  const procCount = procText ? (procText.match(/Procedimiento:/g) || []).length : 0;
 
   const configs: { key: keyof EvaluationSuggestion; profiles: GradeProfile[]; label: string; maxPts: number }[] = [
     { key: 'dificultad', profiles: DIFICULTAD_PROFILES, label: 'Dificultad de Funciones', maxPts: 200 },
@@ -411,10 +413,13 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
 
     if (procText) {
       const procEval = evaluateByProfile(procText, profiles, label, 'los procedimientos asociados');
-      cov = mergeCov(funcEval.details.coverage, procEval.details.coverage);
-      matched = mergeMatched(funcEval.details.matched, procEval.details.matched);
-      degree = gradeFromCoverage(cov);
-      source = 'las funciones del puesto y los procedimientos asociados';
+      const procCovSum = procEval.details.coverage[1] + procEval.details.coverage[2] + procEval.details.coverage[3] + procEval.details.coverage[4] + procEval.details.coverage[5];
+      if (procCovSum > 0) {
+        cov = mergeCov(funcEval.details.coverage, procEval.details.coverage);
+        matched = mergeMatched(funcEval.details.matched, procEval.details.matched);
+        degree = gradeFromCoverage(cov);
+        source = 'las funciones del puesto y los procedimientos asociados';
+      }
     }
 
     const mergedScore: RubricScore = {
@@ -423,7 +428,7 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
     };
 
     result[key] = degree;
-    result[`${key}_just`] = buildRubricJustification(label, mergedScore, profiles.find(p => p.grade === degree)?.desc || '', source, !!procText);
+    result[`${key}_just`] = buildRubricJustification(label, mergedScore, profiles.find(p => p.grade === degree)?.desc || '', source, !!procText && source.includes('procedimientos'));
 
     const pts = continuousPoints(cov, maxPts);
     continuousTotal += pts;
@@ -442,6 +447,7 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
   const evaluated = validateAndCalculate(result, puesto.id, 'rule-based');
   evaluated.totalPuntos = Math.round(continuousTotal);
   evaluated.factorPoints = factorPoints;
+  evaluated.buildVersion = BUILD_VERSION;
   if (procCount) evaluated.procedimientosCount = procCount;
   return evaluated;
 }

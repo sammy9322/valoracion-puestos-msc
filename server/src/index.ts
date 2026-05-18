@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Build: v8 — coverage mergeado (funciones+procedimientos) + puntaje continuo por factor en DB
+// Build: v9 — solo mergea proc si coverage>0, build_version en response, debug info
 
 import express from 'express';
 import cors from 'cors';

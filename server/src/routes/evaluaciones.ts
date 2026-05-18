@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import prisma from '../db';
-import { aiAgentService, POINTS_MAP } from '../services/aiAgentService';
+import { aiAgentService, POINTS_MAP, BUILD_VERSION } from '../services/aiAgentService';
 import { generateEvaluationReport } from '../services/reportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
 
@@ -176,7 +176,22 @@ router.post('/ai-evaluate', async (req, res) => {
             evaluacion,
             totalPuntos: result.totalPuntos,
             analisis: result.data,
-            procedimientosCount: result.procedimientosCount || 0
+            procedimientosCount: result.procedimientosCount || 0,
+            buildVersion: BUILD_VERSION,
+            factorPoints: result.factorPoints || {},
+            motor: result.motor,
+            debug: {
+                procedimientosEncontrados: result.procedimientosCount || 0,
+                puntosPorFactorOriginales: {
+                    dificultad: POINTS_MAP.dificultad[result.data.dificultad],
+                    supervision: POINTS_MAP.supervision[result.data.supervision],
+                    responsabilidad: POINTS_MAP.responsabilidad[result.data.responsabilidad],
+                    condiciones: POINTS_MAP.condiciones[result.data.condiciones],
+                    error: POINTS_MAP.error[result.data.error],
+                    requisitos: POINTS_MAP.requisitos[result.data.requisitos],
+                },
+                totalOriginal: POINTS_MAP.dificultad[result.data.dificultad] + POINTS_MAP.supervision[result.data.supervision] + POINTS_MAP.responsabilidad[result.data.responsabilidad] + POINTS_MAP.condiciones[result.data.condiciones] + POINTS_MAP.error[result.data.error] + POINTS_MAP.requisitos[result.data.requisitos]
+            }
         });
 
     } catch (error: any) {
