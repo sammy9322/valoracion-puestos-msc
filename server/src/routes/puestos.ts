@@ -17,23 +17,8 @@ router.get('/', async (req, res) => {
         res.status(500).json({ error: 'Error al obtener los puestos' });
     }
 });
-// GET single Puesto
-router.get('/:id', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const puesto = await prisma.puesto.findUnique({
-            where: { id }
-        });
-        if (!puesto) return res.status(404).json({ error: 'Puesto no encontrado' });
-        res.json(puesto);
-    }
-    catch (error) {
-        console.error(error);
-        res.status(500).json({ error: 'Error al obtener el puesto' });
-    }
-});
 
-// GET Puestos Eliminados (solo Admin)
+// GET Puestos Eliminados (solo Admin) — DEBE ir antes de /:id
 router.get('/eliminados', async (req, res) => {
     try {
         const puestos = await prisma.puesto.findMany({
@@ -48,7 +33,7 @@ router.get('/eliminados', async (req, res) => {
     }
 });
 
-// GET Puestos Clave only
+// GET Puestos Clave only — DEBE ir antes de /:id
 router.get('/clave', async (req, res) => {
     try {
         const clave = await prisma.puesto.findMany({
@@ -59,6 +44,22 @@ router.get('/clave', async (req, res) => {
     }
     catch (error) {
         res.status(500).json({ error: 'Error al obtener puestos clave' });
+    }
+});
+
+// GET single Puesto (va al final para no atrapar /eliminados o /clave)
+router.get('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const puesto = await prisma.puesto.findUnique({
+            where: { id }
+        });
+        if (!puesto) return res.status(404).json({ error: 'Puesto no encontrado' });
+        res.json(puesto);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al obtener el puesto' });
     }
 });
 

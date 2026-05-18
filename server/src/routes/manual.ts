@@ -1,7 +1,7 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import prisma from '../db';
-import { parseManual, ManualParseResult } from '../services/manualParser';
+import { parseManual } from '../services/manualParser';
 import { manualService } from '../services/manualService';
 
 const router = Router();
@@ -19,8 +19,6 @@ const upload = multer({
     }
   }
 });
-
-let ultimoParseo: ManualParseResult | null = null;
 
 router.post('/upload', upload.single('archivo'), async (req: Request, res: Response) => {
   try {
@@ -57,7 +55,7 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
             data: { es_vigente: false }
           });
 
-          const nuevaVersion = Date.now(); 
+          const nuevaVersion = Date.now();
 
           for (const clase of resultado.clases) {
             for (const cargo of clase.cargos) {
@@ -75,7 +73,7 @@ router.post('/upload', upload.single('archivo'), async (req: Request, res: Respo
                   requisitos_legales: cargo.requisitos.legales,
                   conocimientos_deseables: JSON.stringify(cargo.conocimientos),
                   condiciones_personales: JSON.stringify(cargo.condiciones),
-                  version: Math.floor(nuevaVersion / 1000000), 
+                  version: nuevaVersion,
                   fecha_importacion: new Date(),
                   es_vigente: true
                 }

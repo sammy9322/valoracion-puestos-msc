@@ -196,15 +196,15 @@ const FichasPuestos: React.FC = () => {
                 }
             }
             
-            setFormData({
-                ...formData,
+            setFormData(prev => ({
+                ...prev,
                 nombre: baseData.nombre,
                 area: baseData.area,
                 descripcion_funciones: baseData.funciones,
                 educacion_requerida: baseData.educacion,
                 experiencia_requerida: baseData.experiencia,
                 estrato: baseData.estrato
-            });
+            }));
 
         } catch (error) {
             console.error('Error en Motor de Vinculación:', error);

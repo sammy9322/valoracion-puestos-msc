@@ -87,20 +87,19 @@ router.get('/sugerido', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const { periodo, valor_punto_aplicado, total_salarios, total_puntos, calculado_por } = req.body;
+    const { periodo, valor_punto_aplicado, total_salarios, total_puntos, calculado_por, puestos_clave_usados } = req.body;
 
     const nuevoVP = await prisma.valorPunto.create({
       data: {
         periodo,
         valor_punto_aplicado,
-        valor_punto_exacto: valor_punto_aplicado, // En esta lógica usamos el aplicado como base
+        valor_punto_exacto: valor_punto_aplicado,
         total_salarios,
         total_puntos,
-        puestos_clave_usados: 0, // Se puede actualizar despues
+        puestos_clave_usados: puestos_clave_usados || 0,
         calculado_por,
         fecha_vigencia_inicio: new Date(),
-        estado: 'activo'
-      } as any // Usamos any para saltar la restricción de campos si el schema es ligeramente distinto
+      },
     });
 
     res.status(201).json(nuevoVP);
