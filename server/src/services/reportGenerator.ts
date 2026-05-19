@@ -97,85 +97,93 @@ class ReportGenerator {
   }
 
   private checkPage(needed: number = 80): void {
-    if (this.y + needed > MAX_Y) { this.doc.addPage(); this.y = MG; this.pageNum++; this.addFooter(); }
+    const avail = MAX_Y - this.y;
+    if (needed <= avail) return;
+    const safe = Math.min(needed, MAX_Y - MG - 12);
+    if (avail < safe) {
+      this.doc.addPage();
+      this.y = MG;
+      this.pageNum++;
+      this.addFooter();
+    }
   }
 
   private addFooter(): void {
-    this.doc.fontSize(7).font('Helvetica').fillColor('#94a3b8');
+    this.doc.fontSize(7.5).font('Helvetica').fillColor('#94a3b8');
     this.doc.text(`Pagina ${this.pageNum}`, MG, PH - 28, { align: 'center' });
   }
 
   private addHeader(): void {
-    this.doc.rect(0, 0, PW, 62).fill(C.primary);
-    this.doc.fillColor('#ffffff').fontSize(16).font('Helvetica-Bold');
-    this.doc.text('Municipalidad de San Carlos', MG, 14, { align: 'center' });
-    this.doc.fontSize(10).font('Helvetica');
-    this.doc.text('Sistema Integral de RRHH — Valoracion de Puestos', MG, 33, { align: 'center' });
-    this.doc.fontSize(9).font('Helvetica-Oblique');
-    this.doc.text('Metodologia MSC — Puntos por Factores', MG, 48, { align: 'center' });
-    this.doc.rect(0, 62, PW, 3).fill(C.secondary);
-    this.y = 76;
+    this.doc.rect(0, 0, PW, 68).fill(C.primary);
+    this.doc.fillColor('#ffffff').fontSize(18).font('Helvetica-Bold');
+    this.doc.text('Municipalidad de San Carlos', MG, 12, { align: 'center' });
+    this.doc.fontSize(11).font('Helvetica');
+    this.doc.text('Sistema Integral de RRHH — Valoracion de Puestos', MG, 34, { align: 'center' });
+    this.doc.fontSize(10).font('Helvetica-Oblique');
+    this.doc.text('Metodologia MSC — Puntos por Factores', MG, 50, { align: 'center' });
+    this.doc.rect(0, 68, PW, 3).fill(C.secondary);
+    this.y = 82;
     this.pageNum = 1;
     this.addFooter();
   }
 
   private addSectionTitle(title: string): void {
-    this.checkPage(36);
-    this.doc.rect(MG, this.y, CW, 22).fill(C.surface);
-    this.doc.rect(MG, this.y, 4, 22).fill(C.secondary);
-    this.doc.fontSize(11).font('Helvetica-Bold').fillColor(C.primary);
-    this.doc.text(title, MG + 14, this.y + 4);
-    this.y += 30;
+    this.checkPage(42);
+    this.doc.rect(MG, this.y, CW, 26).fill(C.surface);
+    this.doc.rect(MG, this.y, 4, 26).fill(C.secondary);
+    this.doc.fontSize(13).font('Helvetica-Bold').fillColor(C.primary);
+    this.doc.text(title, MG + 14, this.y + 5);
+    this.y += 34;
   }
 
   private addField(label: string, value: string): void {
-    this.checkPage(24);
-    this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
+    this.checkPage(28);
+    this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.muted);
     this.doc.text(label, MG, this.y);
-    this.y += 9;
-    this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
+    this.y += 11;
+    this.doc.fontSize(10).font('Helvetica').fillColor(C.text);
     this.doc.text(value || 'No especificado', MG, this.y);
-    this.y += 15;
+    this.y += 17;
   }
 
   private addFunctionsBlock(label: string, text: string): void {
-    const opts = { width: CW, align: 'justify' as const, lineGap: 2 };
-    this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
+    const opts = { width: CW, align: 'justify' as const, lineGap: 3 };
+    this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.muted);
     this.doc.text(label, MG, this.y);
-    this.y += 9;
-    this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
+    this.y += 11;
+    this.doc.fontSize(10).font('Helvetica').fillColor(C.text);
     const t = text || 'No especificado';
     const h = this.doc.heightOfString(t, opts);
-    this.checkPage(h + 24);
+    this.checkPage(h + 28);
     this.doc.text(t, MG, this.y, opts);
-    this.y += h + 6;
+    this.y += h + 8;
   }
 
   private addProcedimientosBlock(procedimientos: ProcedimientosContext): void {
     this.addSectionTitle('3. Contexto Operativo (Procedimientos Asociados)');
-    this.doc.fontSize(8.5).font('Helvetica').fillColor(C.muted);
+    this.doc.fontSize(9).font('Helvetica').fillColor(C.muted);
     const intro = `Se identificaron ${procedimientos.totalProcedimientos} procedimientos asociados al area del puesto.`;
     this.doc.text(intro, MG, this.y, { width: CW });
-    this.y += 14;
+    this.y += 16;
     for (const proc of procedimientos.procedimientos) {
-      this.checkPage(30);
+      this.checkPage(36);
       this.doc.rect(MG, this.y, CW, 0.5).fill(C.border);
-      this.y += 5;
-      this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.primary);
+      this.y += 6;
+      this.doc.fontSize(10).font('Helvetica-Bold').fillColor(C.primary);
       this.doc.text(`${proc.nombre} (${proc.codigo})`, MG, this.y);
-      this.y += 12;
+      this.y += 14;
       if (proc.proposito) {
-        this.doc.fontSize(8.5).font('Helvetica').fillColor(C.text);
+        this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
         const ph = this.doc.heightOfString(proc.proposito, { width: CW, align: 'justify' });
         this.doc.text(proc.proposito, MG, this.y, { width: CW, align: 'justify' });
-        this.y += ph + 4;
+        this.y += ph + 6;
       }
     }
   }
 
   private addFactorsTable(evaluacion: any): void {
-    this.checkPage(120);
-    const colW = [160, 50, 55, 55, 70]; const rh = 24;
+    this.checkPage(130);
+    const colW = [160, 50, 55, 55, 70]; const rh = 26;
     const rows = FACTORS.map(f => {
       const d = FACTOR_DISPLAY[f]; const g = grado(evaluacion[`grado_${f}`] || 1);
       const p = POINTS_MAP[f][g] || 0; return { label: d.label, grado: g, puntos: p, max: d.max, pct: Math.round(p / d.max * 100) };
@@ -186,86 +194,94 @@ class ReportGenerator {
     this.doc.rect(MG, hh, CW, rh).fill(C.primary);
     const hdrs = ['Factor', 'Grado', 'Pts', 'Max', '%'];
     for (let i = 0; i < colW.length; i++) {
-      this.doc.fillColor('#ffffff').fontSize(8.5).font('Helvetica-Bold');
+      this.doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
       this.doc.text(hdrs[i], cx + 5, hh + 6, { width: colW[i] - 10, align: i === 0 ? 'left' : 'center' });
       cx += colW[i];
     }
     this.y = hh + rh;
     for (let ri = 0; ri < rows.length; ri++) {
       const r = rows[ri]; const bg = ri % 2 === 0 ? C.surface : '#ffffff';
-      this.checkPage(rh + 4);
+      this.checkPage(rh + 6);
       cx = MG; const ry = this.y;
       this.doc.fillColor(bg).rect(cx, ry, CW, rh).fill();
       const vals = [r.label, `G${r.grado}`, `${r.puntos}`, `${r.max}`, `${r.pct}%`];
       for (let i = 0; i < colW.length; i++) {
-        this.doc.fillColor(C.text).fontSize(8).font('Helvetica');
+        this.doc.fillColor(C.text).fontSize(9).font('Helvetica');
         this.doc.text(vals[i], cx + 5, ry + 6, { width: colW[i] - 10, align: i === 0 ? 'left' : 'center' });
         if (i === 4) {
           const bw = (colW[i] - 16) * r.pct / 100;
-          if (bw > 4) { this.doc.fillColor(GRADE_COLORS[r.grado - 1]); this.doc.rect(cx + 6, ry + 17, bw, 3).fill(); }
+          if (bw > 4) { this.doc.fillColor(GRADE_COLORS[r.grado - 1]); this.doc.rect(cx + 6, ry + 19, bw, 4).fill(); }
         }
         cx += colW[i];
       }
       this.y += rh;
     }
     this.doc.rect(MG, this.y, CW, 1.5).fill(C.primary);
-    this.y += 6;
-    this.doc.fontSize(11).font('Helvetica-Bold').fillColor(C.primary);
+    this.y += 8;
+    this.doc.fontSize(13).font('Helvetica-Bold').fillColor(C.primary);
     this.doc.text(`TOTAL: ${total} / 1000 pts`, MG, this.y);
-    this.y += 20;
+    this.y += 24;
   }
 
   private addFactorDetail(evaluacion: any): void {
-    this.checkPage(50);
+    this.checkPage(70);
     this.addSectionTitle('5. Detalle Tecnico por Factor');
     for (const factor of FACTORS) {
-      const d = FACTOR_DISPLAY[factor]; const g = grado(evaluacion[`grado_${factor}`] || 1);
+      const d = FACTOR_DISPLAY[factor];
+      const g = grado(evaluacion[`grado_${factor}`] || 1);
       const p = POINTS_MAP[factor][g] || 0;
       const just = (evaluacion[`justif_${factor}`] || '').trim();
       const desc = GRADES_DESC[factor]?.[g - 1] || '';
       const gi = g - 1;
 
-      const justOpts = { width: CW - 28, align: 'justify' as const, lineGap: 2 };
-      const jh = this.doc.heightOfString(just, justOpts);
-      const cardH = Math.max(jh + 58, 70);
-      const maxCard = Math.min(cardH, MAX_Y - MG);
-      this.checkPage(maxCard + 12);
+      this.checkPage(60);
       const by = this.y;
 
-      // Left accent
-      this.doc.fillColor(GRADE_COLORS[gi]).rect(MG, by, 4, maxCard).fill();
-      // White bg
-      this.doc.fillColor('#ffffff').rect(MG + 4, by, CW - 4, maxCard).fill();
-      // Top border
-      this.doc.fillColor(C.border).rect(MG + 4, by, CW - 4, 1).fill();
+      // Header bar with grade color
+      this.doc.fillColor(GRADE_COLORS[gi]).rect(MG, by, CW, 30).fill();
+      this.doc.fillColor('#ffffff').fontSize(11).font('Helvetica-Bold');
+      this.doc.text(d.label, MG + 14, by + 7);
 
-      // Header bar inside card
-      this.doc.fillColor(GRADE_COLORS[gi]).rect(MG + 4, by, CW - 4, 26).fill();
-      this.doc.fillColor('#ffffff').fontSize(9.5).font('Helvetica-Bold');
-      this.doc.text(d.label, MG + 16, by + 6);
-      // Grade badge circle
+      // Grade badge
       const bx = MG + CW - 44;
-      this.doc.fillColor('#ffffff').circle(bx + 10, by + 13, 10).fill();
-      this.doc.fillColor(GRADE_BADGE_COLORS[gi]).fontSize(9).font('Helvetica-Bold');
-      this.doc.text(`G${g}`, bx + 3, by + 6, { width: 14, align: 'center' });
+      this.doc.fillColor('#ffffff').circle(bx + 10, by + 15, 11).fill();
+      this.doc.fillColor(GRADE_BADGE_COLORS[gi]).fontSize(10).font('Helvetica-Bold');
+      this.doc.text(`G${g}`, bx + 3, by + 7, { width: 14, align: 'center' });
 
-      // Points line
-      this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
-      this.doc.text(`${p}/${d.max} pts — ${desc}`, MG + 16, by + 33, { width: CW - 60 });
+      this.y = by + 36;
 
-      // Justification header
-      this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.primary);
-      this.doc.text('Fundamentacion:', MG + 16, by + 48);
+      // Subtitle
+      this.checkPage(22);
+      this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.muted);
+      this.doc.text(`${p}/${d.max} pts — ${desc}`, MG + 10, this.y);
+      this.y += 20;
 
-      // Evidencia sections
-      this.doc.fontSize(8.5).font('Helvetica').fillColor(C.text);
-      this.doc.text(just, MG + 16, by + 62, justOpts);
-      this.y = by + maxCard + 8;
+      // Fundamentacion label
+      this.checkPage(18);
+      this.doc.fontSize(10).font('Helvetica-Bold').fillColor(C.primary);
+      this.doc.text('Fundamentacion Tecnica:', MG + 10, this.y);
+      this.y += 15;
+
+      // Justification text — flows naturally
+      const justOpts = { width: CW - 20, align: 'justify' as const, lineGap: 3 };
+      this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
+      if (just.length > 2000) {
+        const truncated = just.substring(0, 1997) + '...';
+        this.doc.text(truncated, MG + 10, this.y, justOpts);
+      } else {
+        this.doc.text(just, MG + 10, this.y, justOpts);
+      }
+      this.y = Math.min(this.doc.y + 14, MAX_Y);
+
+      // Thin separator between factors
+      if (factor !== FACTORS[FACTORS.length - 1]) {
+        this.doc.fillColor(C.border).rect(MG + 20, this.y - 4, CW - 40, 0.5).fill();
+      }
     }
   }
 
   private addConclusion(evaluacion: any, totalPuntos: number, procedimientos?: ProcedimientosContext): void {
-    this.checkPage(80);
+    this.checkPage(90);
     this.addSectionTitle('6. Conclusion y Dictamen Tecnico');
     const pct = Math.round((totalPuntos / 1000) * 100);
     const clase = getClaseSugerida(totalPuntos);
@@ -277,49 +293,48 @@ class ReportGenerator {
     else if (pct <= 80) { cat = 'Nivel Directivo'; desc = 'Puesto de direccion estrategica, toma de decisiones criticas y gestion de procesos clave.'; }
     else { cat = 'Nivel Superior / Alta Direccion'; desc = 'Puesto de maxima responsabilidad institucional y direccion estrategica integral.'; }
 
-    // Score banner
-    this.checkPage(50);
-    this.doc.rect(MG, this.y, CW, 46).fill(C.surface);
-    this.doc.rect(MG, this.y, 4, 46).fill(C.accent);
-    this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
-    this.doc.text('PUNTUACION TOTAL', MG + 16, this.y + 5);
-    this.doc.fillColor(C.primary).fontSize(20).font('Helvetica-Bold');
-    this.doc.text(`${totalPuntos} / 1000`, MG + 16, this.y + 18);
-    this.doc.fillColor(C.muted).fontSize(10).font('Helvetica');
-    this.doc.text(`${pct}%`, MG + CW - 52, this.y + 20);
-    this.y += 56;
+    this.checkPage(56);
+    this.doc.rect(MG, this.y, CW, 52).fill(C.surface);
+    this.doc.rect(MG, this.y, 4, 52).fill(C.accent);
+    this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.muted);
+    this.doc.text('PUNTUACION TOTAL', MG + 18, this.y + 6);
+    this.doc.fillColor(C.primary).fontSize(24).font('Helvetica-Bold');
+    this.doc.text(`${totalPuntos} / 1000`, MG + 18, this.y + 20);
+    this.doc.fillColor(C.muted).fontSize(11).font('Helvetica');
+    this.doc.text(`${pct}%`, MG + CW - 56, this.y + 24);
+    this.y += 62;
 
     if (clase) {
-      this.checkPage(40);
-      this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
+      this.checkPage(46);
+      this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.muted);
       this.doc.text('CLASE MUNICIPAL SUGERIDA', MG, this.y);
-      this.y += 11;
-      this.doc.fillColor(C.accent).fontSize(12).font('Helvetica-Bold');
+      this.y += 12;
+      this.doc.fillColor(C.accent).fontSize(14).font('Helvetica-Bold');
       this.doc.text(clase.nombre, MG, this.y);
-      this.y += 16;
-      this.doc.fillColor(C.muted).fontSize(8.5).font('Helvetica');
+      this.y += 18;
+      this.doc.fillColor(C.muted).fontSize(9).font('Helvetica');
       this.doc.text(`Serie: ${clase.serie}`, MG, this.y);
-      this.y += 14;
+      this.y += 16;
       if (clase.nombre.includes('(Prohib.)')) {
-        this.doc.fillColor('#dc2626').fontSize(8).font('Helvetica-Oblique');
+        this.doc.fillColor('#dc2626').fontSize(9).font('Helvetica-Oblique');
         this.doc.text('Nota: Clase restringida (Prohib.). Validar con el departamento de RRHH.', MG, this.y, { width: CW });
-        this.y += 10;
+        this.y += 12;
       }
     }
 
-    this.checkPage(40);
-    this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
+    this.checkPage(46);
+    this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.muted);
     this.doc.text(`CATEGORIA ASIGNADA: ${cat}`, MG, this.y);
-    this.y += 12;
-    this.doc.fillColor(C.text).fontSize(9).font('Helvetica');
+    this.y += 14;
+    this.doc.fillColor(C.text).fontSize(10).font('Helvetica');
     const dh = this.doc.heightOfString(desc, { width: CW, align: 'justify' });
     this.doc.text(desc, MG, this.y, { width: CW, align: 'justify' });
-    this.y += dh + 12;
+    this.y += dh + 14;
 
-    this.checkPage(40);
-    this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
+    this.checkPage(46);
+    this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.muted);
     this.doc.text('DICTAMEN TECNICO', MG, this.y);
-    this.y += 12;
+    this.y += 14;
 
     const motorTexto = !evaluacion.motor || evaluacion.motor === 'rule-based' ? 'motor de analisis contextual' : 'agente de inteligencia artificial';
     const base = `El puesto "${evaluacion.puesto?.nombre || ''}" fue evaluado mediante la metodologia MSC de Puntos por Factores, obteniendo ${totalPuntos}/1000 pts (${pct}% del maximo).`;
@@ -327,15 +342,15 @@ class ReportGenerator {
     const motor = ` El analisis fue ejecutado por ${motorTexto}${evaluacion.buildVersion ? ` (${evaluacion.buildVersion})` : ''}, garantizando la objetividad y trazabilidad del proceso.`;
     const proc = procedimientos ? ` Se consideraron ${procedimientos.totalProcedimientos} procedimientos operativos asociados al area como contexto adicional para la evaluacion.` : '';
     const dtxt = `${base}${ctxt}${motor}${proc}`;
-    this.doc.fillColor(C.text).fontSize(9).font('Helvetica');
-    const dxh = this.doc.heightOfString(dtxt, { width: CW, align: 'justify', lineGap: 2 });
-    this.doc.text(dtxt, MG, this.y, { width: CW, align: 'justify', lineGap: 2 });
-    this.y += dxh + 14;
+    this.doc.fillColor(C.text).fontSize(10).font('Helvetica');
+    const dxh = this.doc.heightOfString(dtxt, { width: CW, align: 'justify', lineGap: 3 });
+    this.doc.text(dtxt, MG, this.y, { width: CW, align: 'justify', lineGap: 3 });
+    this.y += dxh + 16;
 
-    this.checkPage(30);
-    this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
+    this.checkPage(36);
+    this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.muted);
     this.doc.text('RECOMENDACIONES', MG, this.y);
-    this.y += 12;
+    this.y += 14;
 
     let rec = '';
     if (pct < 30) rec = 'Se recomienda revisar la descripcion de funciones para asegurar que refleje adecuadamente todas las responsabilidades del puesto. Evaluar la posibilidad de ajuste salarial conforme a la categoria asignada.';
@@ -343,20 +358,20 @@ class ReportGenerator {
     else if (pct < 70) rec = 'Se recomienda realizar un analisis de mercado salarial para validar la competitividad de la categoria asignada. Documentar formalmente las funciones criticas del puesto.';
     else rec = 'Se recomienda asegurar que el puesto cuenta con las condiciones laborales y compensaciones adecuadas a su nivel de responsabilidad. Revisar la coherencia jerarquica con otros puestos de la institucion.';
 
-    this.doc.fillColor(C.text).fontSize(9).font('Helvetica');
+    this.doc.fillColor(C.text).fontSize(10).font('Helvetica');
     const rh = this.doc.heightOfString(rec, { width: CW, align: 'justify' });
     this.doc.text(rec, MG, this.y, { width: CW, align: 'justify' });
-    this.y += rh + 14;
+    this.y += rh + 16;
   }
 
   private addSignature(evaluacion: any): void {
-    this.checkPage(120);
+    this.checkPage(130);
     this.y = Math.max(this.y, MAX_Y - 130);
     this.doc.rect(MG, this.y, CW, 1).fill(C.border);
-    this.y += 10;
-    this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
-    this.doc.text('FIRMA DIGITAL DEL SISTEMA', MG, this.y, { align: 'center' });
     this.y += 12;
+    this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.muted);
+    this.doc.text('FIRMA DIGITAL DEL SISTEMA', MG, this.y, { align: 'center' });
+    this.y += 14;
     const rows: [string, string][] = [
       ['Generado por', 'Agente Evaluador IA — Sistema Integral RRHH'],
       ['Fecha de emision', evaluacion.fecha_evaluacion ? new Date(evaluacion.fecha_evaluacion).toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' })],
@@ -364,15 +379,15 @@ class ReportGenerator {
       ['Version del informe', `v${evaluacion.version || '1'} — Generado automaticamente`],
     ];
     for (const [l, v] of rows) {
-      this.doc.fontSize(8).font('Helvetica').fillColor(C.muted);
+      this.doc.fontSize(9).font('Helvetica').fillColor(C.muted);
       this.doc.text(l, MG, this.y);
-      this.y += 8;
-      this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.text);
+      this.y += 9;
+      this.doc.fontSize(10).font('Helvetica-Bold').fillColor(C.text);
       this.doc.text(v, MG, this.y);
-      this.y += 13;
+      this.y += 15;
     }
-    this.y += 6;
-    this.doc.fontSize(7).font('Helvetica-Oblique').fillColor('#94a3b8');
+    this.y += 8;
+    this.doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#94a3b8');
     this.doc.text('Este informe fue generado automaticamente por el Agente Evaluador IA. Los resultados se basan en el analisis objetivo de la descripcion de funciones del puesto segun la metodologia MSC de Puntos por Factores.', MG, this.y, { width: CW, align: 'center' });
   }
 
@@ -402,11 +417,11 @@ class ReportGenerator {
       'Cada grado asignado se sustenta con evidencia textual de la descripcion de funciones y, cuando estan disponibles, ' +
       'de los procedimientos operativos asociados al area del puesto.' +
       (procedimientos ? ` Para este analisis se incorporaron ${procedimientos.totalProcedimientos} procedimientos operativos asociados al area como contexto adicional.` : '');
-    const metOpts = { width: CW, align: 'justify' as const, lineGap: 2 };
+    const metOpts = { width: CW, align: 'justify' as const, lineGap: 3 };
     const mh = this.doc.heightOfString(metText, metOpts);
-    this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
+    this.doc.fontSize(10).font('Helvetica').fillColor(C.text);
     this.doc.text(metText, MG, this.y, metOpts);
-    this.y += mh + 10;
+    this.y += mh + 14;
 
     if (procedimientos) this.addProcedimientosBlock(procedimientos);
     this.addSectionTitle('4. Resumen de Puntuacion');
@@ -414,7 +429,7 @@ class ReportGenerator {
     this.addFactorDetail(evaluacion);
     this.addConclusion(evaluacion, totalPuntos, procedimientos);
     this.addSignature(evaluacion);
-    this.doc.fontSize(8).font('Helvetica').fillColor('#94a3b8');
+    this.doc.fontSize(9).font('Helvetica').fillColor('#94a3b8');
     this.doc.text('— Fin del Informe —', MG, this.y, { align: 'center' });
     return this.doc;
   }
