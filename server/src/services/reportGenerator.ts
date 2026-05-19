@@ -99,7 +99,7 @@ class ReportGenerator {
   }
 
   private checkPage(needed: number = 80): void {
-    if (this.y > MAX_Y - needed) { this.doc.addPage(); this.y = MARGIN; this.addFooter(); }
+    if (this.y > MAX_Y - needed) { this.doc.addPage(); this.y = MARGIN; }
   }
 
   private moveDown(space: number): void { this.y += space; this.checkPage(); }

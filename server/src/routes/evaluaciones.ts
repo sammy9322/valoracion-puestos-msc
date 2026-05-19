@@ -305,7 +305,7 @@ router.get('/:id/report', async (req, res) => {
 
     } catch (error: any) {
         console.error('Error generando PDF:', error);
-        res.status(500).json({ error: 'Error al generar el informe PDF' });
+        res.status(500).json({ error: 'Error al generar el informe PDF', detail: error?.message || error?.toString() });
     }
 });
 
