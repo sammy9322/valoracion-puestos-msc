@@ -88,10 +88,11 @@ const C = {
 function g(gv: number): number { return Math.max(1, Math.min(5, gv)); }
 
 function getGradeColor(gr: number): string {
-  if (gr <= 2) return C.g1;
-  if (gr === 3) return C.g3;
-  if (gr === 4) return C.g4;
-  return C.g5;
+  if (gr === 1) return '#10b981'; // Emerald
+  if (gr === 2) return '#06b6d4'; // Teal/Cyan
+  if (gr === 3) return '#3b82f6'; // Royal Blue
+  if (gr === 4) return '#1e3a5f'; // Navy Institutional
+  return '#8b5cf6'; // Purple / Directivo
 }
 
 const ESTRATOS_MUNICIPALES = [
@@ -168,32 +169,32 @@ class ReportGenerator {
 
   private addPageHeader(): void {
     this.doc.fontSize(7.5).font('Helvetica').fillColor(C.muted);
-    this.doc.text('MUNICIPALIDAD DE SAN CARLOS — INFORME DE VALORACION DE PUESTO', MG, 15);
-    this.doc.text(`Pagina ${this.pageNum}`, MG + CW - 40, 15, { width: 40, align: 'right' });
+    this.doc.text('MUNICIPALIDAD DE SAN CARLOS — INFORME DE VALORACIÓN DE PUESTO', MG, 15);
+    this.doc.text(`Página ${this.pageNum}`, MG + CW - 40, 15, { width: 40, align: 'right' });
     this.doc.fillColor(C.lightBorder).rect(MG, 25, CW, 0.5).fill();
     this.y = 40;
   }
 
   private addInstitutionalHeader(): void {
-    // Elegant left vertical brand bar (4px wide, 42px high)
-    this.doc.fillColor(C.accent).rect(MG, this.y, 4, 42).fill();
+    // Elegant left vertical brand bar (4px wide, 42px high, rounded pill)
+    this.doc.fillColor(C.accent).roundedRect(MG, this.y, 4, 42, 2).fill();
     
     // Header texts
     this.doc.fillColor(C.accent).fontSize(14).font('Helvetica-Bold');
     this.doc.text('MUNICIPALIDAD DE SAN CARLOS', MG + 12, this.y + 2);
     
     this.doc.fillColor(C.muted).fontSize(9).font('Helvetica');
-    this.doc.text('Direccion de Gestion del Talento Humano  \u00b7  Sistema Integral de RRHH', MG + 12, this.y + 17);
+    this.doc.text('Dirección de Gestión de Talento Humano  \u00b7  Sistema Integral de RRHH', MG + 12, this.y + 17);
     
     this.doc.fillColor(C.text).fontSize(10.5).font('Helvetica-Bold');
-    this.doc.text('INFORME TECNICO DE VALORACION DE PUESTO (MSC)', MG + 12, this.y + 29);
+    this.doc.text('INFORME TÉCNICO DE VALORACIÓN DE PUESTO (MSC)', MG + 12, this.y + 29);
     
     // Decorative metadata info on top-right of page 1
     const metaX = MG + CW - 180;
     this.doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold');
     this.doc.text('DOCUMENTO OFICIAL', metaX, this.y + 4, { width: 180, align: 'right' });
     this.doc.font('Helvetica');
-    this.doc.text(`Codigo: INF-VAL-${new Date().getFullYear()}`, metaX, this.y + 14, { width: 180, align: 'right' });
+    this.doc.text(`Código: INF-VAL-${new Date().getFullYear()}`, metaX, this.y + 14, { width: 180, align: 'right' });
     this.doc.text(`Fecha: ${new Date().toLocaleDateString('es-CR')}`, metaX, this.y + 24, { width: 180, align: 'right' });
     
     this.y += 50;
@@ -207,8 +208,8 @@ class ReportGenerator {
 
   private addSectionTitle(title: string): void {
     this.checkPage(40);
-    // Vertical tag indicator
-    this.doc.fillColor(C.accent).rect(MG, this.y + 1, 3, 13).fill();
+    // Vertical tag indicator (rounded)
+    this.doc.fillColor(C.accent).roundedRect(MG, this.y + 1, 3, 13, 1.5).fill();
     
     // Section title
     this.doc.fontSize(11).font('Helvetica-Bold').fillColor(C.text);
@@ -226,33 +227,42 @@ class ReportGenerator {
     const colW = CW / 2;
     const gridY = this.y;
 
+    // Draw cohesive rounded background card
+    this.doc.fillColor(C.cardBg).roundedRect(MG, gridY, CW, rh * 3, 6).fill();
+    this.doc.strokeColor(C.lightBorder).lineWidth(0.5).roundedRect(MG, gridY, CW, rh * 3, 6).stroke();
+
+    // Internal dividers
+    this.doc.save();
+    this.doc.strokeColor(C.lightBorder).lineWidth(0.5);
+    // Vertical split
+    this.doc.moveTo(MG + colW, gridY).lineTo(MG + colW, gridY + rh * 3).stroke();
+    // Horizontal splits
+    this.doc.moveTo(MG, gridY + rh).lineTo(MG + CW, gridY + rh).stroke();
+    this.doc.moveTo(MG, gridY + rh * 2).lineTo(MG + CW, gridY + rh * 2).stroke();
+    this.doc.restore();
+
     const drawGridCell = (col: number, row: number, label: string, val: string) => {
       const cx = MG + col * colW;
       const cy = gridY + row * rh;
       
-      // Draw background cell
-      this.doc.fillColor(C.cardBg).rect(cx, cy, colW, rh).fill();
-      // Draw borders
-      this.doc.strokeColor(C.lightBorder).lineWidth(0.5).rect(cx, cy, colW, rh).stroke();
-      
       // Labels and Values
       this.doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold');
-      this.doc.text(label.toUpperCase(), cx + 10, cy + 7);
+      this.doc.text(label.toUpperCase(), cx + 12, cy + 8);
       
       this.doc.fillColor(C.text).fontSize(9.5).font('Helvetica');
-      this.doc.text(val || 'No especificado', cx + 10, cy + 18, { width: colW - 20, ellipsis: true });
+      this.doc.text(val || 'No especificado', cx + 12, cy + 18, { width: colW - 24, ellipsis: true });
     };
 
     drawGridCell(0, 0, 'Nombre del Puesto', puesto.nombre);
-    drawGridCell(1, 0, 'Area / Departamento', puesto.area);
+    drawGridCell(1, 0, 'Área / Departamento', puesto.area);
     
-    drawGridCell(0, 1, 'Reporta a (Jerarquia)', puesto.reporta_a);
-    drawGridCell(1, 1, 'Requisitos Academicos', puesto.educacion_requerida);
+    drawGridCell(0, 1, 'Reporta a (Jerarquía)', puesto.reporta_a);
+    drawGridCell(1, 1, 'Requisitos Académicos', puesto.educacion_requerida);
     
     drawGridCell(0, 2, 'Experiencia Requerida', puesto.experiencia_requerida);
     
     const engineDesc = `${motorText}${buildVersion ? ` (${buildVersion})` : ''}`;
-    drawGridCell(1, 2, 'Motor de Valoracion', engineDesc);
+    drawGridCell(1, 2, 'Motor de Valoración', engineDesc);
 
     this.y += rh * 3 + 15;
   }
@@ -290,7 +300,7 @@ class ReportGenerator {
     
     this.checkPage(20);
     this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
-    this.doc.text(`Se identificaron ${procedimientos.totalProcedimientos} procedimientos operativos asociados al area del puesto en el manual municipal.`, MG, this.y, { width: CW });
+    this.doc.text(`Se identificaron ${procedimientos.totalProcedimientos} procedimientos operativos asociados al área del puesto en el manual municipal.`, MG, this.y, { width: CW });
     this.y += 16;
     
     for (const proc of procedimientos.procedimientos) {
@@ -373,8 +383,12 @@ class ReportGenerator {
       }
     };
 
+    // Save and clip entire table for beautiful rounded corners
+    this.doc.save();
+    this.doc.roundedRect(lx, by, totalW, tableH, 6).clip();
+
     // Header cells - beautiful white text on dark navy
-    drawRow(0, '#1e3a5f', true, ['Factor Evaluado', 'Grado', 'Pts', 'Carga Grafica', 'Maximo']);
+    drawRow(0, '#1e3a5f', true, ['Factor Evaluado', 'Grado', 'Pts', 'Carga Gráfica', 'Máximo']);
     
     // Data cells
     for (let ri = 0; ri < rows.length; ri++) {
@@ -384,22 +398,24 @@ class ReportGenerator {
     }
     
     // Total cells
-    drawRow(1 + rows.length, C.tableHeader, true, ['PUNTUACION TOTAL ACUMULADA', '', `${total}`, '', '1000']);
+    drawRow(1 + rows.length, C.tableHeader, true, ['PUNTUACIÓN TOTAL ACUMULADA', '', `${total}`, '', '1000']);
 
-    // Outer table border and division lines
-    this.doc.strokeColor(C.border).lineWidth(0.5).rect(lx, by, totalW, tableH).stroke();
-    
-    // Horizontal row lines
+    // Horizontal row lines inside clipped area
     for (let i = 1; i < allRows; i++) {
       this.doc.strokeColor(C.lightBorder).lineWidth(0.5).moveTo(lx, by + i * rh).lineTo(lx + totalW, by + i * rh).stroke();
     }
     
-    // Vertical columns lines (only below header row to keep it sleek and clean)
+    // Vertical columns lines inside clipped area (only below header row to keep it sleek and clean)
     let cx = lx;
     for (let ci = 0; ci < colW.length - 1; ci++) {
       cx += colW[ci];
       this.doc.strokeColor(C.lightBorder).lineWidth(0.5).moveTo(cx, by + rh).lineTo(cx, by + tableH).stroke();
     }
+
+    this.doc.restore();
+
+    // Draw the clean outer rounded border over the clipped content
+    this.doc.strokeColor(C.border).lineWidth(0.5).roundedRect(lx, by, totalW, tableH, 6).stroke();
 
     this.y = by + tableH + 20;
   }
@@ -438,7 +454,7 @@ class ReportGenerator {
   }
 
   private addFactorDetail(evaluacion: any): void {
-    this.addSectionTitle('5. Detalle Tecnico y Fundamentacion por Factor');
+    this.addSectionTitle('5. Detalle Técnico y Fundamentación por Factor');
     
     for (const factor of FACTORS) {
       const d = FACTOR_DISPLAY[factor];
@@ -510,30 +526,30 @@ class ReportGenerator {
   }
 
   private addConclusionHero(evaluacion: any, totalPuntos: number): void {
-    this.addSectionTitle('6. Conclusion y Dictamen Tecnico');
+    this.addSectionTitle('6. Conclusión y Dictamen Técnico');
     
     const pct = Math.round((totalPuntos / 1000) * 100);
     const clase = getClaseSugerida(totalPuntos);
     
     let cat = '', desc = '';
     if (pct <= 20) {
-      cat = 'Nivel Operativo Basico';
-      desc = 'Puesto con funciones simples, supervision de personal nula y baja responsabilidad de activos.';
+      cat = 'Nivel Operativo Básico';
+      desc = 'Puesto con funciones simples, supervisión de personal nula y baja responsabilidad de activos.';
     } else if (pct <= 35) {
       cat = 'Nivel Operativo Calificado';
-      desc = 'Puesto con tareas estandarizadas, supervision ocasional de soporte y responsabilidad de operacion menor.';
+      desc = 'Puesto con tareas estandarizadas, supervisión ocasional de soporte y responsabilidad de operación menor.';
     } else if (pct <= 50) {
-      cat = 'Nivel Tecnico-Administrativo';
-      desc = 'Puesto que requiere analisis tecnico medio, coordinacion operativa y manejo de informacion confidencial.';
+      cat = 'Nivel Técnico-Administrativo';
+      desc = 'Puesto que requiere análisis técnico medio, coordinación operativa y manejo de información confidencial.';
     } else if (pct <= 65) {
       cat = 'Nivel Profesional';
-      desc = 'Puesto con alta complejidad tecnica y profesional, jefatura de unidad y alta responsabilidad por presupuestos.';
+      desc = 'Puesto con alta complejidad técnica y profesional, jefatura de unidad y alta responsabilidad por presupuestos.';
     } else if (pct <= 80) {
       cat = 'Nivel Directivo';
-      desc = 'Puesto de direccion estrategica, toma de decisiones criticas e impacto inmediato en el presupuesto institucional.';
+      desc = 'Puesto de dirección estratégica, toma de decisiones críticas e impacto inmediato en el presupuesto institucional.';
     } else {
-      cat = 'Nivel Superior / Alta Direccion';
-      desc = 'Puesto de maxima jerarquia, direccion estrategica integral y representacion legal e institucional.';
+      cat = 'Nivel Superior / Alta Dirección';
+      desc = 'Puesto de máxima jerarquía, dirección estratégica integral y representación legal e institucional.';
     }
 
     // 1. Solid Hero Scorecard Box Panel
@@ -544,14 +560,14 @@ class ReportGenerator {
     
     // Left score display
     this.doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
-    this.doc.text('PUNTUACION TOTAL ACUMULADA', MG + 15, this.y + 15);
+    this.doc.text('PUNTUACIÓN TOTAL ACUMULADA', MG + 15, this.y + 15);
     
     this.doc.fontSize(22).font('Helvetica-Bold');
     this.doc.text(`${totalPuntos}`, MG + 15, this.y + 26);
     this.doc.fontSize(11).font('Helvetica');
     this.doc.text('/ 1000 pts', MG + 65, this.y + 36);
     this.doc.fontSize(9.5).font('Helvetica-Oblique').fillColor('#93c5fd');
-    this.doc.text(`Carga salarial equivalente al ${pct}% del maximo de escala`, MG + 15, this.y + 53);
+    this.doc.text(`Carga salarial equivalente al ${pct}% del máximo de escala`, MG + 15, this.y + 53);
     
     // Right class sug display
     if (clase) {
@@ -566,12 +582,10 @@ class ReportGenerator {
       this.doc.text(`Serie Laboral: ${clase.serie}`, rx, this.y + 40, { width: 220, align: 'right' });
     }
     
-    this.y += heroH + 18;
-
-    // 2. Category Block
+    this.y += heroH + 18;    // 2. Category Block
     this.checkPage(40);
     this.doc.fontSize(8.5).font('Helvetica-Bold').fillColor(C.muted);
-    this.doc.text('CATEGORIA MUNICIPAL ASIGNADA', MG, this.y);
+    this.doc.text('CATEGORÍA MUNICIPAL ASIGNADA', MG, this.y);
     this.y += 10;
     
     this.doc.fontSize(10.5).font('Helvetica-Bold').fillColor(C.text);
@@ -583,14 +597,14 @@ class ReportGenerator {
     this.doc.text(desc, MG, this.y, { width: CW, align: 'justify' });
     this.y += dh + 16;
 
-    // 3. Dictamen Tecnico
+    // 3. Dictamen Técnico
     this.checkPage(40);
     this.doc.fontSize(9.5).font('Helvetica-Bold').fillColor(C.muted);
-    this.doc.text('RESOLUCION Y DICTAMEN TECNICO', MG, this.y);
+    this.doc.text('RESOLUCIÓN Y DICTAMEN TÉCNICO', MG, this.y);
     this.y += 10;
 
     const motorTexto = !evaluacion.motor || evaluacion.motor === 'rule-based' ? 'el motor de reglas contextuales v12' : 'el agente de inteligencia artificial';
-    const dtxt = `Conforme al analisis tecnico de las funciones descritas y la metodologa oficial de Puntos por Factores de la Municipalidad de San Carlos, el puesto "${evaluacion.puesto?.nombre || ''}" obtiene una valoracion de ${totalPuntos} puntos. Con base en esta puntuacion objetiva y auditable, se dictamina su clasificacion en la clase "${clase?.nombre || 'No determinada'}" (Serie ${clase?.serie || 'General'}). La valoracion fue ejecutada de forma sistematica por ${motorTexto}, garantizando total objetividad, trazabilidad y cumplimiento normativo.`;
+    const dtxt = `Conforme al análisis técnico de las funciones descritas y la metodología oficial de Puntos por Factores de la Municipalidad de San Carlos, el puesto "${evaluacion.puesto?.nombre || ''}" obtiene una valoración de ${totalPuntos} puntos. Con base en esta puntuación objetiva y auditable, se dictamina su clasificación en la clase "${clase?.nombre || 'No determinada'}" (Serie ${clase?.serie || 'General'}). La valoración fue ejecutada de forma sistemática por ${motorTexto}, garantizando total objetividad, trazabilidad y cumplimiento normativo.`;
     
     this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
     const dxh = this.doc.heightOfString(dtxt, { width: CW, align: 'justify', lineGap: 3.5 });
@@ -605,13 +619,13 @@ class ReportGenerator {
     
     let rec = '';
     if (pct < 30) {
-      rec = '1. Revisar la descripcion de funciones en el perfil oficial para asegurar que refleje con total exactitud las labores reales.\n2. Estabilizar la escala jerarquica verificando que el puesto no tenga subordinados directos sin registrar.';
+      rec = '1. Revisar la descripción de funciones en el perfil oficial para asegurar que refleje con total exactitud las labores reales.\n2. Estabilizar la escala jerárquica verificando que el puesto no tenga subordinados directos sin registrar.';
     } else if (pct < 50) {
-      rec = '1. Formalizar e indexar los procedimientos tecnicos asociados al area en el Manual de Procedimientos Municipal.\n2. Monitorear que la carga operativa este alineada con las responsabilidades tecnicas y de control interno del puesto.';
+      rec = '1. Formalizar e indexar los procedimientos técnicos asociados al área en el Manual de Procedimientos Municipal.\n2. Monitorear que la carga operativa esté alineada con las responsabilidades técnicas y de control interno del puesto.';
     } else if (pct < 70) {
-      rec = '1. Asegurar la aplicacion estricta de la prohibicion o carrera profesional en caso de que la clase profesional sugerida lo requiera.\n2. Programar auditorias de puesto periodicas para corroborar la vigencia del perfil en la estructura.';
+      rec = '1. Asegurar la aplicación estricta de la prohibición o carrera profesional en caso de que la clase profesional sugerida lo requiera.\n2. Programar auditorías de puesto periódicas para corroborar la vigencia del perfil en la estructura.';
     } else {
-      rec = '1. Validar la coherencia jerarquica y el rango de control del puesto en relacion con las demas plazas directivas.\n2. Asegurar que las competencias de liderazgo y planeacion estrategica se encuentren debidamente evaluadas en el expediente del colaborador.';
+      rec = '1. Validar la coherencia jerárquica y el rango de control del puesto en relación con las demás plazas directivas.\n2. Asegurar que las competencias de liderazgo y planeación estratégica se encuentren debidamente evaluadas en el expediente del colaborador.';
     }
 
     this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
@@ -677,12 +691,12 @@ class ReportGenerator {
 
     this.addInstitutionalHeader();
     
-    this.addSectionTitle('1. Identificacion del Puesto y Datos de Registro');
+    this.addSectionTitle('1. Identificación del Puesto y Datos de Registro');
     this.addMetadataGrid(puesto, motorText, evaluacion.buildVersion);
-    this.addFunctionsCard('Descripcion Detallada de Funciones Evaluadas', puesto.descripcion_funciones);
+    this.addFunctionsCard('Descripción Detallada de Funciones Evaluadas', puesto.descripcion_funciones);
     
-    this.addSectionTitle('2. Resumen Metodologico MSC');
-    const metText = 'La valoracion tecnica de la plaza se efectuo mediante el Manual de Clases y Metodologia de Puntos por Factores oficial de la Municipalidad de San Carlos. Se evaluan seis factores clave ponderados: Dificultad de las Funciones (200 pts max.), Supervision Ejercida (150 pts max.), Responsabilidad por Activos, Valores y Datos (200 pts max.), Condiciones de Trabajo (100 pts max.), Consecuencia y Trascendencia de los Errores (150 pts max.), y Requisitos Formativos y de Experiencia (200 pts max.). La escala total acumula un maximo de 1000 puntos. El analisis evalua la naturaleza sustantiva de las tareas, la jerarquia institucional, la autonomia de accion y los pisos minimos del area del puesto.';
+    this.addSectionTitle('2. Resumen Metodológico MSC');
+    const metText = 'La valoración técnica de la plaza se efectuó mediante el Manual de Clases y Metodología de Puntos por Factores oficial de la Municipalidad de San Carlos. Se evalúan seis factores clave ponderados: Dificultad de las Funciones (200 pts máx.), Supervisión Ejercida (150 pts máx.), Responsabilidad por Activos, Valores y Datos (200 pts máx.), Condiciones de Trabajo (100 pts máx.), Consecuencia y Trascendencia de los Errores (150 pts máx.), y Requisitos Formativos y de Experiencia (200 pts máx.). La escala total acumula un máximo de 1000 puntos. El análisis evalúa la naturaleza sustantiva de las tareas, la jerarquía institucional, la autonomía de acción y los pisos mínimos del área del puesto.';
     const metOpts = { width: CW, align: 'justify' as const, lineGap: 3.5 };
     const mh = this.doc.heightOfString(metText, metOpts);
     this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
