@@ -150,7 +150,9 @@ router.post('/ai-evaluate', async (req, res) => {
                 justif_requisitos: result.data.requisitos_just || '',
 
                 puntos_totales: result.totalPuntos,
-                estado: 'borrador'
+                estado: 'borrador',
+                motor: result.motor || 'rule-based',
+                buildVersion: result.buildVersion || BUILD_VERSION
             }
         });
 

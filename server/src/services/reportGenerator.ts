@@ -433,7 +433,7 @@ class ReportGenerator {
     this.doc.text('Dictamen Técnico:', MARGIN, this.y);
     this.y += 14;
 
-    const motorTexto = evaluacion.motor === 'rule-based'
+    const motorTexto = !evaluacion.motor || evaluacion.motor === 'rule-based'
       ? 'motor de análisis basado en reglas'
       : 'agente de inteligencia artificial';
 
@@ -441,7 +441,7 @@ class ReportGenerator {
     const dictamenClase = clase
       ? ` Con base en esta puntuación, se sugiere su clasificación en la clase "${clase.nombre}" de la serie ${clase.serie}.`
       : '';
-    const dictamenMotor = ` El análisis fue ejecutado por el ${motorTexto}, garantizando la objetividad y trazabilidad del proceso.`;
+    const dictamenMotor = ` El análisis fue ejecutado por el ${motorTexto}${evaluacion.buildVersion ? ` (${evaluacion.buildVersion})` : ''}, garantizando la objetividad y trazabilidad del proceso.`;
     const dictamenProc = procedimientos
       ? ` Se consideraron ${procedimientos.totalProcedimientos} procedimientos operativos asociados al área del puesto como contexto adicional para la evaluación.`
       : '';

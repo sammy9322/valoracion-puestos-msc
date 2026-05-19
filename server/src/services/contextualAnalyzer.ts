@@ -159,60 +159,69 @@ function tieneInfoSensible(fx:string,area:string):boolean{
 function clamp(g:number):number{return Math.max(1,Math.min(5,Math.round(g)));}
 
 function evalDificultad(acc:Accion[],pf:RolProfile):FactorResult{
-  if(!acc.length){const g=Math.max(1,pf.baseDificultad||1);return{grado:g,puntos:POINTS_MAP.dificultad[g],justificacion:`Evaluacion de Dificultad: no se identificaron acciones especificas. Se asigna Grado ${g} segun el perfil del puesto.`};}
-  let tot=0;const det:string[]=[];
-  for(const a of acc){const vc=clasifVerbo(a.verboNorm),oc=clasifObj(a.objeto),g=clamp(vc.base+oc.boost);tot+=g;det.push(`'${a.verbo} ${a.objeto}' (G${g})`);}
-  let avg=tot/acc.length;if(pf.baseDificultad>0)avg=Math.max(avg,pf.baseDificultad);
-  const g=clamp(avg);
-  return{grado:g,puntos:POINTS_MAP.dificultad[g],justificacion:`Evaluacion de Dificultad: ${acc.length} acciones identificadas: ${det.join('; ')}.${pf.baseDificultad>0?` Perfil minimo G${pf.baseDificultad}.`:''} Resultado: Grado ${g}.`};
+  if(!acc.length){const g=Math.max(1,pf.baseDificultad||1);return{grado:g,puntos:POINTS_MAP.dificultad[g],justificacion:`Evaluacion de Dificultad de Funciones: no se identificaron acciones especificas en la descripcion. El perfil del puesto "${pf.nombre}" establece un minimo de G${pf.baseDificultad} segun su categoria. Formula: perfil base = G${g}. Resultado: se asigna Grado ${g} (${POINTS_MAP.dificultad[g]} pts) segun rubrica contextual MSC.`};}
+  const det:string[]=[];let tot=0;
+  for(const a of acc){const vc=clasifVerbo(a.verboNorm),oc=clasifObj(a.objeto),g=clamp(vc.base+oc.boost);tot+=g;det.push(`${det.length+1}) '${a.verbo} ${a.objeto}' → verbo '${a.verbo}' categoria '${vc.cat}' (base G${vc.base}), objeto tipo '${oc.tipo}' (boost ${oc.boost >=0?'+':''}${oc.boost}). Formula: G${vc.base}+(${oc.boost >=0?'+':''}${oc.boost})=G${g}.`);}
+  let avg=Math.round(tot*10/acc.length)/10;let avgR=clamp(avg);let r=avgR;
+  let pfText='';if(pf.baseDificultad>0&&pf.baseDificultad>avgR){r=pf.baseDificultad;pfText=` Perfil del puesto "${pf.nombre}" establece minimo G${pf.baseDificultad} segun categoria/area. Grado final: max(G${avgR},G${pf.baseDificultad})=G${r}.`;}
+  const g=r;
+  return{grado:g,puntos:POINTS_MAP.dificultad[g],justificacion:`Evaluacion de Dificultad de Funciones: se analizaron las funciones del puesto mediante el metodo contextual MSC (Verbo+Objeto+Alcance).\n${det.join('\n')}\nPromedio de acciones: G${avg} → redondeado G${avgR}.${pfText||''}\nResultado: se asigna Grado ${g} (${POINTS_MAP.dificultad[g]} pts) segun rubrica contextual MSC.`};
 }
 
 function evalSupervision(acc:Accion[],pf:RolProfile,t:string):FactorResult{
-  let g=pf.baseSupervision||1;
-  if(tienePersonal(acc,t)){g=/jefe|director|gerente|subdirector|lider|supervisor/i.test(norm(pf.nombre))?4:/coordina|supervisa|dirige|lidera/.test(norm(t))?3:2;if(/departamento|unidad|direccion|gerencia|area\s+mayor/.test(norm(t)))g=Math.max(g,4);}
-  else if(/supervision\s+ocasional|apoya\s+supervision|guia\s+a\s+comp/.test(norm(t)))g=Math.max(g,2);
-  else if(/sin\s+personal\s+a\s+cargo|no\s+supervisa|trabajo\s+individual|funciones\s+individuales/.test(norm(t)))g=Math.max(1,Math.min(2,g));
+  let g=pf.baseSupervision||1;const tn=norm(t);const tp=tienePersonal(acc,t);let razon='';
+  if(tp){const nivelTit=/jefe|director|gerente|subdirector|lider|supervisor/i.test(norm(pf.nombre));const nivelFunc=/coordina|supervisa|dirige|lidera/.test(tn);g=nivelTit?4:nivelFunc?3:2;razon=nivelTit?'cargo de jefatura formal':nivelFunc?'verbos de supervision en funciones':'personal a cargo detectado';if(/departamento|unidad|direccion|gerencia|area\s+mayor/.test(tn)){g=Math.max(g,4);razon+=' con alcance de unidad/departamento';}}
+  else if(/supervision\s+ocasional|apoya\s+supervision|guia\s+a\s+comp/.test(tn)){g=Math.max(g,2);razon='supervision ocasional detectada';}
+  else if(/sin\s+personal\s+a\s+cargo|no\s+supervisa|trabajo\s+individual|funciones\s+individuales/.test(tn)){g=Math.max(1,Math.min(2,g));razon='no ejerce supervision explicita';}
+  else razon='sin evidencia de personal a cargo';
+  if(pf.baseSupervision>g){g=pf.baseSupervision;razon+=(`, perfil base G${pf.baseSupervision}`);}
   g=clamp(g);
-  return{grado:g,puntos:POINTS_MAP.supervision[g],justificacion:`Evaluacion de Supervision: el puesto "${pf.nombre}"${tienePersonal(acc,t)?' tiene personal a cargo':' no tiene personal a cargo explicito'}${pf.baseSupervision>0?`. Perfil base G${pf.baseSupervision}`:''}. Resultado: Grado ${g}.`};
+  return{grado:g,puntos:POINTS_MAP.supervision[g],justificacion:`Evaluacion de Supervision Ejercida: se analizaron las funciones y el titulo del puesto mediante metodo contextual MSC. Evidencia: ${razon}.${pf.baseSupervision>0?` Perfil de puesto "${pf.nombre}" establece base G${pf.baseSupervision}.`:''} Resultado: se asigna Grado ${g} (${POINTS_MAP.supervision[g]} pts) segun rubrica contextual MSC.`};
 }
 
 function evalResponsabilidad(acc:Accion[],pf:RolProfile,t:string):FactorResult{
-  let g=pf.baseResponsabilidad||1;const tn=norm(t);
-  if(/responsable\s+(?:de\s+|del?\s+)(?:presupuesto|fondos|contratacion|licitacion|recursos\s+financieros|patrimonio|activos\s+financieros)/i.test(tn))g=Math.max(g,4);
-  else if(/responsable\s+(?:de\s+|del?\s+)(?:informacion\s+sensible|confidencial|custodia|datos\s+personales|documentacion\s+reservada|valores|fondos\s+fijos)/i.test(tn))g=Math.max(g,3);
-  else if(tieneInfoSensible(t,pf.nombre))g=Math.max(g,3);
-  else if(/responsable\s+(?:de\s+|del?\s+)(?:materiales|equipo\s+menor|inventario|herramientas|suministros)/i.test(tn))g=Math.max(g,2);
-  else if(/custodia|protege|resguarda|salvaguardar/i.test(tn))g=Math.max(g,3);
-  else if(/presupuesto|fondos|contratacion|licitacion|compras\s+mayores|activos\s+financieros|activos\s+institucionales/i.test(tn))g=Math.max(g,4);
-  else if(/gestion\s+total|proceso\s+clave|decision\s+estrategico|alto\s+impacto|recursos\s+institucionales/i.test(tn))g=Math.max(g,5);
-  for(const a of acc)if(a.verboNorm==='administrar'||a.verboNorm==='gestionar'){const oc=clasifObj(a.objeto);if(oc.tipo==='estrategico')g=Math.max(g,4);if(oc.tipo==='directivo')g=Math.max(g,5);}
+  let g=pf.baseResponsabilidad||1;const tn=norm(t);let razon='';
+  if(/responsable\s+(?:de\s+|del?\s+)(?:presupuesto|fondos|contratacion|licitacion|recursos\s+financieros|patrimonio|activos\s+financieros)/i.test(tn)){g=Math.max(g,4);razon='responsable explicitamente de recursos financieros';}
+  else if(/responsable\s+(?:de\s+|del?\s+)(?:informacion\s+sensible|confidencial|custodia|datos\s+personales|documentacion\s+reservada|valores|fondos\s+fijos)/i.test(tn)){g=Math.max(g,3);razon='responsable de informacion sensible/confidencial';}
+  else if(tieneInfoSensible(t,pf.nombre)){g=Math.max(g,3);razon='area/puesto implica manejo de informacion sensible';}
+  else if(/responsable\s+(?:de\s+|del?\s+)(?:materiales|equipo\s+menor|inventario|herramientas|suministros)/i.test(tn)){g=Math.max(g,2);razon='responsable de activos menores';}
+  else if(/custodia|protege|resguarda|salvaguardar/i.test(tn)){g=Math.max(g,3);razon='funciones de custodia y proteccion';}
+  else if(/presupuesto|fondos|contratacion|licitacion|compras\s+mayores|activos\s+financieros|activos\s+institucionales/i.test(tn)){g=Math.max(g,4);razon='gestion de presupuestos o activos institucionales';}
+  else if(/gestion\s+total|proceso\s+clave|decision\s+estrategico|alto\s+impacto|recursos\s+institucionales/i.test(tn)){g=Math.max(g,5);razon='gestion de procesos clave institucionales';}
+  else razon='responsabilidad estandar del perfil';
+  for(const a of acc)if(a.verboNorm==='administrar'||a.verboNorm==='gestionar'){const oc=clasifObj(a.objeto);if(oc.tipo==='estrategico'){g=Math.max(g,4);razon+=`, administra recursos estrategicos`;}if(oc.tipo==='directivo'){g=Math.max(g,5);razon+=`, gestion de nivel directivo`;}}
+  if(pf.baseResponsabilidad>g){razon+=`. Perfil area minima G${pf.baseResponsabilidad}`;g=pf.baseResponsabilidad;}
   g=clamp(g);
-  return{grado:g,puntos:POINTS_MAP.responsabilidad[g],justificacion:`Evaluacion de Responsabilidad: el area "${pf.nombre}" implica${tieneInfoSensible(t,pf.nombre)?' manejo de informacion sensible/confidencial':' responsabilidades institucionales'}.${pf.baseResponsabilidad>0?` Perfil minimo G${pf.baseResponsabilidad}.`:''} Resultado: Grado ${g}.`};
+  return{grado:g,puntos:POINTS_MAP.responsabilidad[g],justificacion:`Evaluacion de Responsabilidad: se analizaron las funciones y el area del puesto mediante metodo contextual MSC. Evidencia: ${razon}.${pf.baseResponsabilidad>0?` El area "${pf.nombre}" tiene un minimo de G${pf.baseResponsabilidad} segun la clasificacion MSC.`:''} Resultado: se asigna Grado ${g} (${POINTS_MAP.responsabilidad[g]} pts) segun rubrica contextual MSC.`};
 }
 
-function evalCondiciones(t:string):FactorResult{
-  const tn=norm(t);let g=1;
-  const cm=(re:RegExp,gr:number)=>{if(re.test(tn))g=Math.max(g,gr);};
-  cm(/trabajo\s+de\s+oficina|ambiente\s+controlado|trabajo\s+sedentario|ambiente\s+de\s+oficina/i,1);
-  cm(/esfuerzo\s+fisico\s+moderado|ambiente\s+incomodo|bipedestacion|de\s+pie|camina\s+frecuentemente|levanta\s+peso/i,2);
-  cm(/intemperie|via\s+publica|ambiente\s+variable|trabajo\s+de\s+campo|labores\s+de\s+campo|en\s+el\s+exterior|condiciones\s+climaticas|ruido\s+constante|calor\s+(?!humano|de\s+hogar)/i,3);
-  cm(/riesgo\s+de\s+(?:accidente|caida|lesion|fisico|mecanico|electrico|quimico|biologico)|accidente\s+laboral|trabajo\s+en\s+altura|maquinaria\s+peligrosa|sustancias|quimicos|equipo\s+peligroso/i,4);
-  cm(/alta\s+peligrosidad|insalubridad|enfermedad\s+profesional|ambiente\s+extremo|radiacion|peligro\s+constante|material\s+peligroso|alta\s+exposicion|toxicos/i,5);
+function evalCondiciones(t:string,pf:RolProfile):FactorResult{
+  const tn=norm(t);let g=1;let razon='';
+  const cm=(re:RegExp,gr:number,lb:string)=>{if(re.test(tn)&&gr>g){g=gr;razon=lb;}};
+  cm(/trabajo\s+de\s+oficina|ambiente\s+controlado|trabajo\s+sedentario|ambiente\s+de\s+oficina/i,1,'trabajo en oficina/ambiente controlado');
+  cm(/esfuerzo\s+fisico\s+moderado|ambiente\s+incomodo|bipedestacion|de\s+pie|camina\s+frecuentemente|levanta\s+peso/i,2,'esfuerzo fisico moderado o ambiente incomodo');
+  cm(/intemperie|via\s+publica|ambiente\s+variable|trabajo\s+de\s+campo|labores\s+de\s+campo|en\s+el\s+exterior|condiciones\s+climaticas|ruido\s+constante|calor\s+(?!humano|de\s+hogar)/i,3,'trabajo a la intemperie o condiciones climaticas variables');
+  cm(/riesgo\s+de\s+(?:accidente|caida|lesion|fisico|mecanico|electrico|quimico|biologico)|accidente\s+laboral|trabajo\s+en\s+altura|maquinaria\s+peligrosa|sustancias|quimicos|equipo\s+peligroso/i,4,'riesgo de accidentes laborales');
+  cm(/alta\s+peligrosidad|insalubridad|enfermedad\s+profesional|ambiente\s+extremo|radiacion|peligro\s+constante|material\s+peligroso|alta\s+exposicion|toxicos/i,5,'alta peligrosidad/insalubridad');
+  if(!razon)razon='ambiente de oficina controlado estandar';
+  if(pf?.baseCondiciones>g){g=pf.baseCondiciones;razon+=`. Perfil base G${pf.baseCondiciones} segun area`;}
   g=clamp(g);
-  return{grado:g,puntos:POINTS_MAP.condiciones[g],justificacion:`Evaluacion de Condiciones de Trabajo: entorno${g>3?' con riesgos laborales significativos':g>1?' con exigencias fisicas':' de oficina controlado'}. Resultado: Grado ${g}.`};
+  return{grado:g,puntos:POINTS_MAP.condiciones[g],justificacion:`Evaluacion de Condiciones de Trabajo: se analizaron las condiciones descritas mediante metodo contextual MSC. Evidencia: ${razon}. Resultado: se asigna Grado ${g} (${POINTS_MAP.condiciones[g]} pts) segun rubrica contextual MSC.`};
 }
 
 function evalError(t:string,pf:RolProfile):FactorResult{
-  const tn=norm(t);let g=pf.baseError||1;
-  if(/error\s+compromete\s+(?:la\s+)?estabilidad|seguridad\s+publica|reputacion\s+institucional|crisis|confianza\s+publica|irreversible|estabilidad\s+institucional/i.test(tn))g=Math.max(g,5);
-  else if(/perdida\s+economica|perdida\s+financiera|multa|sancion|demanda|penal|consecuencia\s+legal|responsabilidad\s+legal|legal\s+(?!.*ilegal)/i.test(tn))g=Math.max(g,4);
-  else if(/afecta\s+(?:a\s+)?servicio|cliente|usuario|ciudadano|externo|interrumpe|departamento/i.test(tn))g=Math.max(g,3);
-  else if(/retraso\s+menor|demora|interno|proceso\s+interno|reasignacion/i.test(tn))g=Math.max(g,2);
-  if(/control\s+interno|auditoria|juridico|legal/i.test(norm(pf.nombre)))g=Math.max(g,3);
-  if(/financiero|presupuesto|tesoreria|contabilidad/i.test(norm(pf.nombre)))g=Math.max(g,3);
-  if(/facil\s+de\s+corregir|facil\s+de\s+detectar|sin\s+impacto|bajo\s+impacto|minimo\s+efecto/i.test(tn))g=Math.max(g,1);
+  const tn=norm(t);let g=pf.baseError||1;let razon='';
+  const cm=(re:RegExp,gr:number,lb:string)=>{if(re.test(tn)&&gr>g){g=gr;razon=lb;}};
+  cm(/error\s+compromete\s+(?:la\s+)?estabilidad|seguridad\s+publica|reputacion\s+institucional|crisis|confianza\s+publica|irreversible|estabilidad\s+institucional/i,5,'consecuencia critica: estabilidad institucional o seguridad publica');
+  cm(/perdida\s+economica|perdida\s+financiera|multa|sancion|demanda|penal|consecuencia\s+legal|responsabilidad\s+legal|legal\s+(?!.*ilegal)/i,4,'perdida economica o consecuencias legales');
+  cm(/afecta\s+(?:a\s+)?servicio|cliente|usuario|ciudadano|externo|interrumpe|departamento/i,3,'afecta servicio externo o ciudadanos');
+  cm(/retraso\s+menor|demora|interno|proceso\s+interno|reasignacion/i,2,'retrasos operativos internos');
+  if(/control\s+interno|auditoria|juridico|legal/i.test(norm(pf.nombre))){const ng=Math.max(g,3);if(ng>g){g=ng;razon+=`; area "${pf.nombre}" con funciones de control/auditoria`;}}
+  if(/financiero|presupuesto|tesoreria|contabilidad/i.test(norm(pf.nombre))){const ng=Math.max(g,3);if(ng>g){g=ng;razon+=`; area "${pf.nombre}" con funciones financieras`;}}
+  if(!razon)razon='bajo impacto operativo';
+  if(pf.baseError>g){g=pf.baseError;razon+=`. Perfil base G${pf.baseError} segun area`;}
   g=clamp(g);
-  return{grado:g,puntos:POINTS_MAP.error[g],justificacion:`Evaluacion de Consecuencia del Error: el puesto${pf.baseError>1?` en ${pf.nombre}`:''} implica${g>=4?' consecuencias economicas/legales':g>=3?' impacto en servicio externo':g>=2?' retrasos operativos':' bajo impacto'}. Resultado: Grado ${g}.`};
+  return{grado:g,puntos:POINTS_MAP.error[g],justificacion:`Evaluacion de Consecuencia del Error: se analizaron las funciones y el area del puesto mediante metodo contextual MSC. Evidencia: ${razon}. Resultado: se asigna Grado ${g} (${POINTS_MAP.error[g]} pts) segun rubrica contextual MSC.`};
 }
 
 const EDUC:[RegExp,number,string][]=[
@@ -226,10 +235,10 @@ const EDUC:[RegExp,number,string][]=[
 function evalRequisitos(educacion:string):FactorResult{
   const tn=norm(educacion);
   if(/no\s+(?:requiere|necesita|exige|se\s+requiere|se\s+exige)/i.test(tn))
-    return{grado:1,puntos:POINTS_MAP.requisitos[1],justificacion:'Evaluacion de Requisitos: no se requiere formacion academica especifica. Resultado: Grado 1.'};
+    return{grado:1,puntos:POINTS_MAP.requisitos[1],justificacion:'Evaluacion de Requisitos de Formacion: se analizaron los requisitos del puesto mediante metodo contextual MSC. No se requiere formacion academica especifica. Formula: sin requisito → Grado 1 (5 pts) segun rubrica contextual MSC.'};
   let mg=1,lb='educacion basica';
   for(const[re,g,lbl]of EDUC)if(re.test(tn)&&g>mg){mg=g;lb=lbl;}
-  return{grado:mg,puntos:POINTS_MAP.requisitos[mg],justificacion:`Evaluacion de Requisitos: se requiere "${lb}" (Grado ${mg}). Resultado: Grado ${mg}.`};
+  return{grado:mg,puntos:POINTS_MAP.requisitos[mg],justificacion:`Evaluacion de Requisitos de Formacion: se analizaron los requisitos del puesto mediante metodo contextual MSC. Se requiere "${lb}" (Grado ${mg} segun tabla de formacion academica MSC). Formula: nivel educativo detectado "${lb}" → G${mg} (${POINTS_MAP.requisitos[mg]} pts) segun rubrica contextual MSC.`};
 }
 
 function evalProcedimientos(procCtx:any,pf:RolProfile):{ref:string[];acc:Accion[]}{
@@ -248,7 +257,7 @@ export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
   const all=[...acc,...pr.acc];
   const res:Record<string,FactorResult>={
     dificultad:evalDificultad(all,pf),supervision:evalSupervision(all,pf,fx),
-    responsabilidad:evalResponsabilidad(all,pf,fx),condiciones:evalCondiciones(fx),error:evalError(fx,pf),requisitos:evalRequisitos(ed),
+    responsabilidad:evalResponsabilidad(all,pf,fx),condiciones:evalCondiciones(fx,pf),error:evalError(fx,pf),requisitos:evalRequisitos(ed),
   };
   const data:EvaluationSuggestion={
     dificultad:res.dificultad.grado,dificultad_just:res.dificultad.justificacion,
