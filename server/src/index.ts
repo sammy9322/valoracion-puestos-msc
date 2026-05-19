@@ -12,7 +12,7 @@ import asignacionesRouter from './routes/asignaciones';
 import auditoriaRouter from './routes/auditoria';
 import manualRouter from './routes/manual';
 
-async function ensureColumns() {
+const startup = (async () => {
   try {
     await prisma.$executeRawUnsafe(`ALTER TABLE "Evaluacion" ADD COLUMN IF NOT EXISTS "motor" TEXT;`);
     await prisma.$executeRawUnsafe(`ALTER TABLE "Evaluacion" ADD COLUMN IF NOT EXISTS "buildVersion" TEXT;`);
@@ -20,13 +20,19 @@ async function ensureColumns() {
   } catch (e: any) {
     console.warn('[migrate] could not ensure columns:', e?.message);
   }
-}
+})();
 
 const app = express();
 const port = process.env.PORT || 5000;
 
 app.use(cors());
 app.use(express.json());
+
+// Wait for startup migration before processing requests
+app.use(async (_req, _res, next) => {
+  await startup;
+  next();
+});
 
 // Main Routes
 app.use('/api/puestos', puestosRouter);
@@ -43,7 +49,6 @@ app.get('/api/health', (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
-  ensureColumns();
 });
 
 export default app;
