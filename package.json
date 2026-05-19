@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "postinstall": "prisma generate --schema=server/prisma/schema.prisma"
+    "postinstall": "prisma generate --schema=server/prisma/schema.prisma",
+    "build": "prisma migrate deploy --schema=server/prisma/schema.prisma"
   }
 }
