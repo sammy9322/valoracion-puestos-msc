@@ -150,11 +150,21 @@ router.post('/ai-evaluate', async (req, res) => {
                 justif_requisitos: result.data.requisitos_just || '',
 
                 puntos_totales: result.totalPuntos,
-                estado: 'borrador',
-                motor: result.motor || 'rule-based',
-                buildVersion: result.buildVersion || BUILD_VERSION
+                estado: 'borrador'
             }
         });
+
+        // Store motor/buildVersion via raw SQL (columns may not exist yet)
+        try {
+            await prisma.$executeRawUnsafe(
+                `UPDATE "Evaluacion" SET "motor" = $1, "buildVersion" = $2 WHERE "id" = $3`,
+                result.motor || 'rule-based',
+                result.buildVersion || BUILD_VERSION,
+                evaluacion.id
+            );
+        } catch (_e) {
+            // columns don't exist yet — safe to ignore
+        }
 
         await prisma.auditoria.create({
             data: {
@@ -267,6 +277,22 @@ router.get('/:id/report', async (req, res) => {
         if (!evaluacion) {
             return res.status(404).json({ error: 'Evaluación no encontrada' });
         }
+
+        // Read motor/buildVersion via raw SQL (columns may not exist in old records)
+        let motor: string | undefined;
+        let buildVersion: string | undefined;
+        try {
+            const row: any = await prisma.$queryRawUnsafe(
+                `SELECT "motor", "buildVersion" FROM "Evaluacion" WHERE "id" = $1`,
+                id
+            );
+            if (row?.length) {
+                motor = row[0].motor;
+                buildVersion = row[0].buildVersion;
+            }
+        } catch (_e) { /* columns don't exist yet */ }
+        (evaluacion as any).motor = motor;
+        (evaluacion as any).buildVersion = buildVersion;
 
         const procCtx = await enrichProc(evaluacion.puesto).catch(() => undefined);
         const doc = generateEvaluationReport(evaluacion, procCtx ?? undefined);

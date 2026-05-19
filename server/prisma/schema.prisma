@@ -93,8 +93,6 @@ model Evaluacion {
   fecha_aprobacion          DateTime?
   version                   Int       @default(1)
   estado                    String    @default("borrador")
-  motor                     String?
-  buildVersion              String?
   
   asignaciones              AsignacionSalario[]
 }
