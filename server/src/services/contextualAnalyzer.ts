@@ -66,7 +66,7 @@ const VERB_LEXICON: Record<string, VerbClass> = {
   operar:{cat:'ejecucion',base:2},tramitar:{cat:'ejecucion',base:2},llenar:{cat:'ejecucion',base:2},
   registrar:{cat:'ejecucion',base:2},recibir:{cat:'ejecucion',base:2},enviar:{cat:'ejecucion',base:2},
   atender:{cat:'ejecucion',base:2},asistir:{cat:'ejecucion',base:2},apoyar:{cat:'ejecucion',base:2},
-  analizar:{cat:'analisis',base:3},evaluar:{cat:'analisis',base:3},diagnosticar:{cat:'analisis',base:3},
+  analizar:{cat:'analisis',base:3},auditar:{cat:'analisis',base:3},fiscalizar:{cat:'analisis',base:3},controlar:{cat:'analisis',base:3},vigilar:{cat:'analisis',base:3},evaluar:{cat:'analisis',base:3},diagnosticar:{cat:'analisis',base:3},
   inspeccionar:{cat:'analisis',base:3},revisar:{cat:'analisis',base:3},verificar:{cat:'analisis',base:3},
   supervisar:{cat:'analisis',base:3},coordinar:{cat:'analisis',base:3},resolver:{cat:'analisis',base:3},
   monitorear:{cat:'analisis',base:3},elaborar:{cat:'analisis',base:3},preparar:{cat:'analisis',base:3},
@@ -81,7 +81,7 @@ const VERB_LEXICON: Record<string, VerbClass> = {
 
 const OBJ_CLASSES: [RegExp, ObjType, number][] = [
   [/documento|archivo|expediente|solicitud|papeleria|fotocopia|formulario|oficio|nota|fax|correspondencia|carta/i,'simple',-1],
-  [/informe|estudio|reporte|programa|proyecto|plan|actividad|evento|tramite|proceso|procedimiento|auditoria|control|operacion/i,'tecnico',0],
+  [/informe|estudio|reporte|programa|proyecto|plan|actividad|evento|tramite|proceso|procedimiento|auditoria|auditoria\s+interna|auditoria\s+de\s+cumplimiento|control|control\s+interno|operacion|evaluacion|evaluacion\s+de\s+riesgos|gestion\s+de\s+riesgos|riesgo|riesgos|hallazgo|hallazgos|recomendacion|recomendaciones|segumiento|plan\s+de\s+mejora|no\s+conformidad|incumplimiento|observacion|observaciones/i,'tecnico',0],
   [/politica|sistema|directriz|lineamiento|normativa|reglamento|presupuesto|contratacion|licitacion|estrategia/i,'estrategico',1],
   [/ley|decreto|institucion|municipalidad|nacional|rector/i,'directivo',2],
 ];
@@ -96,7 +96,7 @@ const TITLE_RULES: [RegExp, Partial<RolProfile>][] = [
 ];
 
 const AREA_RULES: [RegExp, Partial<RolProfile>][] = [
-  [/control interno|auditoria|juridico|legal|asesoria legal/i,{baseResponsabilidad:3,baseError:3}],
+  [/control interno|auditoria|juridico|legal|asesoria legal/i,{baseDificultad:3,baseResponsabilidad:3,baseError:3}],
   [/financiero|contabilidad|tesoreria|presupuesto|proveeduria|compras|hacienda/i,{baseResponsabilidad:4,baseError:3}],
   [/gestion humana|recursos humanos|talento humano|rrhh|seleccion|capacitacion/i,{baseResponsabilidad:3,baseError:2}],
   [/policia|seguridad|vigilancia|transito|proteccion|resguardo/i,{baseCondiciones:3,baseError:3}],
@@ -115,16 +115,21 @@ function frases(t:string):string[]{
 
 function extraerAcciones(texto:string):Accion[]{
   const n=norm(texto); const r:Accion[]=[]; const seen=new Set<string>();
-  const pts=[/(\w+)\s+(?:a|de|al|la|el|los|las|un|una|del|en|por|su|sus)?\s+([a-z]{3,60}?)(?=\s+(?:para|con\s+(?:el\s+)?fin|a\s+trav|mediante|segun|[,.;])|$)/gi,
-    /responsable\s+(?:de\s+|del?\s+)([a-z\s]{3,60}?)(?=[,.;]|$)/gi,/encargad[oa]\s+(?:de\s+|del?\s+)([a-z\s]{3,60}?)(?=[,.;]|$)/gi];
-  for(const s of frases(n))
-    for(const re of pts){
-      re.lastIndex=0; let m;
+  const verbKeys=Object.keys(VERB_LEXICON);
+  const V=new RegExp(`\\b(${verbKeys.join('|')})\\s+(?:a|de|al|la|el|los|las|un|una|del|en|por|su|sus|este|esta|estos|estas)\\s+((?:[a-z]+\\s+(?:de|del|de\\s+la|de\\s+los|de\\s+las|en|para|por|con|sin|bajo|mediante)\\s+)*[a-z]{3,50}?)(?=\\s*(?:,|;|\\.|$|para|con\\s+(?:el\\s+)?fin|mediante|segun|as[ií]|o\\s+bien))`,'gi');
+  // Pattern 2: "responsable de + objeto"
+  const R=/responsable\s+(?:de\s+|del?\s+)((?:[a-z]+\s+(?:de|del|de\s+la|de\s+los|de\s+las|en|para|por)\s+)*[a-z]{3,50}?)(?=\s*(?:,|;|\.|$))/gi;
+  // Pattern 3: "encargado de + objeto"
+  const E=/encargad[oa]\s+(?:de\s+|del?\s+)((?:[a-z]+\s+(?:de|del|de\s+la|de\s+los|de\s+las|en|para|por)\s+)*[a-z]{3,50}?)(?=\s*(?:,|;|\.|$))/gi;
+  for(const s of frases(n)){
+    for(const re of[V,R,E]){
+      re.lastIndex=0;let m;
       while((m=re.exec(s))!==null){
-        const vb=m[1]||'',ob=(m[2]||m[1]||'').trim(),key=`${vb}:${ob.slice(0,20)}`;
-        if(!seen.has(key)&&vb.length>2&&ob.length>2){seen.add(key);r.push({verbo:vb,verboNorm:vb,objeto:ob,oracion:s});}
+        const vb=m[1]||'',ob=(m[2]||m[1]||'').trim().replace(/\s{2,}/g,' '),key=`${vb}:${ob.slice(0,30)}`;
+        if(!seen.has(key)&&vb.length>2&&ob.length>3){seen.add(key);r.push({verbo:vb,verboNorm:vb,objeto:ob,oracion:s});}
       }
     }
+  }
   return r;
 }
 
@@ -159,7 +164,7 @@ function tieneInfoSensible(fx:string,area:string):boolean{
 function clamp(g:number):number{return Math.max(1,Math.min(5,Math.round(g)));}
 
 function evalDificultad(acc:Accion[],pf:RolProfile):FactorResult{
-  if(!acc.length){const g=Math.max(1,pf.baseDificultad||1);return{grado:g,puntos:POINTS_MAP.dificultad[g],justificacion:`Evaluacion de Dificultad de Funciones: no se identificaron acciones especificas en la descripcion. El perfil del puesto "${pf.nombre}" establece un minimo de G${pf.baseDificultad} segun su categoria. Formula: perfil base = G${g}. Resultado: se asigna Grado ${g} (${POINTS_MAP.dificultad[g]} pts) segun rubrica contextual MSC.`};}
+  if(!acc.length){const b=pf.baseDificultad||1;const g=Math.max(1,b);return{grado:g,puntos:POINTS_MAP.dificultad[g],justificacion:`Evaluacion de Dificultad de Funciones: no se identificaron acciones especificas en la descripcion de funciones. Se aplica el perfil base del puesto "${pf.nombre}" segun su categoria y area: base minima G${b}. Formula: max(G${b}, G1)=G${g}. Resultado: se asigna Grado ${g} (${POINTS_MAP.dificultad[g]} pts) segun rubrica contextual MSC.`};}
   const det:string[]=[];let tot=0;
   for(const a of acc){const vc=clasifVerbo(a.verboNorm),oc=clasifObj(a.objeto),g=clamp(vc.base+oc.boost);tot+=g;det.push(`${det.length+1}) '${a.verbo} ${a.objeto}' → verbo '${a.verbo}' categoria '${vc.cat}' (base G${vc.base}), objeto tipo '${oc.tipo}' (boost ${oc.boost >=0?'+':''}${oc.boost}). Formula: G${vc.base}+(${oc.boost >=0?'+':''}${oc.boost})=G${g}.`);}
   let avg=Math.round(tot*10/acc.length)/10;let avgR=clamp(avg);let r=avgR;
