@@ -272,11 +272,11 @@ class ReportGenerator {
     this.checkPage(cardH + 10);
     
     // Draw rounded background card
-    this.doc.fillColor(C.cardBg).rect(MG, this.y, CW, cardH).fill();
-    // Accent left bar
-    this.doc.fillColor(C.accent).rect(MG, this.y, 3, cardH).fill();
+    this.doc.fillColor(C.cardBg).roundedRect(MG, this.y, CW, cardH, 4).fill();
+    // Accent left bar (rounded vertical pill)
+    this.doc.fillColor(C.accent).roundedRect(MG, this.y, 3, cardH, 1.5).fill();
     // Card thin border
-    this.doc.strokeColor(C.lightBorder).lineWidth(0.5).rect(MG, this.y, CW, cardH).stroke();
+    this.doc.strokeColor(C.lightBorder).lineWidth(0.5).roundedRect(MG, this.y, CW, cardH, 4).stroke();
 
     // Render Text
     this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
@@ -309,8 +309,8 @@ class ReportGenerator {
       this.checkPage(cardH + 12);
       
       // Gray background card
-      this.doc.fillColor(C.cardBg).rect(MG, this.y, CW, cardH).fill();
-      this.doc.strokeColor(C.lightBorder).lineWidth(0.5).rect(MG, this.y, CW, cardH).stroke();
+      this.doc.fillColor(C.cardBg).roundedRect(MG, this.y, CW, cardH, 4).fill();
+      this.doc.strokeColor(C.lightBorder).lineWidth(0.5).roundedRect(MG, this.y, CW, cardH, 4).stroke();
 
       this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
       this.doc.text(text, MG + 16, this.y + 10, opts);
@@ -344,7 +344,8 @@ class ReportGenerator {
       // Draw background
       this.doc.fillColor(bg).rect(lx, rry, totalW, rh).fill();
       
-      this.doc.fillColor(C.text).fontSize(8.5).font(isBold ? 'Helvetica-Bold' : 'Helvetica');
+      const isHeader = ri === 0;
+      this.doc.fillColor(isHeader ? '#ffffff' : C.text).fontSize(8.5).font(isBold ? 'Helvetica-Bold' : 'Helvetica');
       
       let cx = lx;
       for (let ci = 0; ci < vals.length; ci++) {
@@ -359,10 +360,12 @@ class ReportGenerator {
           const barY = rry + (rh - barH) / 2;
           
           // Draw track background
-          this.doc.fillColor('#e2e8f0').rect(barX, barY, barW, barH).fill();
+          this.doc.fillColor('#e2e8f0').roundedRect(barX, barY, barW, barH, 3).fill();
           // Draw fill with active color
           const actColor = getGradeColor(Number(evaluacion[`grado_${factorKey}`] || 1));
-          this.doc.fillColor(actColor).rect(barX, barY, barW * pct, barH).fill();
+          if (pct > 0) {
+            this.doc.fillColor(actColor).roundedRect(barX, barY, barW * pct, barH, 3).fill();
+          }
         } else {
           this.doc.text(String(vals[ci]), cx + 6, rry + 7, { width: colW[ci] - 12, align });
         }
@@ -370,8 +373,8 @@ class ReportGenerator {
       }
     };
 
-    // Header cells
-    drawRow(0, C.tableHeader, true, ['Factor Evaluado', 'Grado', 'Pts', 'Carga Grafica', 'Maximo']);
+    // Header cells - beautiful white text on dark navy
+    drawRow(0, '#1e3a5f', true, ['Factor Evaluado', 'Grado', 'Pts', 'Carga Grafica', 'Maximo']);
     
     // Data cells
     for (let ri = 0; ri < rows.length; ri++) {
@@ -391,11 +394,11 @@ class ReportGenerator {
       this.doc.strokeColor(C.lightBorder).lineWidth(0.5).moveTo(lx, by + i * rh).lineTo(lx + totalW, by + i * rh).stroke();
     }
     
-    // Vertical columns lines
+    // Vertical columns lines (only below header row to keep it sleek and clean)
     let cx = lx;
     for (let ci = 0; ci < colW.length - 1; ci++) {
       cx += colW[ci];
-      this.doc.strokeColor(C.lightBorder).lineWidth(0.5).moveTo(cx, by).lineTo(cx, by + tableH).stroke();
+      this.doc.strokeColor(C.lightBorder).lineWidth(0.5).moveTo(cx, by + rh).lineTo(cx, by + tableH).stroke();
     }
 
     this.y = by + tableH + 20;
@@ -491,9 +494,9 @@ class ReportGenerator {
         
         // Draw the background card beneath the text retrospectively
         this.doc.save();
-        this.doc.fillColor(C.cardBg).rect(MG, cardTopY, CW, cardH).fill();
-        this.doc.fillColor(actColor).rect(MG, cardTopY, 3, cardH).fill();
-        this.doc.strokeColor(C.lightBorder).lineWidth(0.5).rect(MG, cardTopY, CW, cardH).stroke();
+        this.doc.fillColor(C.cardBg).roundedRect(MG, cardTopY, CW, cardH, 4).fill();
+        this.doc.fillColor(actColor).roundedRect(MG, cardTopY, 3, cardH, 1.5).fill();
+        this.doc.strokeColor(C.lightBorder).lineWidth(0.5).roundedRect(MG, cardTopY, CW, cardH, 4).stroke();
         this.doc.restore();
 
         // Redraw text to avoid it being under filled background
@@ -536,9 +539,8 @@ class ReportGenerator {
     // 1. Solid Hero Scorecard Box Panel
     this.checkPage(85);
     const heroH = 75;
-    this.doc.fillColor(C.accent).rect(MG, this.y, CW, heroH).fill();
-    // Rounded corners look via a thin white border
-    this.doc.strokeColor(C.lightBorder).lineWidth(1).rect(MG, this.y, CW, heroH).stroke();
+    this.doc.fillColor(C.accent).roundedRect(MG, this.y, CW, heroH, 6).fill();
+    this.doc.strokeColor(C.lightBorder).lineWidth(1).roundedRect(MG, this.y, CW, heroH, 6).stroke();
     
     // Left score display
     this.doc.fillColor('#ffffff').fontSize(9).font('Helvetica-Bold');
@@ -644,11 +646,11 @@ class ReportGenerator {
     const boxH = 54;
     
     // Sello border box
-    this.doc.fillColor(C.cardBg).rect(boxX, sigY + 10, boxW, boxH).fill();
-    this.doc.strokeColor(C.border).lineWidth(0.5).rect(boxX, sigY + 10, boxW, boxH).stroke();
+    this.doc.fillColor(C.cardBg).roundedRect(boxX, sigY + 10, boxW, boxH, 4).fill();
+    this.doc.strokeColor(C.border).lineWidth(0.5).roundedRect(boxX, sigY + 10, boxW, boxH, 4).stroke();
     
     // Sello vertical brand border
-    this.doc.fillColor(C.accent).rect(boxX, sigY + 10, 3, boxH).fill();
+    this.doc.fillColor(C.accent).roundedRect(boxX, sigY + 10, 3, boxH, 1.5).fill();
 
     // Sello content
     this.doc.fillColor(C.accent).fontSize(7.5).font('Helvetica-Bold');
