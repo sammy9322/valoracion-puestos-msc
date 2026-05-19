@@ -86,17 +86,32 @@ const OBJ_CLASSES: [RegExp, ObjType, number][] = [
   [/ley|decreto|institucion|municipalidad|nacional|rector/i,'directivo',2],
 ];
 
-const TITLE_RULES: [RegExp, Partial<RolProfile>][] = [
-  [/asistente|auxiliar|oficinista|conserje|mensajero|portero|chofer|guardia|vigilante|recepcionista/i,
-   {baseDificultad:1,baseSupervision:1,baseResponsabilidad:1,baseCondiciones:1,baseError:1}],
-  [/tecnico|analista|especialista|profesional|instructor|inspector|supervisor|coordinador|encargado|oficial/i,
-   {baseDificultad:3,baseSupervision:2,baseResponsabilidad:2,baseCondiciones:2,baseError:2}],
-  [/jefe|director|gerente|subdirector|lider|subgerente/i,
-   {baseDificultad:4,baseSupervision:4,baseResponsabilidad:4,baseCondiciones:2,baseError:4}],
+const SENIORITY_MAP: [RegExp, string, number, number, number, number, number][] = [
+  [/director|gerente|subdirector/i, 'directivo', 5, 4, 4, 4, 5],
+  [/jefe|subgerente|lider/i, 'jefatura', 4, 4, 3, 3, 4],
+  [/supervisor|coordinador|encargado|oficial/i, 'supervision', 3, 3, 2, 2, 3],
+  [/analista|especialista|profesional|instructor|inspector/i, 'profesional', 3, 2, 2, 2, 4],
+  [/tecnico|operador/i, 'tecnico', 2, 1, 1, 1, 2],
+  [/asistente|auxiliar|oficinista|recepcionista/i, 'apoyo', 1, 1, 1, 1, 1],
+  [/conserje|mensajero|portero|chofer|guardia|vigilante/i, 'operativo', 1, 1, 1, 1, 1],
+];
+
+const SPECIALTY_MAP: [RegExp, number, number, number, number][] = [
+  [/control\s+interno|auditoria/i, 3, 2, 3, 0],
+  [/juridico|legal|asesoria/i, 3, 3, 3, 0],
+  [/financiero|contabilidad|tesoreria|hacienda|proveeduria/i, 2, 3, 2, 0],
+  [/presupuesto|compras|contratacion|licitacion/i, 2, 2, 2, 0],
+  [/sistemas|informatica|tecnologia|digitalizacion|datos/i, 2, 1, 1, 0],
+  [/proyectos|programa|planificacion|innovacion/i, 2, 1, 1, 0],
+  [/rrhh|talento\s+humano|gestion\s+humana|recursos\s+humanos|seleccion|capacitacion/i, 1, 2, 1, 0],
+  [/salud|medico|enfermeria|clinica|hospital|odontologia/i, 2, 2, 3, 0],
+  [/obras|infraestructura|mantenimiento|construccion|ingenieria/i, 2, 1, 1, 2],
+  [/policia|seguridad|transito|proteccion|resguardo/i, 1, 1, 3, 3],
+  [/educacion|cultura|deportes|social|comunitario|desarrollo/i, 1, 1, 1, 0],
 ];
 
 const AREA_RULES: [RegExp, Partial<RolProfile>][] = [
-  [/control interno|auditoria|juridico|legal|asesoria legal/i,{baseDificultad:3,baseResponsabilidad:3,baseError:3}],
+  [/control interno|auditoria|juridico|legal|asesoria legal/i,{baseResponsabilidad:3,baseError:3}],
   [/financiero|contabilidad|tesoreria|presupuesto|proveeduria|compras|hacienda/i,{baseResponsabilidad:4,baseError:3}],
   [/gestion humana|recursos humanos|talento humano|rrhh|seleccion|capacitacion/i,{baseResponsabilidad:3,baseError:2}],
   [/policia|seguridad|vigilancia|transito|proteccion|resguardo/i,{baseCondiciones:3,baseError:3}],
@@ -140,11 +155,15 @@ function clasifObj(texto:string):{tipo:ObjType;boost:number}{
 
 function clasifVerbo(v:string):VerbClass{return VERB_LEXICON[v]||{cat:'ejecucion',base:2};}
 
-function analizarPerfilPuesto(nombre:string,area:string):RolProfile{
+function analizarTituloCompuesto(nombre:string,area:string):RolProfile{
   const n=norm(nombre),a=norm(area);
-  const base:RolProfile={nombre,baseDificultad:0,baseSupervision:0,baseResponsabilidad:0,baseCondiciones:0,baseError:0};
-  for(const[re,p]of TITLE_RULES){if(re.test(n)){Object.assign(base,p);break;}}
-  for(const[re,p]of AREA_RULES){if(re.test(a))Object.assign(base,p);}
+  const base:RolProfile={nombre,baseDificultad:1,baseSupervision:1,baseResponsabilidad:1,baseCondiciones:1,baseError:1};
+  for(const[re,_,d,sup,resp,err]of SENIORITY_MAP)
+    if(re.test(n)){base.baseDificultad=d;base.baseSupervision=sup;base.baseResponsabilidad=resp;base.baseError=err;break;}
+  for(const[re,dMin,respMin,errMin,condMin]of SPECIALTY_MAP)
+    if(re.test(n)){base.baseDificultad=Math.max(base.baseDificultad,dMin);base.baseResponsabilidad=Math.max(base.baseResponsabilidad,respMin);base.baseError=Math.max(base.baseError,errMin);base.baseCondiciones=Math.max(base.baseCondiciones,condMin);}
+  for(const[re,p]of AREA_RULES)
+    if(re.test(a))Object.assign(base,p);
   return base;
 }
 
@@ -246,23 +265,37 @@ function evalRequisitos(educacion:string):FactorResult{
   return{grado:mg,puntos:POINTS_MAP.requisitos[mg],justificacion:`Evaluacion de Requisitos de Formacion: se analizaron los requisitos del puesto mediante metodo contextual MSC. Se requiere "${lb}" (Grado ${mg} segun tabla de formacion academica MSC). Formula: nivel educativo detectado "${lb}" → G${mg} (${POINTS_MAP.requisitos[mg]} pts) segun rubrica contextual MSC.`};
 }
 
-function evalProcedimientos(procCtx:any,pf:RolProfile):{ref:string[];acc:Accion[]}{
+function evalProcedimientos(procCtx:any):{ref:string[];acc:Accion[]}{
   const ref:string[]=[],acc:Accion[]=[];
-  if(!procCtx?.textoCompleto)return{ref,acc};
-  const pa=extraerAcciones(procCtx.textoCompleto);acc.push(...pa);
-  if(pa.length>0)ref.push(`${pa.length} acciones de ${procCtx.totalProcedimientos} procedimientos`);
-  if(procCtx.procedimientos)for(const p of procCtx.procedimientos)if(p.proposito)acc.push(...extraerAcciones(p.proposito));
+  if(!procCtx)return{ref,acc};
+  const fuentes:{campo?:string;label:string}[]=[
+    {campo:procCtx.textoCompleto,label:'texto completo'},
+    ...(procCtx.procedimientos||[]).flatMap((p:any)=>[
+      {campo:p.proposito,label:`proposito ${p.nombre||p.codigo}`},
+      {campo:p.alcance,label:`alcance ${p.nombre||p.codigo}`},
+    ]),
+    ...(procCtx.pasos||[]).map((s:any)=>({campo:s.descripcion,label:`paso ${s.procedimiento_codigo}`})),
+    ...(procCtx.politicas||[]).map((p:any)=>({campo:p.politica,label:`politica ${p.procedimiento_codigo}`})),
+  ];
+  for(const f of fuentes){
+    if(!f.campo)continue;
+    const ex=extraerAcciones(f.campo);
+    if(ex.length)ref.push(`${ex.length} de ${f.label}`);
+    acc.push(...ex);
+  }
   return{ref,acc};
 }
 
 export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
   const fx=puesto.descripcion_funciones||'',ed=puesto.educacion_requerida||'';
-  const pf=analizarPerfilPuesto(puesto.nombre||'',puesto.area||'');
-  const acc=extraerAcciones(fx),pr=evalProcedimientos(procCtx,pf);
+  const pf=analizarTituloCompuesto(puesto.nombre||'',puesto.area||'');
+  const acc=extraerAcciones(fx),pr=evalProcedimientos(procCtx);
   const all=[...acc,...pr.acc];
+  const textoCompleto=[fx,procCtx?.textoCompleto||''].filter(Boolean).join('\n');
   const res:Record<string,FactorResult>={
-    dificultad:evalDificultad(all,pf),supervision:evalSupervision(all,pf,fx),
-    responsabilidad:evalResponsabilidad(all,pf,fx),condiciones:evalCondiciones(fx,pf),error:evalError(fx,pf),requisitos:evalRequisitos(ed),
+    dificultad:evalDificultad(all,pf),supervision:evalSupervision(all,pf,textoCompleto),
+    responsabilidad:evalResponsabilidad(all,pf,textoCompleto),condiciones:evalCondiciones(textoCompleto,pf),
+    error:evalError(textoCompleto,pf),requisitos:evalRequisitos(ed),
   };
   const data:EvaluationSuggestion={
     dificultad:res.dificultad.grado,dificultad_just:res.dificultad.justificacion,
