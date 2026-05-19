@@ -456,7 +456,7 @@ class ReportGenerator {
       this.doc.fontSize(8.5).font('Helvetica').fillColor(C.muted);
       const gh = `Grado ${gr}  \u00b7  ${p}/${d.max} pts  \u00b7  ${desc}`;
       this.doc.text(gh, MG + 260, this.y, { width: CW - 260, align: 'right' });
-      this.y += 4;
+      this.y += 14;
       
       // Separation thin line
       this.doc.fillColor(C.lightBorder).rect(MG, this.y, CW, 0.5).fill();
