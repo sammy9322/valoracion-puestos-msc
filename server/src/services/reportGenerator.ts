@@ -94,12 +94,11 @@ class ReportGenerator {
       size: 'A4', margin: MARGIN,
       info: { Title: 'Informe Tecnico de Valoracion de Puestos', Author: 'Agente Evaluador IA - Municipalidad de San Carlos', Subject: 'Valoracion Salarial - Metodologia MSC', Creator: 'Sistema Integral RRHH' }
     });
-    this.doc.on('pageAdded', () => { this.pageNum++; this.addFooter(); });
     this.y = MARGIN;
   }
 
   private checkPage(needed: number = 80): void {
-    if (this.y > MAX_Y - needed) { this.doc.addPage(); this.y = MARGIN; }
+    if (this.y > MAX_Y - needed) { this.doc.addPage(); this.y = MARGIN; this.pageNum++; this.addFooter(); }
   }
 
   private moveDown(space: number): void { this.y += space; this.checkPage(); }
