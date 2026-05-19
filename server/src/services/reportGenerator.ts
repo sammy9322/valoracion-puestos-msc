@@ -222,7 +222,7 @@ class ReportGenerator {
 
   private addMetadataGrid(puesto: any, motorText: string, buildVersion?: string): void {
     this.checkPage(110);
-    const rh = 32;
+    const rh = 36;
     const colW = CW / 2;
     const gridY = this.y;
 
@@ -237,10 +237,10 @@ class ReportGenerator {
       
       // Labels and Values
       this.doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold');
-      this.doc.text(label.toUpperCase(), cx + 8, cy + 6);
+      this.doc.text(label.toUpperCase(), cx + 10, cy + 7);
       
       this.doc.fillColor(C.text).fontSize(9.5).font('Helvetica');
-      this.doc.text(val || 'No especificado', cx + 8, cy + 16, { width: colW - 16, ellipsis: true });
+      this.doc.text(val || 'No especificado', cx + 10, cy + 18, { width: colW - 20, ellipsis: true });
     };
 
     drawGridCell(0, 0, 'Nombre del Puesto', puesto.nombre);
@@ -258,7 +258,7 @@ class ReportGenerator {
   }
 
   private addFunctionsCard(label: string, text: string): void {
-    const opts = { width: CW - 24, align: 'justify' as const, lineGap: 3.5 };
+    const opts = { width: CW - 32, align: 'justify' as const, lineGap: 3.5 };
     if (!text) text = 'No especificado';
     
     this.checkPage(30);
@@ -267,7 +267,7 @@ class ReportGenerator {
     this.y += 12;
 
     const th = this.doc.heightOfString(text, opts);
-    const cardH = th + 20;
+    const cardH = th + 24;
 
     this.checkPage(cardH + 10);
     
@@ -280,7 +280,7 @@ class ReportGenerator {
 
     // Render Text
     this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
-    this.doc.text(text, MG + 12, this.y + 10, opts);
+    this.doc.text(text, MG + 16, this.y + 12, opts);
     
     this.y += cardH + 15;
   }
@@ -296,7 +296,7 @@ class ReportGenerator {
     for (const proc of procedimientos.procedimientos) {
       const label = `${proc.nombre} (${proc.codigo})`;
       const text = proc.proposito || 'Sin proposito detallado registrado.';
-      const opts = { width: CW - 24, align: 'justify' as const, lineGap: 3 };
+      const opts = { width: CW - 32, align: 'justify' as const, lineGap: 3 };
       
       this.checkPage(35);
       this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.accent);
@@ -304,7 +304,7 @@ class ReportGenerator {
       this.y += 11;
 
       const th = this.doc.heightOfString(text, opts);
-      const cardH = th + 16;
+      const cardH = th + 20;
 
       this.checkPage(cardH + 12);
       
@@ -313,7 +313,7 @@ class ReportGenerator {
       this.doc.strokeColor(C.lightBorder).lineWidth(0.5).rect(MG, this.y, CW, cardH).stroke();
 
       this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
-      this.doc.text(text, MG + 12, this.y + 8, opts);
+      this.doc.text(text, MG + 16, this.y + 10, opts);
       
       this.y += cardH + 10;
     }
@@ -403,7 +403,7 @@ class ReportGenerator {
 
   private renderJustification(text: string): void {
     const lines = text.split('\n').filter((l: string) => l.trim());
-    const opts = { width: CW - 24, align: 'justify' as const, lineGap: 3.5 };
+    const opts = { width: CW - 32, align: 'justify' as const, lineGap: 3.5 };
     
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i].trim();
@@ -413,22 +413,22 @@ class ReportGenerator {
 
       if (i === 0) {
         this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
-        this.doc.text(line, MG + 12, this.y, opts);
+        this.doc.text(line, MG + 16, this.y, opts);
         this.y = this.doc.y + 6;
       } else if (/^\d+[\)\.]/.test(line)) {
         const bulletText = line.replace(/^\d+[\)\.]\s*/, '');
         this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
-        const bx = MG + 16;
+        const bx = MG + 20;
         this.doc.text('\u2022', bx, this.y);
-        this.doc.text(bulletText, bx + 10, this.y, { ...opts, width: CW - 44 });
+        this.doc.text(bulletText, bx + 12, this.y, { ...opts, width: CW - 48 });
         this.y = this.doc.y + 4;
       } else if (/^resultado:/i.test(line)) {
         this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.accent);
-        this.doc.text(line, MG + 12, this.y, opts);
+        this.doc.text(line, MG + 16, this.y, opts);
         this.y = this.doc.y + 8;
       } else {
         this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
-        this.doc.text(line, MG + 12, this.y, opts);
+        this.doc.text(line, MG + 16, this.y, opts);
         this.y = this.doc.y + 4;
       }
     }
@@ -464,9 +464,9 @@ class ReportGenerator {
 
       // Justification Box Card with Dynamic Left border color
       if (just) {
-        const dummyOpts = { width: CW - 24, align: 'justify' as const, lineGap: 3.5 };
+        const dummyOpts = { width: CW - 32, align: 'justify' as const, lineGap: 3.5 };
         // Measure approx height
-        let approxH = 20;
+        let approxH = 24;
         const lines = just.split('\n').filter((l: string) => l.trim());
         for (const line of lines) {
           if (line.startsWith('resultado:')) {
@@ -479,12 +479,15 @@ class ReportGenerator {
         this.checkPage(approxH + 20);
         
         const cardTopY = this.y;
+        this.y += 10;
         
-        // Render justification lines inside card context (we will overlay the background card at the end)
+        // Render justification lines inside card context
         this.renderJustification(just);
         
+        this.y += 10;
+        
         const cardBotY = this.y;
-        const cardH = cardBotY - cardTopY + 4;
+        const cardH = cardBotY - cardTopY;
         
         // Draw the background card beneath the text retrospectively
         this.doc.save();
@@ -494,7 +497,7 @@ class ReportGenerator {
         this.doc.restore();
 
         // Redraw text to avoid it being under filled background
-        this.y = cardTopY;
+        this.y = cardTopY + 10;
         this.renderJustification(just);
         this.y = cardBotY + 18;
       } else {
