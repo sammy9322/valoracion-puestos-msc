@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 dotenv.config();
-// Build: v10 — procContribution x factor, badges, justificacion siempre menciona procs
 
+import prisma from './db';
 import express from 'express';
 import cors from 'cors';
 import puestosRouter from './routes/puestos';
@@ -11,6 +11,16 @@ import calculosRouter from './routes/calculos';
 import asignacionesRouter from './routes/asignaciones';
 import auditoriaRouter from './routes/auditoria';
 import manualRouter from './routes/manual';
+
+async function ensureColumns() {
+  try {
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Evaluacion" ADD COLUMN IF NOT EXISTS "motor" TEXT;`);
+    await prisma.$executeRawUnsafe(`ALTER TABLE "Evaluacion" ADD COLUMN IF NOT EXISTS "buildVersion" TEXT;`);
+    console.log('[migrate] columns motor/buildVersion ensured on Evaluacion');
+  } catch (e: any) {
+    console.warn('[migrate] could not ensure columns:', e?.message);
+  }
+}
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -33,6 +43,7 @@ app.get('/api/health', (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+  ensureColumns();
 });
 
 export default app;
