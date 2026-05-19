@@ -177,21 +177,20 @@ router.post('/ai-evaluate', async (req, res) => {
             totalPuntos: result.totalPuntos,
             analisis: result.data,
             procedimientosCount: result.procedimientosCount || 0,
-            buildVersion: BUILD_VERSION,
+            buildVersion: result.buildVersion || BUILD_VERSION,
             factorPoints: result.factorPoints || {},
             procContribution: result.procContribution || [],
             motor: result.motor,
             debug: {
                 procedimientosEncontrados: result.procedimientosCount || 0,
-                puntosPorFactorOriginales: {
-                    dificultad: POINTS_MAP.dificultad[result.data.dificultad],
-                    supervision: POINTS_MAP.supervision[result.data.supervision],
-                    responsabilidad: POINTS_MAP.responsabilidad[result.data.responsabilidad],
-                    condiciones: POINTS_MAP.condiciones[result.data.condiciones],
-                    error: POINTS_MAP.error[result.data.error],
-                    requisitos: POINTS_MAP.requisitos[result.data.requisitos],
-                },
-                totalOriginal: POINTS_MAP.dificultad[result.data.dificultad] + POINTS_MAP.supervision[result.data.supervision] + POINTS_MAP.responsabilidad[result.data.responsabilidad] + POINTS_MAP.condiciones[result.data.condiciones] + POINTS_MAP.error[result.data.error] + POINTS_MAP.requisitos[result.data.requisitos]
+                grados: {
+                    dificultad: result.data.dificultad,
+                    supervision: result.data.supervision,
+                    responsabilidad: result.data.responsabilidad,
+                    condiciones: result.data.condiciones,
+                    error: result.data.error,
+                    requisitos: result.data.requisitos,
+                }
             }
         });
 

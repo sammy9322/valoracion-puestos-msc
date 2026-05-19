@@ -4,7 +4,7 @@ import { enrich as enrichProc } from './procedimientosService';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
-export const BUILD_VERSION = 'v10';
+export const BUILD_VERSION = 'v11-fp-free';
 
 let ollamaAvailable = false;
 
@@ -36,6 +36,15 @@ export const POINTS_MAP: Record<string, number[]> = {
   condiciones: [0, 20, 40, 60, 80, 100],
   error: [0, 30, 60, 90, 120, 150],
   requisitos: [0, 40, 80, 120, 160, 200]
+};
+
+export const CONTINUOUS_MAX: Record<string, number> = {
+  dificultad: 200,
+  supervision: 150,
+  responsabilidad: 200,
+  condiciones: 100,
+  error: 150,
+  requisitos: 200
 };
 
 export interface EvaluationSuggestion {
@@ -105,6 +114,14 @@ function getSentences(text: string): string[] {
     .filter(s => s.length > 10);
 }
 
+function wordBoundaryMatch(text: string, pattern: string): boolean {
+  if (pattern.includes(' ')) {
+    return text.includes(pattern);
+  }
+  const escaped = pattern.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`\\b${escaped}\\b`).test(text);
+}
+
 interface GradeIndicator {
   patterns: string[];
   weight: number;
@@ -128,37 +145,67 @@ interface RubricScore {
 const DIFICULTAD_PROFILES: GradeProfile[] = [
   { grade: 1, desc: 'Tareas simples y repetitivas', indicators: [
     { patterns: ['barrer', 'limpiar', 'cargar', 'archivar', 'ordenar', 'copiar', 'etiquetar', 'fotocopiar', 'doblar', 'empacar'], weight: 2, desc: 'verbos operativos basicos' },
-    { patterns: ['tarea', 'elemento', 'archivo', 'documento'], weight: 2, desc: 'alcance de tarea individual' },
-    { patterns: ['simple', 'repetitivo', 'manual', 'rutina', 'elemental'], weight: 1, desc: 'patron de simplicidad' },
+    { patterns: ['tarea operativa', 'tarea simple', 'tarea basica', 'tarea manual', 'elemento de archivo', 'archivar documento'], weight: 1, desc: 'alcance de tarea individual' },
+    { patterns: ['repetitivo', 'rutina', 'elemental'], weight: 1, desc: 'patron de simplicidad' },
+    { patterns: ['trabajo manual', 'labor manual'], weight: 1.5, desc: 'trabajo manual' },
   ]},
   { grade: 2, desc: 'Tareas variadas estandarizadas', indicators: [
-    { patterns: ['operar', 'asistir', 'apoyar', 'tramitar', 'recibir', 'enviar', 'registrar', 'atender', 'levantar', 'llenar'], weight: 2, desc: 'verbos de ejecucion' },
-    { patterns: ['procedimiento', 'tramite', 'expediente', 'caso', 'turno'], weight: 2, desc: 'alcance de procedimiento' },
-    { patterns: ['operativo', 'estandarizado', 'programado'], weight: 1, desc: 'patron de estandarizacion' },
+    { patterns: ['operar', 'tramitar', 'llenar'], weight: 2, desc: 'verbos de ejecucion' },
+    { patterns: ['asistir', 'apoyar'], weight: 1, desc: 'verbos de apoyo',
+      contextExclude: ['gestion', 'coordinacion', 'planificacion', 'estrategico', 'programa', 'proyecto'] },
+    { patterns: ['tramite', 'expediente'], weight: 2, desc: 'alcance de procedimiento' },
+    { patterns: ['procedimiento'], weight: 1, desc: 'referencia a procedimientos',
+      contextExclude: ['establece', 'define', 'formula', 'elabora', 'disena', 'norma', 'reglamenta'] },
+    { patterns: ['recibir', 'enviar', 'registrar'], weight: 0.5, desc: 'verbos administrativos basicos' },
+    { patterns: ['atender'], weight: 1, desc: 'verbos de atencion',
+      contextExclude: ['requerimiento tecnico', 'solicitud compleja', 'analisis', 'evaluacion'] },
+    { patterns: ['atender usuarios', 'atender publico', 'atender cliente', 'atender ciudadano'], weight: 1.5, desc: 'atencion al publico' },
+    { patterns: ['operativo'], weight: 0.5, desc: 'patron de estandarizacion' },
+    { patterns: ['estandarizado', 'programado'], weight: 1, desc: 'patron de estandarizacion' },
   ]},
   { grade: 3, desc: 'Analisis y juicio tecnico', indicators: [
-    { patterns: ['analizar', 'evaluar', 'resolver', 'diagnosticar', 'preparar', 'monitorear', 'elaborar', 'revisar', 'verificar', 'inspeccionar'], weight: 2, desc: 'verbos de analisis' },
-    { patterns: ['programa', 'proyecto', 'servicio'], weight: 2, desc: 'alcance de programa/proyecto' },
-    { patterns: ['tecnico', 'analisis', 'diagnostico', 'coordinacion'], weight: 1, desc: 'patron de complejidad tecnica',
+    { patterns: ['analizar', 'evaluar', 'resolver', 'diagnosticar', 'monitorear', 'inspeccionar'], weight: 2, desc: 'verbos de analisis' },
+    { patterns: ['elaborar informes', 'elaborar estudios', 'elaborar analisis', 'elaborar dictamenes', 'elaborar programas', 'elaborar proyectos'], weight: 1.5, desc: 'elaboracion tecnica' },
+    { patterns: ['preparar informes', 'preparar estudios', 'preparar analisis'], weight: 1, desc: 'preparacion tecnica' },
+    { patterns: ['revisar'], weight: 0.5, desc: 'verificacion',
+      contextExclude: ['documento simple', 'solicitud', 'tramite'] },
+    { patterns: ['verificar'], weight: 1, desc: 'verificacion tecnica' },
+    { patterns: ['programa', 'proyecto'], weight: 1.5, desc: 'alcance de programa/proyecto' },
+    { patterns: ['analisis', 'diagnostico'], weight: 1.5, desc: 'patron de complejidad tecnica',
       contextExclude: ['comite', 'mesa', 'reunion', 'asistencia', 'apoyo'] },
-    { patterns: ['evaluacion', 'resolucion'], weight: 1, desc: 'patron de evaluacion',
+    { patterns: ['coordinacion'], weight: 1, desc: 'coordinacion',
+      contextExclude: ['comite', 'mesa', 'reunion', 'asistencia', 'apoyo'] },
+    { patterns: ['evaluacion'], weight: 1, desc: 'patron de evaluacion',
       contextExclude: ['desempeno', 'rendimiento', 'personal', 'clima laboral'] },
+    { patterns: ['resolucion de problemas', 'resolucion tecnica'], weight: 1.5, desc: 'resolucion analitica' },
   ]},
   { grade: 4, desc: 'Alta complejidad y planeacion', indicators: [
-    { patterns: ['planificar', 'planear', 'disenar', 'implementar', 'organizar', 'programar', 'establecer', 'desarrollar', 'proponer', 'administrar', 'gestionar'], weight: 2, desc: 'verbos de planificacion' },
-    { patterns: ['departamento', 'unidad', 'direccion', 'gerencia'], weight: 2, desc: 'alcance de unidad/departamento' },
-    { patterns: ['planificacion', 'planeamiento', 'diseño', 'implementacion', 'coordinacion general'], weight: 1, desc: 'patron de planeacion' },
+    { patterns: ['planificar', 'planear', 'disenar', 'administrar', 'gestionar'], weight: 2, desc: 'verbos de planificacion' },
+    { patterns: ['implementar', 'proponer'], weight: 1.5, desc: 'verbos de implementacion' },
+    { patterns: ['establecer politicas', 'establecer directrices', 'establecer planes', 'establecer programas', 'establecer normativa'], weight: 2, desc: 'establecimiento estrategico' },
+    { patterns: ['organizar'], weight: 0.5, desc: 'organizacion',
+      contextExclude: ['archivo', 'documento', 'evento', 'reunion', 'tarea'] },
+    { patterns: ['planificacion', 'planeamiento', 'diseno', 'implementacion', 'coordinacion general'], weight: 1.5, desc: 'patron de planeacion' },
+    { patterns: ['jefe de departamento', 'jefe de unidad', 'encargado de departamento', 'encargado de unidad', 'responsable de departamento', 'responsable de unidad', 'direccion de unidad', 'direccion de departamento'], weight: 1.5, desc: 'alcance de jefatura' },
+    { patterns: ['desarrollar programas', 'desarrollar proyectos', 'desarrollar planes', 'desarrollar politicas', 'desarrollar sistemas'], weight: 1.5, desc: 'desarrollo estrategico' },
+    { patterns: ['programar actividades', 'programar proyectos', 'programar programas'], weight: 1, desc: 'programacion de actividades' },
   ]},
   { grade: 5, desc: 'Direccion estrategica', indicators: [
-    { patterns: ['formular', 'definir', 'liderar', 'conducir', 'dictar', 'aprobar', 'autorizar', 'normar', 'reglamentar'], weight: 2, desc: 'verbos directivos' },
-    { patterns: ['institucion', 'municipalidad', 'alcance nacional'], weight: 2, desc: 'alcance institucional' },
-    { patterns: ['estrategico', 'politica', 'directriz', 'rector', 'reglamento', 'ley', 'normativa'], weight: 1.5, desc: 'patron estrategico' },
+    { patterns: ['formular', 'liderar', 'autorizar', 'normar', 'reglamentar'], weight: 2, desc: 'verbos directivos' },
+    { patterns: ['definir politicas', 'definir estrategias', 'definir directrices', 'definir lineamientos'], weight: 2, desc: 'definicion estrategica' },
+    { patterns: ['dictar normas', 'dictar politicas', 'dictar reglamentos', 'dictar resoluciones'], weight: 2, desc: 'dictado normativo' },
+    { patterns: ['aprobar politicas', 'aprobar planes', 'aprobar presupuestos', 'aprobar normativa'], weight: 2, desc: 'aprobacion estrategica' },
+    { patterns: ['alcance nacional', 'institucional'], weight: 1.5, desc: 'alcance institucional' },
+    { patterns: ['estrategico', 'directriz', 'rector'], weight: 1.5, desc: 'patron estrategico' },
+    { patterns: ['politica institucional', 'politica publica', 'politica municipal'], weight: 1.5, desc: 'politica de alto nivel' },
   ]},
 ];
 
 const SUPERVISION_PROFILES: GradeProfile[] = [
   { grade: 1, desc: 'No ejerce supervision', indicators: [
-    { patterns: ['sin personal', 'no supervisa', 'trabajo individual', 'no tiene personal', 'personal a cargo no', 'funciones individuales', 'tareas individuales'], weight: 2, desc: 'ausencia de personal a cargo' },
+    { patterns: ['sin personal a cargo', 'no supervisa', 'trabajo individual', 'no tiene personal a cargo', 'funciones individuales', 'tareas individuales'], weight: 2, desc: 'ausencia de personal a cargo' },
+    { patterns: ['sin personal'], weight: 2, desc: 'sin personal',
+      contextExclude: ['departamento', 'unidad', 'area', 'oficina'] },
   ]},
   { grade: 2, desc: 'Supervision ocasional', indicators: [
     { patterns: ['supervision ocasional', 'apoya supervision', 'guia a compañeros', 'colabora con equipo'], weight: 2, desc: 'supervision eventual' },
@@ -169,45 +216,67 @@ const SUPERVISION_PROFILES: GradeProfile[] = [
     { patterns: ['responsable de equipo', 'lider de grupo', 'capataz', 'supervisor'], weight: 1.5, desc: 'cargo de supervision directa' },
   ]},
   { grade: 4, desc: 'Jefatura de unidad', indicators: [
-    { patterns: ['jefe', 'jefatura', 'unidad', 'departamento', 'dirige personal', 'encargado de departamento', 'responsable de area', 'coordinador general'], weight: 2, desc: 'jefatura formal' },
+    { patterns: ['jefe', 'jefatura'], weight: 2, desc: 'jefatura formal',
+      contextExclude: ['su jefe', 'del jefe', 'al jefe', 'reporta', 'reportar'] },
+    { patterns: ['jefe de unidad', 'jefe de departamento', 'jefe de area', 'jefe de oficina', 'encargado de departamento', 'encargado de unidad', 'encargado de area', 'responsable de area'], weight: 2, desc: 'jefatura de unidad' },
+    { patterns: ['dirige personal', 'coordinador general'], weight: 2, desc: 'direccion de personal' },
   ]},
   { grade: 5, desc: 'Direccion de area mayor', indicators: [
-    { patterns: ['direccion', 'gerencia', 'subdireccion', 'director', 'gerente', 'subdirector', 'alta gerencia'], weight: 2, desc: 'cargo directivo' },
+    { patterns: ['direccion', 'gerencia', 'subdireccion', 'alta gerencia'], weight: 2, desc: 'cargo directivo',
+      contextExclude: ['reporta a', 'reporta a la', 'de la direccion', 'de direccion', 'subdireccion'] },
+    { patterns: ['director', 'gerente', 'subdirector'], weight: 2, desc: 'titulo directivo',
+      contextExclude: ['reporta al', 'del director', 'al director', 'subdirector'] },
   ]},
 ];
 
 const RESP_PROFILES: GradeProfile[] = [
   { grade: 1, desc: 'Baja responsabilidad', indicators: [
-    { patterns: ['baja responsabilidad', 'herramientas basicas', 'equipo basico', 'material de oficina', 'papeleria'], weight: 2, desc: 'responsabilidad minima' },
+    { patterns: ['baja responsabilidad', 'papeleria'], weight: 2, desc: 'responsabilidad minima' },
+    { patterns: ['material de oficina', 'equipo basico'], weight: 1.5, desc: 'activos basicos' },
   ]},
   { grade: 2, desc: 'Responsabilidad moderada', indicators: [
-    { patterns: ['materiales', 'equipo menor', 'herramientas', 'activos menores', 'suministros', 'inventario basico'], weight: 2, desc: 'activos menores' },
+    { patterns: ['equipo menor', 'activos menores', 'inventario basico', 'suministros'], weight: 2, desc: 'activos menores' },
+    { patterns: ['materiales de oficina', 'materiales de trabajo', 'materiales e insumos'], weight: 1.5, desc: 'materiales de uso' },
+    { patterns: ['herramientas de trabajo', 'herramientas manuales', 'herramientas y equipo'], weight: 1.5, desc: 'herramientas fisicas' },
   ]},
   { grade: 3, desc: 'Custodia de informacion sensible', indicators: [
     { patterns: ['informacion sensible', 'confidencial', 'datos personales', 'fondos fijos', 'custodia', 'valores menores', 'documentacion reservada'], weight: 2, desc: 'informacion o valores sensibles' },
   ]},
   { grade: 4, desc: 'Responsabilidad por presupuestos', indicators: [
-    { patterns: ['presupuesto', 'activos', 'fondos', 'contratacion', 'recursos financieros', 'patrimonio municipal', 'licitacion', 'compras mayores'], weight: 2, desc: 'gestion de recursos financieros' },
+    { patterns: ['presupuesto', 'fondos', 'contratacion', 'licitacion'], weight: 2, desc: 'gestion de recursos financieros' },
+    { patterns: ['recursos financieros', 'patrimonio municipal', 'compras mayores', 'activos financieros', 'activos institucionales'], weight: 2, desc: 'activos financieros' },
   ]},
   { grade: 5, desc: 'Gestion de proceso clave', indicators: [
-    { patterns: ['gestion total', 'proceso clave', 'decision estrategico', 'politica institucional', 'alto impacto', 'recursos institucionales', 'patrimonio'], weight: 2, desc: 'responsabilidad institucional' },
+    { patterns: ['gestion total', 'proceso clave', 'decision estrategico', 'politica institucional', 'alto impacto', 'recursos institucionales'], weight: 2, desc: 'responsabilidad institucional' },
   ]},
 ];
 
 const COND_PROFILES: GradeProfile[] = [
   { grade: 1, desc: 'Oficina normal', indicators: [
-    { patterns: ['oficina', 'escritorio', 'ambiente controlado', 'trabajo sedentario'], weight: 1, desc: 'trabajo en ambiente controlado' },
+    { patterns: ['trabajo de oficina', 'ambiente de oficina'], weight: 1.5, desc: 'trabajo en ambiente controlado' },
+    { patterns: ['trabajo sedentario'], weight: 1.5, desc: 'trabajo sedentario' },
+    { patterns: ['ambiente controlado'], weight: 1, desc: 'ambiente controlado' },
   ]},
   { grade: 2, desc: 'Esfuerzo fisico moderado', indicators: [
-    { patterns: ['esfuerzo fisico moderado', 'ambiente incomodo', 'bipedestacion', 'de pie', 'camina frecuentemente', 'levanta peso moderado'], weight: 1.5, desc: 'esfuerzo fisico ocasional' },
+    { patterns: ['esfuerzo fisico moderado', 'ambiente incomodo', 'bipedestacion'], weight: 1.5, desc: 'esfuerzo fisico ocasional' },
+    { patterns: ['de pie'], weight: 1, desc: 'trabajo de pie' },
+    { patterns: ['camina frecuentemente', 'levanta peso moderado'], weight: 1.5, desc: 'actividad fisica moderada' },
   ]},
   { grade: 3, desc: 'Exposicion a condiciones climaticas', indicators: [
-    { patterns: ['intemperie', 'clima', 'ruido constante', 'calor', 'via publica', 'campo', 'exterior', 'ambiente variable'], weight: 1.5, desc: 'exposicion ambiental' },
+    { patterns: ['intemperie', 'ruido constante', 'via publica', 'ambiente variable'], weight: 1.5, desc: 'exposicion ambiental' },
+    { patterns: ['trabajo de campo', 'labores de campo'], weight: 1.5, desc: 'trabajo de campo' },
+    { patterns: ['trabajo en exterior', 'labores en exterior', 'en el exterior'], weight: 1.5, desc: 'trabajo en exterior' },
+    { patterns: ['calor'], weight: 1, desc: 'exposicion a calor',
+      contextExclude: ['calor humano', 'calor de hogar'] },
+    { patterns: ['condiciones climaticas', 'exposicion climatica'], weight: 1.5, desc: 'condiciones climaticas' },
   ]},
   { grade: 4, desc: 'Riesgo de accidentes', indicators: [
-    { patterns: ['riesgo', 'accidente', 'altura', 'maquinaria', 'sustancias', 'quimicos'], weight: 2, desc: 'riesgo laboral',
-      contextExclude: ['control interno', 'metodologia', 'valoracion', 'matriz', 'gestion de riesgo', 'evaluacion de riesgo'] },
-    { patterns: ['equipo peligroso', 'trabajo en altura'], weight: 1.5, desc: 'condicion peligrosa' },
+    { patterns: ['riesgo de accidente', 'riesgo de caida', 'riesgo de lesion', 'riesgo fisico', 'riesgo laboral', 'riesgo mecanico', 'riesgo electrico', 'riesgo quimico', 'riesgo biologico'], weight: 2, desc: 'riesgo laboral fisico' },
+    { patterns: ['accidente laboral', 'accidente de trabajo', 'accidente fisico'], weight: 1.5, desc: 'accidentes laborales' },
+    { patterns: ['trabajo en altura', 'altura'], weight: 1.5, desc: 'trabajo en altura',
+      contextExclude: ['a la altura', 'altura de miras', 'a esta altura'] },
+    { patterns: ['maquinaria', 'sustancias', 'quimicos'], weight: 1.5, desc: 'condicion peligrosa' },
+    { patterns: ['equipo peligroso'], weight: 1.5, desc: 'equipo peligroso' },
   ]},
   { grade: 5, desc: 'Alta peligrosidad', indicators: [
     { patterns: ['alta peligrosidad', 'insalubridad', 'enfermedad profesional', 'ambiente extremo', 'radiacion', 'peligro constante'], weight: 2, desc: 'peligro permanente' },
@@ -217,7 +286,7 @@ const COND_PROFILES: GradeProfile[] = [
 
 const ERROR_PROFILES: GradeProfile[] = [
   { grade: 1, desc: 'Error facil de corregir', indicators: [
-    { patterns: ['facil de corregir', 'facil de detectar', 'sin impacto', 'bajo impacto', 'minimo efecto', 'error facil'], weight: 2, desc: 'error de bajo impacto' },
+    { patterns: ['facil de corregir', 'facil de detectar', 'sin impacto', 'bajo impacto', 'minimo efecto'], weight: 2, desc: 'error de bajo impacto' },
   ]},
   { grade: 2, desc: 'Retrasos menores', indicators: [
     { patterns: ['retraso menor', 'demora', 'interno', 'proceso interno', 'reasignacion'], weight: 2, desc: 'impacto interno menor' },
@@ -226,18 +295,25 @@ const ERROR_PROFILES: GradeProfile[] = [
     { patterns: ['afecta servicio', 'departamento', 'cliente', 'usuario', 'ciudadano', 'externo', 'interrumpe'], weight: 2, desc: 'impacto en servicio externo' },
   ]},
   { grade: 4, desc: 'Perdidas economicas o legales', indicators: [
-    { patterns: ['perdida economica', 'perdida financiera', 'legal', 'multa', 'sancion', 'significativo', 'demanda', 'penal'], weight: 2, desc: 'consecuencia economica/legal' },
+    { patterns: ['perdida economica', 'perdida financiera', 'multa', 'sancion', 'demanda', 'penal'], weight: 2, desc: 'consecuencia economica/legal' },
+    { patterns: ['legal'], weight: 2, desc: 'consecuencia legal',
+      contextExclude: ['ilegal'] },
+    { patterns: ['significativo'], weight: 1, desc: 'impacto significativo' },
   ]},
   { grade: 5, desc: 'Compromete estabilidad institucional', indicators: [
-    { patterns: ['estabilidad', 'seguridad publica', 'institucional', 'critico', 'nacional', 'reputacion', 'crisis', 'confianza publica', 'irreversible'], weight: 2, desc: 'impacto institucional critico' },
+    { patterns: ['estabilidad', 'seguridad publica', 'reputacion', 'crisis', 'confianza publica', 'irreversible'], weight: 2, desc: 'impacto institucional critico' },
+    { patterns: ['critico'], weight: 1.5, desc: 'critico',
+      contextExclude: ['critica', 'criticar', 'criticas'] },
+    { patterns: ['institucional', 'nacional'], weight: 1, desc: 'impacto de nivel superior',
+      contextExclude: ['capacitacion institucional', 'evento institucional', 'actividad institucional'] },
   ]},
 ];
 
 const EDUC_LEVELS: { patterns: string[]; score: number; label: string }[] = [
-  { patterns: ['primaria', 'basica', 'alfabeto', 'no requiere'], score: 1, label: 'educacion basica' },
-  { patterns: ['bachillerato', 'media', 'secundaria', 'tecnico basico', 'educacion diversificada'], score: 2, label: 'bachillerato' },
+  { patterns: ['primaria', 'alfabeto', 'no requiere'], score: 1, label: 'educacion basica' },
+  { patterns: ['bachillerato', 'educacion media', 'secundaria', 'tecnico basico', 'educacion diversificada'], score: 2, label: 'bachillerato' },
   { patterns: ['diplomado', 'tecnico superior', 'parauniversitario', 'tecnico medio'], score: 3, label: 'tecnico superior' },
-  { patterns: ['licenciatura', 'universitario', 'bachillerato universitario', 'profesional', 'grado universitario'], score: 4, label: 'licenciatura' },
+  { patterns: ['licenciatura', 'bachillerato universitario', 'grado universitario'], score: 4, label: 'licenciatura' },
   { patterns: ['maestria', 'master', 'magister', 'especializacion', 'doctorado', 'phd', 'posgrado'], score: 5, label: 'maestria/doctorado' },
 ];
 
@@ -246,8 +322,8 @@ const EDUC_LEVELS: { patterns: string[]; score: number; label: string }[] = [
 function patternMatchesInSentence(normalized: string, pattern: string, exclude?: string[]): boolean {
   const sentences = normalized.split(/[.!;\n]+/).map(s => s.trim()).filter(Boolean);
   for (const s of sentences) {
-    if (!s.includes(pattern)) continue;
-    if (exclude && exclude.some(ex => s.includes(ex))) continue;
+    if (!wordBoundaryMatch(s, pattern)) continue;
+    if (exclude && exclude.some(ex => wordBoundaryMatch(s, ex))) continue;
     return true;
   }
   return false;
@@ -281,15 +357,17 @@ function evaluateByRubric(text: string, profiles: GradeProfile[]): RubricScore {
     matched[profile.grade] = [...new Set(indicators)].slice(0, 4);
   }
 
-  // Compute noise for each grade
+  // Select best grade: prefer the grade with highest coverage,
+  // but if another grade has both higher coverage AND higher grade, prefer that
   let bestGrade = 1;
   let bestScore = -1;
 
   for (let g = 1; g <= 5; g++) {
-    const otherCoverages = [1, 2, 3, 4, 5].filter(x => x !== g).map(x => coverage[x]);
-    const avgNoise = otherCoverages.reduce((a, b) => a + b, 0) / otherCoverages.length;
-    const penalty = coverage[g] < 0.2 ? 0.5 : 1;
-    const score = coverage[g] * (1 - 0.4 * avgNoise) * penalty;
+    const maxOther = Math.max(
+      ...[1, 2, 3, 4, 5].filter(x => x !== g).map(x => coverage[x])
+    );
+    const dominanceRatio = maxOther > 0 ? coverage[g] / (Math.max(coverage[g], maxOther)) : 1;
+    const score = coverage[g] * dominanceRatio;
 
     if (score > bestScore) {
       bestScore = score;
@@ -339,12 +417,20 @@ function evaluateByProfile(
 
 function evaluateRequisitos(educacion: string): { grado: number; keyword: string; evidence: string } {
   const normalized = normalizeText(educacion);
+
+  const negationPatterns = ['no requiere', 'sin ', 'no necesita', 'no exige', 'no se requiere', 'no se exige'];
+  const isNegated = negationPatterns.some(p => normalized.includes(p));
+
+  if (isNegated) {
+    return { grado: 1, keyword: 'no requiere formacion especifica', evidence: 'No se requiere formacion academica especifica' };
+  }
+
   let maxScore = 1;
   let matched = 'educacion basica';
 
   for (const level of EDUC_LEVELS) {
     for (const pattern of level.patterns) {
-      if (normalized.includes(pattern)) {
+      if (wordBoundaryMatch(normalized, pattern)) {
         if (level.score > maxScore) {
           maxScore = level.score;
           matched = level.label;
@@ -359,10 +445,9 @@ function evaluateRequisitos(educacion: string): { grado: number; keyword: string
 function gradeFromCoverage(cov: number[]): number {
   let best = 1, bestScore = -1;
   for (let g = 1; g <= 5; g++) {
-    const others = [1, 2, 3, 4, 5].filter(x => x !== g).map(x => cov[x]);
-    const avgNoise = others.reduce((a, b) => a + b, 0) / others.length;
-    const penalty = cov[g] < 0.2 ? 0.5 : 1;
-    const score = cov[g] * (1 - 0.4 * avgNoise) * penalty;
+    const maxOther = Math.max(...[1, 2, 3, 4, 5].filter(x => x !== g).map(x => cov[x]));
+    const dominanceRatio = maxOther > 0 ? cov[g] / (Math.max(cov[g], maxOther)) : 1;
+    const score = cov[g] * dominanceRatio;
     if (score > bestScore) { bestScore = score; best = g; }
   }
   return best;
@@ -377,7 +462,13 @@ function continuousPoints(cov: number[], maxPts: number): number {
 }
 
 function mergeCov(c1: number[], c2: number[]): number[] {
-  return c1.map((v, i) => v * 0.7 + c2[i] * 0.3);
+  const totalC1 = c1.reduce((a, b) => a + b, 0);
+  const totalC2 = c2.reduce((a, b) => a + b, 0);
+  const sum = totalC1 + totalC2;
+  if (sum === 0) return c1.map(() => 0);
+  const w1 = Math.max(0.5, totalC1 / sum);
+  const w2 = 1 - w1;
+  return c1.map((v, i) => v * w1 + c2[i] * w2);
 }
 
 function mergeMatched(m1: Record<number, string[]>, m2: Record<number, string[]>): Record<number, string[]> {
@@ -405,6 +496,7 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
   let continuousTotal = 0;
   const factorPoints: Record<string, number> = {};
   const procContribution: string[] = [];
+  const MIN_PROC_COVERAGE = 0.3;
 
   for (const { key, profiles, label, maxPts } of configs) {
     const funcEval = evaluateByProfile(funciones, profiles, label, 'las funciones del puesto');
@@ -417,13 +509,17 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
     if (procText) {
       const procEval = evaluateByProfile(procText, profiles, label, 'los procedimientos asociados');
       const procCovSum = procEval.details.coverage[1] + procEval.details.coverage[2] + procEval.details.coverage[3] + procEval.details.coverage[4] + procEval.details.coverage[5];
-      if (procCovSum > 0) {
-        cov = mergeCov(funcEval.details.coverage, procEval.details.coverage);
-        matched = mergeMatched(funcEval.details.matched, procEval.details.matched);
-        degree = gradeFromCoverage(cov);
-        source = 'las funciones del puesto y los procedimientos asociados';
-        procMerged = true;
-        procContribution.push(key);
+      if (procCovSum >= MIN_PROC_COVERAGE) {
+        const mergedCov = mergeCov(funcEval.details.coverage, procEval.details.coverage);
+        const mergedGrade = gradeFromCoverage(mergedCov);
+        if (mergedGrade !== degree) {
+          cov = mergedCov;
+          matched = mergeMatched(funcEval.details.matched, procEval.details.matched);
+          degree = mergedGrade;
+          source = 'las funciones del puesto y los procedimientos asociados';
+          procMerged = true;
+          procContribution.push(key);
+        }
       }
     }
 
@@ -446,10 +542,10 @@ function ruleBasedEvaluation(puesto: any, procText?: string): AIEvaluationResult
 
   const { grado: reqGrado, evidence: reqEvidence } = evaluateRequisitos(educacion);
   result.requisitos = reqGrado;
-  const reqPts = 200 * (Math.max(1, Math.min(5, reqGrado)) - 1) / 4;
+  const reqPts = POINTS_MAP.requisitos[reqGrado];
   continuousTotal += reqPts;
   factorPoints.requisitos = Math.round(reqPts);
-  result.requisitos_just = reqEvidence && reqEvidence !== 'educacion basica'
+  result.requisitos_just = reqEvidence && reqEvidence !== 'educacion basica' && !reqEvidence.includes('No se requiere')
     ? `Evaluacion de Requisitos: el puesto requiere "${reqEvidence}", lo cual corresponde a Grado ${reqGrado} segun la escala de formacion academica MSC.`
     : `Evaluacion de Requisitos: se requiere "${reqEvidence}", asignando Grado ${reqGrado} segun la rubrica MSC.`;
 
@@ -625,6 +721,17 @@ async function callOllama(prompt: string): Promise<any> {
   return JSON.parse(cleanJson);
 }
 
+function calculateFactorPoints(data: EvaluationSuggestion): Record<string, number> {
+  return {
+    dificultad: POINTS_MAP.dificultad[data.dificultad],
+    supervision: POINTS_MAP.supervision[data.supervision],
+    responsabilidad: POINTS_MAP.responsabilidad[data.responsabilidad],
+    condiciones: POINTS_MAP.condiciones[data.condiciones],
+    error: POINTS_MAP.error[data.error],
+    requisitos: POINTS_MAP.requisitos[data.requisitos],
+  };
+}
+
 export const aiAgentService = {
     getEngineStatus,
 
@@ -640,6 +747,7 @@ export const aiAgentService = {
             const prompt = buildPrompt(enrichedPuesto);
             const raw = await callOllama(prompt);
             result = validateAndCalculate(raw, puesto.id, 'llm');
+            result.factorPoints = calculateFactorPoints(result.data);
           } catch (error: any) {
             console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
             result = ruleBasedEvaluation(puesto, procText);
@@ -648,6 +756,7 @@ export const aiAgentService = {
           result = ruleBasedEvaluation(puesto, procText);
         }
         if (procCtx) result.procedimientosCount = procCtx.totalProcedimientos;
+        result.buildVersion = BUILD_VERSION;
         return result;
     },
 
