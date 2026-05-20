@@ -1,5 +1,6 @@
 import PDFDocument from 'pdfkit';
 import type { ProcedimientosContext } from './procedimientosService';
+import { extraerAcciones, evalProcedimientos, TaggedAccion } from './contextualAnalyzer';
 
 const POINTS_MAP: Record<string, number[]> = {
   dificultad: [0, 40, 80, 120, 160, 200],
@@ -420,40 +421,129 @@ class ReportGenerator {
     this.y = by + tableH + 20;
   }
 
+  private renderActionsTable(factor: string, allAcc: TaggedAccion[]): void {
+    let factorAcc: TaggedAccion[] = [];
+    if (factor === 'dificultad') factorAcc = allAcc;
+    else if (factor === 'supervision') factorAcc = allAcc.filter(a => ['supervisar','dirigir','liderar','coordinar'].includes(a.verboNorm));
+    else if (factor === 'responsabilidad') factorAcc = allAcc.filter(a => ['administrar','gestionar','custodiar','controlar'].includes(a.verboNorm));
+    else if (factor === 'condiciones') factorAcc = allAcc.filter(a => /condicion|ambiente|riesgo|campo|oficina/i.test(a.verboNorm + a.objeto));
+    else if (factor === 'error') factorAcc = allAcc.filter(a => /error|impacto|riesgo|consecuencia/i.test(a.verboNorm + a.objeto));
+    
+    factorAcc = factorAcc.slice(0, 5); // Limit to 5 most relevant
+    if (factorAcc.length === 0) return;
+
+    this.checkPage(40);
+    this.doc.fontSize(8.5).font('Helvetica-Bold').fillColor(C.accent);
+    this.doc.text('ACCIONES DETECTADAS RELEVANTES', MG, this.y);
+    this.y += 12;
+
+    const colW = [100, 260, 130];
+    const th = 20;
+    const by = this.y;
+    
+    // draw table header
+    this.doc.fillColor(C.tableHeader).rect(MG, by, CW, th).fill();
+    this.doc.fillColor(C.muted).fontSize(7.5).font('Helvetica-Bold');
+    this.doc.text('VERBO', MG + 6, by + 6, { width: colW[0] - 12 });
+    this.doc.text('OBJETO', MG + colW[0] + 6, by + 6, { width: colW[1] - 12 });
+    this.doc.text('FUENTE', MG + colW[0] + colW[1] + 6, by + 6, { width: colW[2] - 12 });
+    
+    this.y += th;
+    
+    // draw rows
+    for (const acc of factorAcc) {
+      this.checkPage(20);
+      this.doc.font('Helvetica').fontSize(8.5);
+      const rh = Math.max(18, this.doc.heightOfString(acc.objeto, { width: colW[1] - 12 }) + 8);
+      
+      this.doc.strokeColor(C.lightBorder).lineWidth(0.5).moveTo(MG, this.y).lineTo(MG + CW, this.y).stroke();
+      
+      this.doc.fillColor(C.text);
+      this.doc.text(acc.verbo.toUpperCase(), MG + 6, this.y + 5, { width: colW[0] - 12 });
+      this.doc.text(acc.objeto, MG + colW[0] + 6, this.y + 5, { width: colW[1] - 12 });
+      
+      this.doc.fillColor(C.muted).fontSize(7.5);
+      const fuenteText = acc.fuente === 'procedimiento' ? `Procedimiento (${acc.procCodigo || 'PR'})` : 'Funciones (Perfil)';
+      this.doc.text(fuenteText, MG + colW[0] + colW[1] + 6, this.y + 5, { width: colW[2] - 12 });
+      
+      this.y += rh;
+    }
+    this.doc.strokeColor(C.lightBorder).lineWidth(0.5).moveTo(MG, this.y).lineTo(MG + CW, this.y).stroke();
+    this.y += 15;
+  }
+
   private renderJustification(text: string): void {
-    const lines = text.split('\n').filter((l: string) => l.trim());
     const opts = { width: CW - 32, align: 'justify' as const, lineGap: 3.5 };
     
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      if (!line) continue;
+    const hasHallazgos = /HALLAZGOS:/i.test(text);
+    const hasAnalisis = /ANÁLISIS:|ANALISIS:/i.test(text);
+    const hasResolucion = /RESOLUCIÓN:|RESOLUCION:/i.test(text);
 
-      this.checkPage(15);
-
-      if (i === 0) {
-        this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
-        this.doc.text(line, MG + 16, this.y, opts);
-        this.y = this.doc.y + 6;
-      } else if (/^\d+[\)\.]/.test(line)) {
-        const bulletText = line.replace(/^\d+[\)\.]\s*/, '');
-        this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
-        const bx = MG + 20;
-        this.doc.text('\u2022', bx, this.y);
-        this.doc.text(bulletText, bx + 12, this.y, { ...opts, width: CW - 48 });
-        this.y = this.doc.y + 4;
-      } else if (/^resultado:/i.test(line)) {
-        this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.accent);
-        this.doc.text(line, MG + 16, this.y, opts);
-        this.y = this.doc.y + 8;
-      } else {
-        this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
-        this.doc.text(line, MG + 16, this.y, opts);
-        this.y = this.doc.y + 4;
+    if (hasHallazgos && hasAnalisis && hasResolucion) {
+      const regex = /(HALLAZGOS:|AN[AÁ]LISIS:|RESOLUCI[OÓ]N:)/i;
+      const parts = text.split(regex).filter(p => p.trim());
+      
+      let currentHeader = '';
+      for (const part of parts) {
+        if (regex.test(part)) {
+          currentHeader = part.trim().toUpperCase();
+        } else {
+          // Render Header
+          this.checkPage(20);
+          this.doc.fontSize(9.5).font('Helvetica-Bold').fillColor(C.accent);
+          this.doc.text(currentHeader, MG + 16, this.y, opts);
+          this.y = this.doc.y + 4;
+          
+          // Render Content
+          const lines = part.split('\n').filter(l => l.trim());
+          for (const line of lines) {
+            this.checkPage(15);
+            if (line.trim().startsWith('-')) {
+              this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
+              const bulletText = line.trim().substring(1).trim();
+              this.doc.text('\u2022', MG + 20, this.y);
+              this.doc.text(bulletText, MG + 32, this.y, { ...opts, width: CW - 48 });
+              this.y = this.doc.y + 4;
+            } else {
+              this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
+              this.doc.text(line.trim(), MG + 16, this.y, opts);
+              this.y = this.doc.y + 4;
+            }
+          }
+          this.y += 6;
+        }
+      }
+    } else {
+      // Legacy format
+      const lines = text.split('\n').filter((l: string) => l.trim());
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        this.checkPage(15);
+        if (i === 0) {
+          this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
+          this.doc.text(line, MG + 16, this.y, opts);
+          this.y = this.doc.y + 6;
+        } else if (/^\d+[\)\.]/.test(line)) {
+          const bulletText = line.replace(/^\d+[\)\.]\s*/, '');
+          this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
+          this.doc.text('\u2022', MG + 20, this.y);
+          this.doc.text(bulletText, MG + 32, this.y, { ...opts, width: CW - 48 });
+          this.y = this.doc.y + 4;
+        } else if (/^resultado:/i.test(line)) {
+          this.doc.fontSize(9).font('Helvetica-Bold').fillColor(C.accent);
+          this.doc.text(line, MG + 16, this.y, opts);
+          this.y = this.doc.y + 8;
+        } else {
+          this.doc.fontSize(9).font('Helvetica').fillColor(C.text);
+          this.doc.text(line, MG + 16, this.y, opts);
+          this.y = this.doc.y + 4;
+        }
       }
     }
   }
 
-  private addFactorDetail(evaluacion: any): void {
+  private addFactorDetail(evaluacion: any, allAcc: TaggedAccion[]): void {
     this.addSectionTitle('5. Detalle Técnico y Fundamentación por Factor');
     
     for (const factor of FACTORS) {
@@ -481,17 +571,20 @@ class ReportGenerator {
       this.doc.fillColor(C.lightBorder).rect(MG, this.y, CW, 0.5).fill();
       this.y += 10;
 
+      // Render Actions Table before the justification box
+      this.renderActionsTable(factor, allAcc);
+
       // Justification Box Card with Dynamic Left border color
       if (just) {
         const dummyOpts = { width: CW - 32, align: 'justify' as const, lineGap: 3.5 };
         // Measure approx height
-        let approxH = 24;
+        let approxH = 30;
         const lines = just.split('\n').filter((l: string) => l.trim());
         for (const line of lines) {
-          if (line.startsWith('resultado:')) {
-            approxH += this.doc.heightOfString(line, dummyOpts) + 8;
+          if (/(HALLAZGOS:|AN[AÁ]LISIS:|RESOLUCI[OÓ]N:)/i.test(line)) {
+            approxH += this.doc.heightOfString(line, dummyOpts) + 12;
           } else {
-            approxH += this.doc.heightOfString(line, dummyOpts) + 6;
+            approxH += this.doc.heightOfString(line, dummyOpts) + 8;
           }
         }
 
@@ -710,7 +803,12 @@ class ReportGenerator {
     this.addSectionTitle('4. Resumen Grafico de Puntuacion por Factor');
     this.addFactorsTable(evaluacion);
     
-    this.addFactorDetail(evaluacion);
+    const fx = puesto.descripcion_funciones || '';
+    const accFx = extraerAcciones(fx).map(a => ({...a, fuente: 'funciones'} as TaggedAccion));
+    const pr = evalProcedimientos(evaluacion._procedimientos);
+    const allAcc: TaggedAccion[] = [...accFx, ...pr.acc];
+
+    this.addFactorDetail(evaluacion, allAcc);
     
     this.addConclusionHero(evaluacion, totalPuntos);
     

@@ -24,11 +24,61 @@ export const POINTS_MAP: Record<string, number[]> = {
   requisitos: [0, 40, 80, 120, 160, 200]
 };
 
+const GRADE_DESCRIPTIONS: Record<string, string[]> = {
+  dificultad: [
+    'Tareas simples y repetitivas, poca iniciativa',
+    'Tareas variadas pero estandarizadas',
+    'Requiere análisis y juicio para resolver problemas técnicos',
+    'Alta complejidad, planificación y coordinación institucional',
+    'Dirección estratégica y toma de decisiones críticas'
+  ],
+  supervision: [
+    'No ejerce supervisión',
+    'Supervisión ocasional de tareas simples',
+    'Supervisión de grupo de trabajo operativo',
+    'Jefatura de una unidad o departamento',
+    'Dirección de área técnica o administrativa mayor'
+  ],
+  responsabilidad: [
+    'Baja responsabilidad por valores o equipo',
+    'Responsabilidad moderada por materiales y herramientas',
+    'Custodia de información sensible o fondos fijos',
+    'Responsabilidad por presupuestos o activos de alto valor',
+    'Responsabilidad total por gestión de proceso clave'
+  ],
+  condiciones: [
+    'Ambiente de oficina normal, riesgos mínimos',
+    'Esfuerzo físico moderado o ambiente algo incómodo',
+    'Exposición a condiciones climáticas o ruido constante',
+    'Riesgo de accidentes laborales o manejo de químicos',
+    'Condiciones de alta peligrosidad o insalubridad constante'
+  ],
+  error: [
+    'Error fácil de detectar y corregir',
+    'Error causa retrasos menores en el flujo de trabajo',
+    'Error afecta a otros departamentos o al servicio al ciudadano',
+    'Error causa pérdidas económicas o legales significativas',
+    'Error compromete la estabilidad institucional o seguridad pública'
+  ],
+  requisitos: [
+    'Educación básica o primaria',
+    'Bachillerato en Educación Media o Técnico básico',
+    'Diplomado o Técnico superior especializado',
+    'Bachillerato Universitario o Licenciatura profesional',
+    'Grado de Maestría o especialización avanzada requerida'
+  ]
+};
+
 type VerbCat = 'operativo'|'ejecucion'|'analisis'|'planificacion'|'direccion';
 type ObjType = 'simple'|'tecnico'|'estrategico'|'directivo';
 
 interface VerbClass { cat: VerbCat; base: number }
 interface Accion { verbo: string; verboNorm: string; objeto: string; oracion: string }
+export interface TaggedAccion extends Accion {
+  fuente: 'funciones' | 'procedimiento';
+  procCodigo?: string;
+  procNombre?: string;
+}
 interface RolProfile { nombre: string; baseDificultad: number; baseSupervision: number; baseResponsabilidad: number; baseCondiciones: number; baseError: number }
 interface FactorResult { grado: number; puntos: number; justificacion: string }
 
@@ -128,7 +178,7 @@ function frases(t:string):string[]{
   return (t||'').split(/[.!;\n]+/).map(s=>s.trim()).filter(s=>s.length>10);
 }
 
-function extraerAcciones(texto:string):Accion[]{
+export function extraerAcciones(texto:string):Accion[]{
   const n=norm(texto); const r:Accion[]=[]; const seen=new Set<string>();
   const verbKeys=Object.keys(VERB_LEXICON);
   const V=new RegExp(`\\b(${verbKeys.join('|')})\\s+(?:a|de|al|la|el|los|las|un|una|del|en|por|su|sus|este|esta|estos|estas)\\s+((?:[a-z]+\\s+(?:de|del|de\\s+la|de\\s+los|de\\s+las|en|para|por|con|sin|bajo|mediante)\\s+)*[a-z]{3,50}?)(?=\\s*(?:,|;|\\.|$|para|con\\s+(?:el\\s+)?fin|mediante|segun|as[ií]|o\\s+bien))`,'gi');
@@ -182,70 +232,172 @@ function tieneInfoSensible(fx:string,area:string):boolean{
 
 function clamp(g:number):number{return Math.max(1,Math.min(5,Math.round(g)));}
 
-function evalDificultad(acc:Accion[],pf:RolProfile):FactorResult{
-  if(!acc.length){const b=pf.baseDificultad||1;const g=Math.max(1,b);return{grado:g,puntos:POINTS_MAP.dificultad[g],justificacion:`Evaluacion de Dificultad de Funciones: no se identificaron acciones especificas en la descripcion de funciones. Se aplica el perfil base del puesto "${pf.nombre}" segun su categoria y area: base minima G${b}. Formula: max(G${b}, G1)=G${g}. Resultado: se asigna Grado ${g} (${POINTS_MAP.dificultad[g]} pts) segun rubrica contextual MSC.`};}
-  const det:string[]=[];let tot=0;
-  for(const a of acc){const vc=clasifVerbo(a.verboNorm),oc=clasifObj(a.objeto),g=clamp(vc.base+oc.boost);tot+=g;det.push(`${det.length+1}) '${a.verbo} ${a.objeto}' → verbo '${a.verbo}' categoria '${vc.cat}' (base G${vc.base}), objeto tipo '${oc.tipo}' (boost ${oc.boost >=0?'+':''}${oc.boost}). Formula: G${vc.base}+(${oc.boost >=0?'+':''}${oc.boost})=G${g}.`);}
-  let avg=Math.round(tot*10/acc.length)/10;let avgR=clamp(avg);let r=avgR;
-  let pfText='';if(pf.baseDificultad>0&&pf.baseDificultad>avgR){r=pf.baseDificultad;pfText=` Perfil del puesto "${pf.nombre}" establece minimo G${pf.baseDificultad} segun categoria/area. Grado final: max(G${avgR},G${pf.baseDificultad})=G${r}.`;}
-  const g=r;
-  return{grado:g,puntos:POINTS_MAP.dificultad[g],justificacion:`Evaluacion de Dificultad de Funciones: se analizaron las funciones del puesto mediante el metodo contextual MSC (Verbo+Objeto+Alcance).\n${det.join('\n')}\nPromedio de acciones: G${avg} → redondeado G${avgR}.${pfText||''}\nResultado: se asigna Grado ${g} (${POINTS_MAP.dificultad[g]} pts) segun rubrica contextual MSC.`};
+function evalDificultad(acc:TaggedAccion[],pf:RolProfile):FactorResult{
+  const b=pf.baseDificultad||1;
+  let g = 1;
+  let hallazgos = '';
+  let analisis = '';
+  
+  if(!acc.length){
+    g = Math.max(1,b);
+    hallazgos = 'No se identificaron acciones sustantivas en la descripcion de funciones ni en los procedimientos asociados.';
+    analisis = `Ante la falta de evidencia detallada, se asume el perfil base del puesto "${pf.nombre}" que establece un minimo de Grado ${b}. Segun la rubrica MSC, el Grado ${g} se define como "${GRADE_DESCRIPTIONS.dificultad[g-1]}". No existe base documental para asignar un grado superior.`;
+  } else {
+    let tot=0;
+    for(const a of acc){const vc=clasifVerbo(a.verboNorm),oc=clasifObj(a.objeto);tot+=clamp(vc.base+oc.boost);}
+    let avg=Math.round(tot*10/acc.length)/10;
+    let avgR=clamp(avg);
+    g=avgR;
+    
+    let pfText='';
+    if(pf.baseDificultad>0&&pf.baseDificultad>avgR){
+      g=pf.baseDificultad;
+      pfText=` Adicionalmente, el perfil del puesto "${pf.nombre}" requiere un nivel minimo de G${pf.baseDificultad}, predominando sobre el promedio analitico de las acciones.`;
+    }
+
+    const funcAcc = acc.filter(a => a.fuente === 'funciones').slice(0, 3);
+    const procAcc = acc.filter(a => a.fuente === 'procedimiento');
+    const procsMap = new Map<string, {nombre: string, acciones: string[]}>();
+    procAcc.forEach(a => {
+        const key = a.procCodigo || 'PR-GEN';
+        if (!procsMap.has(key)) procsMap.set(key, {nombre: a.procNombre || 'Procedimiento', acciones: []});
+        procsMap.get(key)!.acciones.push(a.oracion);
+    });
+
+    const hFunc = funcAcc.length > 0 ? `Se identificaron acciones sustantivas en la descripcion de funciones del puesto. Entre las mas relevantes: "${funcAcc.map(a => a.oracion).join('; ')}".` : '';
+    const hProc = Array.from(procsMap.entries()).slice(0, 2).map(([cod, data]) => `En el procedimiento ${cod} (${data.nombre}), se establece que el puesto: "${data.acciones[0]}".`).join(' ');
+    hallazgos = [hFunc, hProc].filter(Boolean).join(' ') || 'Se analizaron las funciones sin identificar citas literales destacables.';
+
+    analisis = `Las acciones identificadas corresponden a funciones que promedian un nivel G${avgR} en complejidad.${pfText} Segun la rubrica MSC, el Grado ${g} de Dificultad de Funciones se define como "${GRADE_DESCRIPTIONS.dificultad[g-1]}", lo cual es consistente con la naturaleza y alcance de las tareas descritas. No se evidencian elementos suficientes que justifiquen una clasificacion distinta.`;
+  }
+
+  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.dificultad[g]} puntos de ${CONTINUOUS_MAX.dificultad} posibles) para el factor de Dificultad de Funciones.`;
+  return { grado:g, puntos:POINTS_MAP.dificultad[g], justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}` };
 }
 
-function evalSupervision(acc:Accion[],pf:RolProfile,t:string):FactorResult{
+function evalSupervision(acc:TaggedAccion[],pf:RolProfile,t:string):FactorResult{
   let g=pf.baseSupervision||1;const tn=norm(t);const tp=tienePersonal(acc,t);let razon='';
-  if(tp){const nivelTit=/jefe|director|gerente|subdirector|lider|supervisor/i.test(norm(pf.nombre));const nivelFunc=/coordina|supervisa|dirige|lidera/.test(tn);g=nivelTit?4:nivelFunc?3:2;razon=nivelTit?'cargo de jefatura formal':nivelFunc?'verbos de supervision en funciones':'personal a cargo detectado';if(/departamento|unidad|direccion|gerencia|area\s+mayor/.test(tn)){g=Math.max(g,4);razon+=' con alcance de unidad/departamento';}}
-  else if(/supervision\s+ocasional|apoya\s+supervision|guia\s+a\s+comp/.test(tn)){g=Math.max(g,2);razon='supervision ocasional detectada';}
-  else if(/sin\s+personal\s+a\s+cargo|no\s+supervisa|trabajo\s+individual|funciones\s+individuales/.test(tn)){g=Math.max(1,Math.min(2,g));razon='no ejerce supervision explicita';}
-  else razon='sin evidencia de personal a cargo';
-  if(pf.baseSupervision>g){g=pf.baseSupervision;razon+=(`, perfil base G${pf.baseSupervision}`);}
+  
+  if(tp){
+    const nivelTit=/jefe|director|gerente|subdirector|lider|supervisor/i.test(norm(pf.nombre));
+    const nivelFunc=/coordina|supervisa|dirige|lidera/.test(tn);
+    g=nivelTit?4:nivelFunc?3:2;
+    razon=nivelTit?'jerarquia formal directiva o de jefatura':nivelFunc?'coordinacion y liderazgo evidenciado en funciones':'personal a cargo detectado';
+    if(/departamento|unidad|direccion|gerencia|area\s+mayor/.test(tn)){g=Math.max(g,4);razon+=' con alcance de unidad completa';}
+  }
+  else if(/supervision\s+ocasional|apoya\s+supervision|guia\s+a\s+comp/.test(tn)){g=Math.max(g,2);razon='supervision ocasional y apoyo detectado';}
+  else if(/sin\s+personal\s+a\s+cargo|no\s+supervisa|trabajo\s+individual|funciones\s+individuales/.test(tn)){g=Math.max(1,Math.min(2,g));razon='trabajo puramente individual, sin personal a cargo';}
+  else razon='ausencia de evidencia sobre supervision de personal';
+  
+  let pfText='';
+  if(pf.baseSupervision>g){g=pf.baseSupervision;pfText=` Ademas, el perfil del puesto "${pf.nombre}" demanda un nivel minimo de G${pf.baseSupervision}.`;}
   g=clamp(g);
-  return{grado:g,puntos:POINTS_MAP.supervision[g],justificacion:`Evaluacion de Supervision Ejercida: se analizaron las funciones y el titulo del puesto mediante metodo contextual MSC. Evidencia: ${razon}.${pf.baseSupervision>0?` Perfil de puesto "${pf.nombre}" establece base G${pf.baseSupervision}.`:''} Resultado: se asigna Grado ${g} (${POINTS_MAP.supervision[g]} pts) segun rubrica contextual MSC.`};
+
+  const oraciones = (t||'').split(/[.!;\n]+/).map(s=>s.trim()).filter(s=>s.length>5);
+  let evidencia = oraciones.find(s => /personal\s+a\s+cargo|supervisa|equipo|grupo|dirige|coordina|lidera/i.test(norm(s)));
+  let hallazgos = evidencia ? `Se evidencia responsabilidad de mando en el perfil o descripcion: "${evidencia}".` : `No se identificaron menciones textuales directas sobre tener personal a cargo en la descripcion de funciones.`;
+  
+  const procAcc = acc.filter(a => a.fuente === 'procedimiento' && ['supervisar','dirigir','liderar','coordinar'].includes(a.verboNorm));
+  if (procAcc.length > 0) {
+    hallazgos += ` En el procedimiento ${procAcc[0].procCodigo || 'PR-GEN'}, se indica: "${procAcc[0].oracion}".`;
+  }
+
+  const analisis = `El analisis identifica ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Supervision Ejercida se define como "${GRADE_DESCRIPTIONS.supervision[g-1]}". Esto resulta acorde con la naturaleza de la autoridad delegada al puesto. No existe justificacion suficiente para asignar un grado distinto.`;
+  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.supervision[g]} puntos de ${CONTINUOUS_MAX.supervision} posibles) para el factor de Supervision Ejercida.`;
+
+  return{grado:g,puntos:POINTS_MAP.supervision[g],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
-function evalResponsabilidad(acc:Accion[],pf:RolProfile,t:string):FactorResult{
+function evalResponsabilidad(acc:TaggedAccion[],pf:RolProfile,t:string):FactorResult{
   let g=pf.baseResponsabilidad||1;const tn=norm(t);let razon='';
-  if(/responsable\s+(?:de\s+|del?\s+)(?:presupuesto|fondos|contratacion|licitacion|recursos\s+financieros|patrimonio|activos\s+financieros)/i.test(tn)){g=Math.max(g,4);razon='responsable explicitamente de recursos financieros';}
-  else if(/responsable\s+(?:de\s+|del?\s+)(?:informacion\s+sensible|confidencial|custodia|datos\s+personales|documentacion\s+reservada|valores|fondos\s+fijos)/i.test(tn)){g=Math.max(g,3);razon='responsable de informacion sensible/confidencial';}
-  else if(tieneInfoSensible(t,pf.nombre)){g=Math.max(g,3);razon='area/puesto implica manejo de informacion sensible';}
-  else if(/responsable\s+(?:de\s+|del?\s+)(?:materiales|equipo\s+menor|inventario|herramientas|suministros)/i.test(tn)){g=Math.max(g,2);razon='responsable de activos menores';}
-  else if(/custodia|protege|resguarda|salvaguardar/i.test(tn)){g=Math.max(g,3);razon='funciones de custodia y proteccion';}
-  else if(/presupuesto|fondos|contratacion|licitacion|compras\s+mayores|activos\s+financieros|activos\s+institucionales/i.test(tn)){g=Math.max(g,4);razon='gestion de presupuestos o activos institucionales';}
-  else if(/gestion\s+total|proceso\s+clave|decision\s+estrategico|alto\s+impacto|recursos\s+institucionales/i.test(tn)){g=Math.max(g,5);razon='gestion de procesos clave institucionales';}
-  else razon='responsabilidad estandar del perfil';
-  for(const a of acc)if(a.verboNorm==='administrar'||a.verboNorm==='gestionar'){const oc=clasifObj(a.objeto);if(oc.tipo==='estrategico'){g=Math.max(g,4);razon+=`, administra recursos estrategicos`;}if(oc.tipo==='directivo'){g=Math.max(g,5);razon+=`, gestion de nivel directivo`;}}
-  if(pf.baseResponsabilidad>g){razon+=`. Perfil area minima G${pf.baseResponsabilidad}`;g=pf.baseResponsabilidad;}
+  if(/responsable\s+(?:de\s+|del?\s+)(?:presupuesto|fondos|contratacion|licitacion|recursos\s+financieros|patrimonio|activos\s+financieros)/i.test(tn)){g=Math.max(g,4);razon='gestion directa de recursos financieros o presupuestos';}
+  else if(/responsable\s+(?:de\s+|del?\s+)(?:informacion\s+sensible|confidencial|custodia|datos\s+personales|documentacion\s+reservada|valores|fondos\s+fijos)/i.test(tn)){g=Math.max(g,3);razon='manejo y custodia de informacion sensible o confidencial';}
+  else if(tieneInfoSensible(t,pf.nombre)){g=Math.max(g,3);razon='naturaleza del area implica acceso a informacion sensible';}
+  else if(/responsable\s+(?:de\s+|del?\s+)(?:materiales|equipo\s+menor|inventario|herramientas|suministros)/i.test(tn)){g=Math.max(g,2);razon='responsabilidad por materiales, suministros o equipo menor';}
+  else if(/custodia|protege|resguarda|salvaguardar/i.test(tn)){g=Math.max(g,3);razon='responsabilidades formales de custodia y proteccion';}
+  else if(/presupuesto|fondos|contratacion|licitacion|compras\s+mayores|activos\s+financieros|activos\s+institucionales/i.test(tn)){g=Math.max(g,4);razon='implicacion en la gestion de presupuestos institucionales';}
+  else if(/gestion\s+total|proceso\s+clave|decision\s+estrategico|alto\s+impacto|recursos\s+institucionales/i.test(tn)){g=Math.max(g,5);razon='responsabilidad total sobre procesos clave de alto impacto';}
+  else razon='responsabilidad operativa estandar';
+  
+  for(const a of acc)if(a.verboNorm==='administrar'||a.verboNorm==='gestionar'){const oc=clasifObj(a.objeto);if(oc.tipo==='estrategico'){g=Math.max(g,4);razon+=`, administracion de recursos estrategicos`;}if(oc.tipo==='directivo'){g=Math.max(g,5);razon+=`, gestion de nivel directivo`;}}
+  
+  let pfText='';
+  if(pf.baseResponsabilidad>g){g=pf.baseResponsabilidad;pfText=` Por su pertenencia al area "${pf.nombre}", el perfil demanda un nivel minimo de G${pf.baseResponsabilidad}.`;}
   g=clamp(g);
-  return{grado:g,puntos:POINTS_MAP.responsabilidad[g],justificacion:`Evaluacion de Responsabilidad: se analizaron las funciones y el area del puesto mediante metodo contextual MSC. Evidencia: ${razon}.${pf.baseResponsabilidad>0?` El area "${pf.nombre}" tiene un minimo de G${pf.baseResponsabilidad} segun la clasificacion MSC.`:''} Resultado: se asigna Grado ${g} (${POINTS_MAP.responsabilidad[g]} pts) segun rubrica contextual MSC.`};
+
+  const oraciones = (t||'').split(/[.!;\n]+/).map(s=>s.trim()).filter(s=>s.length>5);
+  let evidencia = oraciones.find(s => /presupuesto|fondos|informacion\s+sensible|confidencial|materiales|custodia|valores/i.test(norm(s)));
+  let hallazgos = evidencia ? `La descripcion de funciones establece responsabilidades especificas: "${evidencia}".` : `Se analizo la descripcion funcional y no se encontraron citas explicitas sobre manejo de valores, fondos o informacion clasificada; se asume responsabilidad general del nivel.`;
+  
+  const procAcc = acc.filter(a => a.fuente === 'procedimiento' && ['administrar','gestionar','custodiar','controlar'].includes(a.verboNorm));
+  if (procAcc.length > 0) {
+    hallazgos += ` En el procedimiento ${procAcc[0].procCodigo || 'PR-GEN'}, se observa: "${procAcc[0].oracion}".`;
+  }
+
+  const analisis = `El alcance funcional refleja ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Responsabilidad se define como "${GRADE_DESCRIPTIONS.responsabilidad[g-1]}", ajustandose fielmente al grado de riesgo y autonomia exigido. Un nivel superior requeriria autoridad sobre activos de mayor criticidad institucional.`;
+  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.responsabilidad[g]} puntos de ${CONTINUOUS_MAX.responsabilidad} posibles) para el factor de Responsabilidad.`;
+
+  return{grado:g,puntos:POINTS_MAP.responsabilidad[g],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
-function evalCondiciones(t:string,pf:RolProfile):FactorResult{
+function evalCondiciones(acc:TaggedAccion[],t:string,pf:RolProfile):FactorResult{
   const tn=norm(t);let g=1;let razon='';
   const cm=(re:RegExp,gr:number,lb:string)=>{if(re.test(tn)&&gr>g){g=gr;razon=lb;}};
-  cm(/trabajo\s+de\s+oficina|ambiente\s+controlado|trabajo\s+sedentario|ambiente\s+de\s+oficina/i,1,'trabajo en oficina/ambiente controlado');
-  cm(/esfuerzo\s+fisico\s+moderado|ambiente\s+incomodo|bipedestacion|de\s+pie|camina\s+frecuentemente|levanta\s+peso/i,2,'esfuerzo fisico moderado o ambiente incomodo');
-  cm(/intemperie|via\s+publica|ambiente\s+variable|trabajo\s+de\s+campo|labores\s+de\s+campo|en\s+el\s+exterior|condiciones\s+climaticas|ruido\s+constante|calor\s+(?!humano|de\s+hogar)/i,3,'trabajo a la intemperie o condiciones climaticas variables');
-  cm(/riesgo\s+de\s+(?:accidente|caida|lesion|fisico|mecanico|electrico|quimico|biologico)|accidente\s+laboral|trabajo\s+en\s+altura|maquinaria\s+peligrosa|sustancias|quimicos|equipo\s+peligroso/i,4,'riesgo de accidentes laborales');
-  cm(/alta\s+peligrosidad|insalubridad|enfermedad\s+profesional|ambiente\s+extremo|radiacion|peligro\s+constante|material\s+peligroso|alta\s+exposicion|toxicos/i,5,'alta peligrosidad/insalubridad');
-  if(!razon)razon='ambiente de oficina controlado estandar';
-  if(pf?.baseCondiciones>g){g=pf.baseCondiciones;razon+=`. Perfil base G${pf.baseCondiciones} segun area`;}
+  cm(/trabajo\s+de\s+oficina|ambiente\s+controlado|trabajo\s+sedentario|ambiente\s+de\s+oficina/i,1,'desempeno en trabajo de oficina o ambiente controlado');
+  cm(/esfuerzo\s+fisico\s+moderado|ambiente\s+incomodo|bipedestacion|de\s+pie|camina\s+frecuentemente|levanta\s+peso/i,2,'requerimiento de esfuerzo fisico moderado o bipedestacion');
+  cm(/intemperie|via\s+publica|ambiente\s+variable|trabajo\s+de\s+campo|labores\s+de\s+campo|en\s+el\s+exterior|condiciones\s+climaticas|ruido\s+constante|calor\s+(?!humano|de\s+hogar)/i,3,'trabajo de campo a la intemperie o con exposicion climatica variable');
+  cm(/riesgo\s+de\s+(?:accidente|caida|lesion|fisico|mecanico|electrico|quimico|biologico)|accidente\s+laboral|trabajo\s+en\s+altura|maquinaria\s+peligrosa|sustancias|quimicos|equipo\s+peligroso/i,4,'exposicion a riesgos de accidentes laborales o manejo de maquinaria/quimicos');
+  cm(/alta\s+peligrosidad|insalubridad|enfermedad\s+profesional|ambiente\s+extremo|radiacion|peligro\s+constante|material\s+peligroso|alta\s+exposicion|toxicos/i,5,'alta peligrosidad o insalubridad constante');
+  
+  if(!razon)razon='condiciones de oficina normales sin exposicion particular';
+  let pfText='';
+  if(pf?.baseCondiciones>g){g=pf.baseCondiciones;pfText=` El perfil del area indica que el puesto exige base G${pf.baseCondiciones}.`;}
   g=clamp(g);
-  return{grado:g,puntos:POINTS_MAP.condiciones[g],justificacion:`Evaluacion de Condiciones de Trabajo: se analizaron las condiciones descritas mediante metodo contextual MSC. Evidencia: ${razon}. Resultado: se asigna Grado ${g} (${POINTS_MAP.condiciones[g]} pts) segun rubrica contextual MSC.`};
+
+  const oraciones = (t||'').split(/[.!;\n]+/).map(s=>s.trim()).filter(s=>s.length>5);
+  let evidencia = oraciones.find(s => /oficina|esfuerzo|intemperie|campo|riesgo|accidente|peligrosidad|insalubridad/i.test(norm(s)));
+  let hallazgos = evidencia ? `El analisis del puesto indica sobre sus condiciones: "${evidencia}".` : `No se identifican descripciones explicitas de riesgo ambiental extremo en el texto de las funciones.`;
+
+  const procAcc = acc.filter(a => a.fuente === 'procedimiento' && /condicion|ambiente|riesgo|campo|oficina/i.test(a.verboNorm + a.objeto));
+  if (procAcc.length > 0) {
+    hallazgos += ` En el procedimiento ${procAcc[0].procCodigo || 'PR-GEN'}, se describe un contexto afín: "${procAcc[0].oracion}".`;
+  }
+
+  const analisis = `Se evidencia ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Condiciones de Trabajo se define como "${GRADE_DESCRIPTIONS.condiciones[g-1]}", que refleja adecuadamente el entorno fisico y ergonomico. No se justifica modificar este grado por falta de mayor exposicion comprobada.`;
+  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.condiciones[g]} puntos de ${CONTINUOUS_MAX.condiciones} posibles) para el factor de Condiciones de Trabajo.`;
+
+  return{grado:g,puntos:POINTS_MAP.condiciones[g],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
-function evalError(t:string,pf:RolProfile):FactorResult{
+function evalError(acc:TaggedAccion[],t:string,pf:RolProfile):FactorResult{
   const tn=norm(t);let g=pf.baseError||1;let razon='';
   const cm=(re:RegExp,gr:number,lb:string)=>{if(re.test(tn)&&gr>g){g=gr;razon=lb;}};
-  cm(/error\s+compromete\s+(?:la\s+)?estabilidad|seguridad\s+publica|reputacion\s+institucional|crisis|confianza\s+publica|irreversible|estabilidad\s+institucional/i,5,'consecuencia critica: estabilidad institucional o seguridad publica');
-  cm(/perdida\s+economica|perdida\s+financiera|multa|sancion|demanda|penal|consecuencia\s+legal|responsabilidad\s+legal|legal\s+(?!.*ilegal)/i,4,'perdida economica o consecuencias legales');
-  cm(/afecta\s+(?:a\s+)?servicio|cliente|usuario|ciudadano|externo|interrumpe|departamento/i,3,'afecta servicio externo o ciudadanos');
-  cm(/retraso\s+menor|demora|interno|proceso\s+interno|reasignacion/i,2,'retrasos operativos internos');
-  if(/control\s+interno|auditoria|juridico|legal/i.test(norm(pf.nombre))){const ng=Math.max(g,3);if(ng>g){g=ng;razon+=`; area "${pf.nombre}" con funciones de control/auditoria`;}}
-  if(/financiero|presupuesto|tesoreria|contabilidad/i.test(norm(pf.nombre))){const ng=Math.max(g,3);if(ng>g){g=ng;razon+=`; area "${pf.nombre}" con funciones financieras`;}}
-  if(!razon)razon='bajo impacto operativo';
-  if(pf.baseError>g){g=pf.baseError;razon+=`. Perfil base G${pf.baseError} segun area`;}
+  cm(/error\s+compromete\s+(?:la\s+)?estabilidad|seguridad\s+publica|reputacion\s+institucional|crisis|confianza\s+publica|irreversible|estabilidad\s+institucional/i,5,'impacto critico en la estabilidad institucional o seguridad publica');
+  cm(/perdida\s+economica|perdida\s+financiera|multa|sancion|demanda|penal|consecuencia\s+legal|responsabilidad\s+legal|legal\s+(?!.*ilegal)/i,4,'riesgo de perdida economica o repercusiones legales significativas');
+  cm(/afecta\s+(?:a\s+)?servicio|cliente|usuario|ciudadano|externo|interrumpe|departamento/i,3,'afectacion directa a servicios externos o ciudadanos');
+  cm(/retraso\s+menor|demora|interno|proceso\s+interno|reasignacion/i,2,'retrasos operativos menores o impacto en procesos internos');
+  
+  if(/control\s+interno|auditoria|juridico|legal/i.test(norm(pf.nombre))){const ng=Math.max(g,3);if(ng>g){g=ng;razon='naturaleza de las funciones de auditoria/legal aumenta la trascendencia del error';}}
+  if(/financiero|presupuesto|tesoreria|contabilidad/i.test(norm(pf.nombre))){const ng=Math.max(g,3);if(ng>g){g=ng;razon='naturaleza de las funciones financieras expone a la institucion';}}
+  if(!razon)razon='impacto operativo de grado menor, facil de detectar y corregir';
+  
+  let pfText='';
+  if(pf.baseError>g){g=pf.baseError;pfText=` Se considera un piso base de G${pf.baseError} por el impacto inherente al perfil.`;}
   g=clamp(g);
-  return{grado:g,puntos:POINTS_MAP.error[g],justificacion:`Evaluacion de Consecuencia del Error: se analizaron las funciones y el area del puesto mediante metodo contextual MSC. Evidencia: ${razon}. Resultado: se asigna Grado ${g} (${POINTS_MAP.error[g]} pts) segun rubrica contextual MSC.`};
+
+  const oraciones = (t||'').split(/[.!;\n]+/).map(s=>s.trim()).filter(s=>s.length>5);
+  let evidencia = oraciones.find(s => /error|perdida|demanda|consecuencia|impacto|servicio|ciudadano/i.test(norm(s)));
+  let hallazgos = evidencia ? `Respecto a las repercusiones del trabajo, el texto establece: "${evidencia}".` : `No se encuentran estipulaciones precisas sobre el impacto del error en la descripcion base, deduciendose de la naturaleza general del puesto.`;
+
+  const procAcc = acc.filter(a => a.fuente === 'procedimiento' && /error|impacto|riesgo|consecuencia/i.test(a.verboNorm + a.objeto));
+  if (procAcc.length > 0) {
+    hallazgos += ` En el procedimiento ${procAcc[0].procCodigo || 'PR-GEN'}, se requiere precaucion por: "${procAcc[0].oracion}".`;
+  }
+
+  const analisis = `El analisis identifica ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Consecuencia del Error se define como "${GRADE_DESCRIPTIONS.error[g-1]}", que se corresponde con la magnitud de los perjuicios posibles. Un nivel superior estaria reservado a riesgos de mayor afectacion comprobada.`;
+  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.error[g]} puntos de ${CONTINUOUS_MAX.error} posibles) para el factor de Consecuencia del Error.`;
+
+  return{grado:g,puntos:POINTS_MAP.error[g],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
 const EDUC:[RegExp,number,string][]=[
@@ -258,30 +410,40 @@ const EDUC:[RegExp,number,string][]=[
 
 function evalRequisitos(educacion:string):FactorResult{
   const tn=norm(educacion);
-  if(/no\s+(?:requiere|necesita|exige|se\s+requiere|se\s+exige)/i.test(tn))
-    return{grado:1,puntos:POINTS_MAP.requisitos[1],justificacion:'Evaluacion de Requisitos de Formacion: se analizaron los requisitos del puesto mediante metodo contextual MSC. No se requiere formacion academica especifica. Formula: sin requisito → Grado 1 (5 pts) segun rubrica contextual MSC.'};
+  if(/no\s+(?:requiere|necesita|exige|se\s+requiere|se\s+exige)/i.test(tn)) {
+    const hallazgos = `Se especifica formalmente que el puesto no requiere educacion academica ("${educacion}").`;
+    const analisis = `Al no solicitar estudios especificos, el puesto se ubica en el escalafon inicial. Segun la rubrica MSC, el Grado 1 se define como "${GRADE_DESCRIPTIONS.requisitos[0]}".`;
+    const resolucion = `Se asigna Grado 1 (${POINTS_MAP.requisitos[1]} puntos de ${CONTINUOUS_MAX.requisitos} posibles) para el factor de Requisitos.`;
+    return{grado:1,puntos:POINTS_MAP.requisitos[1],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
+  }
   let mg=1,lb='educacion basica';
   for(const[re,g,lbl]of EDUC)if(re.test(tn)&&g>mg){mg=g;lb=lbl;}
-  return{grado:mg,puntos:POINTS_MAP.requisitos[mg],justificacion:`Evaluacion de Requisitos de Formacion: se analizaron los requisitos del puesto mediante metodo contextual MSC. Se requiere "${lb}" (Grado ${mg} segun tabla de formacion academica MSC). Formula: nivel educativo detectado "${lb}" → G${mg} (${POINTS_MAP.requisitos[mg]} pts) segun rubrica contextual MSC.`};
+  
+  const hallazgos = educacion ? `El requerimiento formal del perfil documenta: "${educacion.trim()}".` : `No se dispone de texto formal sobre requisitos de educacion, infiriendose la educacion basica.`;
+  const analisis = `Los estudios exigidos corresponden a la clasificacion de ${lb}. Segun la rubrica MSC, el Grado ${mg} de Requisitos se define como "${GRADE_DESCRIPTIONS.requisitos[mg-1]}". Este grado refleja fielmente el nivel de preparacion academica obligatoria para el adecuado cumplimiento de las funciones descritas.`;
+  const resolucion = `Se asigna Grado ${mg} (${POINTS_MAP.requisitos[mg]} puntos de ${CONTINUOUS_MAX.requisitos} posibles) para el factor de Requisitos.`;
+
+  return{grado:mg,puntos:POINTS_MAP.requisitos[mg],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
-function evalProcedimientos(procCtx:any):{ref:string[];acc:Accion[]}{
-  const ref:string[]=[],acc:Accion[]=[];
+export function evalProcedimientos(procCtx:any):{ref:string[];acc:TaggedAccion[]}{
+  const ref:string[]=[],acc:TaggedAccion[]=[];
   if(!procCtx)return{ref,acc};
-  const fuentes:{campo?:string;label:string}[]=[
+  const fuentes:{campo?:string;label:string;codigo?:string;nombre?:string}[]=[
     {campo:procCtx.textoCompleto,label:'texto completo'},
     ...(procCtx.procedimientos||[]).flatMap((p:any)=>[
-      {campo:p.proposito,label:`proposito ${p.nombre||p.codigo}`},
-      {campo:p.alcance,label:`alcance ${p.nombre||p.codigo}`},
+      {campo:p.proposito,label:\`proposito ${p.nombre||p.codigo}\`,codigo:p.codigo,nombre:p.nombre},
+      {campo:p.alcance,label:\`alcance ${p.nombre||p.codigo}\`,codigo:p.codigo,nombre:p.nombre},
     ]),
-    ...(procCtx.pasos||[]).map((s:any)=>({campo:s.descripcion,label:`paso ${s.procedimiento_codigo}`})),
-    ...(procCtx.politicas||[]).map((p:any)=>({campo:p.politica,label:`politica ${p.procedimiento_codigo}`})),
+    ...(procCtx.pasos||[]).map((s:any)=>({campo:s.descripcion,label:\`paso ${s.procedimiento_codigo}\`,codigo:s.procedimiento_codigo,nombre:s.procedimiento_nombre})),
+    ...(procCtx.politicas||[]).map((p:any)=>({campo:p.politica,label:\`politica ${p.procedimiento_codigo}\`,codigo:p.procedimiento_codigo,nombre:p.procedimiento_nombre})),
   ];
   for(const f of fuentes){
     if(!f.campo)continue;
     const ex=extraerAcciones(f.campo);
-    if(ex.length)ref.push(`${ex.length} de ${f.label}`);
-    acc.push(...ex);
+    if(ex.length)ref.push(\`${ex.length} de ${f.label}\`);
+    const tagged = ex.map(a => ({...a, fuente: 'procedimiento' as const, procCodigo: f.codigo, procNombre: f.nombre}));
+    acc.push(...tagged);
   }
   return{ref,acc};
 }
@@ -289,13 +451,17 @@ function evalProcedimientos(procCtx:any):{ref:string[];acc:Accion[]}{
 export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
   const fx=puesto.descripcion_funciones||'',ed=puesto.educacion_requerida||'';
   const pf=analizarTituloCompuesto(puesto.nombre||'',puesto.area||'');
-  const acc=extraerAcciones(fx),pr=evalProcedimientos(procCtx);
-  const all=[...acc,...pr.acc];
-  const textoCompleto=[fx,procCtx?.textoCompleto||''].filter(Boolean).join('\n');
+  const accFx = extraerAcciones(fx).map(a => ({...a, fuente: 'funciones' as const} as TaggedAccion));
+  const pr = evalProcedimientos(procCtx);
+  const all: TaggedAccion[]=[...accFx,...pr.acc];
+  const textoCompleto=[fx,procCtx?.textoCompleto||''].filter(Boolean).join('\\n');
   const res:Record<string,FactorResult>={
-    dificultad:evalDificultad(all,pf),supervision:evalSupervision(all,pf,textoCompleto),
-    responsabilidad:evalResponsabilidad(all,pf,textoCompleto),condiciones:evalCondiciones(textoCompleto,pf),
-    error:evalError(textoCompleto,pf),requisitos:evalRequisitos(ed),
+    dificultad:evalDificultad(all,pf),
+    supervision:evalSupervision(all,pf,textoCompleto),
+    responsabilidad:evalResponsabilidad(all,pf,textoCompleto),
+    condiciones:evalCondiciones(all,textoCompleto,pf),
+    error:evalError(all,textoCompleto,pf),
+    requisitos:evalRequisitos(ed),
   };
   const data:EvaluationSuggestion={
     dificultad:res.dificultad.grado,dificultad_just:res.dificultad.justificacion,
@@ -310,3 +476,4 @@ export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
   const pc:string[]=pr.ref.length?['dificultad','responsabilidad']:[];
   return{success:true,data,totalPuntos:total,puesto_id:puesto.id,analisis_completo:true,motor:'rule-based',procedimientosCount:procCtx?.totalProcedimientos||0,factorPoints:fp,buildVersion:'v12-contextual',procContribution:pc};
 }
+
