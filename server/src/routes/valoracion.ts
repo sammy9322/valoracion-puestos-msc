@@ -126,15 +126,4 @@ router.post('/pipeline/save', async (req, res) => {
   }
 });
 
-router.get('/migrate', async (_req, res) => {
-  try {
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Evaluacion" ADD COLUMN IF NOT EXISTS "motor" TEXT`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Evaluacion" ADD COLUMN IF NOT EXISTS "buildVersion" TEXT`);
-    await prisma.$executeRawUnsafe(`ALTER TABLE "Evaluacion" ADD COLUMN IF NOT EXISTS "auditoria" JSONB`);
-    res.json({ success: true, message: 'Columnas motor, buildVersion, auditoria agregadas correctamente' });
-  } catch (error: any) {
-    res.status(500).json({ error: 'Error en migración', detail: error.message });
-  }
-});
-
 export default router;
