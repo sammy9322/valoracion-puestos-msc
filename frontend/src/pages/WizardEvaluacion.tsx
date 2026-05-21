@@ -128,29 +128,6 @@ const WizardEvaluacion: React.FC = () => {
     }
   };
 
-  const handleDownloadReport = async () => {
-    if (!savedEvaluacionId) return;
-    try {
-      const res = await fetch(`/api/evaluaciones/${savedEvaluacionId}/report`);
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: 'Error al generar el PDF' }));
-        alert(err.error);
-        return;
-      }
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `informe-evaluacion.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    } catch (e) {
-      alert('Error de red al descargar el informe');
-    }
-  };
-
   const handleReset = () => {
     setReport(null);
     setAnalisis({});
@@ -386,13 +363,22 @@ const WizardEvaluacion: React.FC = () => {
                 >
                   <Save size={16} /> Guardar Evaluación
                 </button>
-                <button
-                  onClick={handleDownloadReport}
-                  disabled={!savedEvaluacionId}
-                  className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl flex items-center justify-center gap-2 transition-all disabled:opacity-40"
-                >
-                  <Download size={16} /> Descargar Informe PDF
-                </button>
+                {savedEvaluacionId ? (
+                  <a
+                    href={`/api/evaluaciones/${savedEvaluacionId}/report`}
+                    download
+                    className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
+                  >
+                    <Download size={16} /> Descargar Informe PDF
+                  </a>
+                ) : (
+                  <button
+                    disabled
+                    className="flex-1 py-3 bg-primary text-primary-foreground font-bold rounded-xl flex items-center justify-center gap-2 transition-all opacity-40 cursor-not-allowed"
+                  >
+                    <Download size={16} /> Descargar Informe PDF
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -407,9 +393,13 @@ const WizardEvaluacion: React.FC = () => {
                 <p className="text-sm text-green-600 mt-1">La evaluación del agente IA ha sido registrada en el sistema.</p>
               </div>
               <div className="flex justify-center gap-3 pt-2">
-                <button onClick={handleDownloadReport} className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl flex items-center gap-2 shadow-lg">
+                <a
+                  href={`/api/evaluaciones/${savedEvaluacionId}/report`}
+                  download
+                  className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl flex items-center gap-2 shadow-lg"
+                >
                   <Download size={16} /> Descargar Informe PDF
-                </button>
+                </a>
                 <button onClick={handleReset} className="px-6 py-2.5 border rounded-xl font-bold text-muted-foreground hover:text-foreground flex items-center gap-2">
                   <RotateCcw size={16} /> Nueva Evaluación
                 </button>
