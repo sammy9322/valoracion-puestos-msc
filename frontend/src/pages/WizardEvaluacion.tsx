@@ -128,9 +128,27 @@ const WizardEvaluacion: React.FC = () => {
     }
   };
 
-  const handleDownloadReport = () => {
+  const handleDownloadReport = async () => {
     if (!savedEvaluacionId) return;
-    window.open(`/api/evaluaciones/${savedEvaluacionId}/report`, '_blank');
+    try {
+      const res = await fetch(`/api/evaluaciones/${savedEvaluacionId}/report`);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Error al generar el PDF' }));
+        alert(err.error);
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `informe-evaluacion.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Error de red al descargar el informe');
+    }
   };
 
   const handleReset = () => {
