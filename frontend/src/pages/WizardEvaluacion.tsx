@@ -398,7 +398,14 @@ const WizardEvaluacion: React.FC = () => {
               </div>
               <div className="flex justify-center gap-3 pt-2">
                 <button
-                  onClick={() => { window.location.href = `/api/evaluaciones/${savedEvaluacionId}/report`; }}
+                  onClick={() => {
+                    const a = document.createElement('a');
+                    a.href = `/api/evaluaciones/${savedEvaluacionId}/report`;
+                    a.download = `informe-evaluacion.pdf`;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                  }}
                   className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl inline-flex items-center gap-2 shadow-lg cursor-pointer"
                 >
                   <Download size={16} /> Descargar Informe PDF
@@ -407,6 +414,16 @@ const WizardEvaluacion: React.FC = () => {
                   <RotateCcw size={16} /> Nueva Evaluación
                 </button>
               </div>
+              <p className="text-xs text-muted-foreground mt-2">
+                Si la descarga no inicia,{' '}
+                <a href={`/api/evaluaciones/${savedEvaluacionId}/report`} target="_blank" rel="noopener noreferrer" className="underline text-primary">
+                  haz clic aquí
+                </a>{' '}
+                o copia esta URL en tu navegador:
+              </p>
+              <p className="text-[10px] text-muted-foreground bg-muted/50 rounded px-2 py-1 mt-1 break-all select-all font-mono">
+                {window.location.origin}/api/evaluaciones/{savedEvaluacionId}/report
+              </p>
             </div>
           )}
         </div>
