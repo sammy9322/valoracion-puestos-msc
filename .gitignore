@@ -51,3 +51,4 @@ pdf_debug.txt
 server/*.pdf
 server/*.txt
 !server/README.md
+.vercel
