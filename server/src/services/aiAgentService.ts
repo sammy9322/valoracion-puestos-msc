@@ -128,14 +128,14 @@ Para CADA factor, realiza un analisis multidimensional:
 
 2. **Contexto organizacional**: Considera la ubicacion del puesto en la estructura (a quien reporta, que areas coordina) y su impacto en los procesos institucionales. Evalua el alcance de sus decisiones y responsabilidades.
 
-3. **Evidencia textual especifica**: Identifica y CITA textualmente las partes de la descripcion que demuestren el nivel del factor. La justificacion debe hacer referencia directa a fragmentos de las funciones.
+3. **Evidencia textual especifica**: Identifica y CITA textualmente las partes de la descripcion que demuestren el nivel del factor. La justificacion DEBE hacer referencia directa a fragmentos de las funciones, envolviendo SIEMPRE las citas exactas en comillas dobles ("..."). Si no usas comillas dobles, el reporte será rechazado.
 
 4. **Asignacion del grado**: Selecciona el grado que MEJOR refleje la totalidad de la evidencia. Si hay elementos de multiples grados, prevalece el nivel predominante descrito. Cada grado debe estar plenamente justificado con evidencia textual.
 
 === INSTRUCCIONES CRITICAS ===
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
 - Cada grado debe ser un numero entero entre 1 y 5.
-- Cada justificacion debe tener entre 2 y 4 oraciones, citando fragmentos especificos de las funciones en comillas.
+- Cada justificacion debe tener entre 2 y 4 oraciones. Es OBLIGATORIO incluir al menos una cita textual exacta usando comillas dobles ("cita").
 - No justifiques con palabras sueltas; explica POR QUE ese fragmento demuestra el nivel asignado.
 - Si no hay evidencia clara, asigna el grado mas conservador (1).
 - Devuelve UNICAMENTE el objeto JSON, sin texto adicional ni codigo.

@@ -22,7 +22,17 @@ export const ValuationReportSchema = z.object({
     buildVersion: z.string(),
     timestamp: z.string(),
     confidence: z.number().min(0).max(1),
-    evidenceFound: z.array(z.string())
+    evidenceFound: z.array(z.string()),
+    confidenceBreakdown: z.object({
+      base: z.number(),
+      penalties: z.array(z.object({
+        reason: z.string(),
+        factor: z.string().optional(),
+        deduction: z.number()
+      })),
+      final: z.number(),
+      reasoning: z.string().optional()
+    }).optional()
   })
 });
 

@@ -17,6 +17,11 @@ export const HEURISTIC_RULES = {
     'posiblemente',
     'tal vez',
     'estimo que',
-    'aproximadamente'
+    'aproximadamente',
+    'generalmente',
+    'se asume',
+    'no hay evidencia',
+    'casi seguro',
+    'se estima'
   ]
 };
