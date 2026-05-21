@@ -445,7 +445,26 @@ const WizardEvaluacion: React.FC = () => {
             <p className="text-xs text-indigo-700/80 leading-relaxed">
               El agente analiza objetivamente la descripción de funciones contra la rúbrica MSC y asigna grados del 1 al 5 para cada factor, eliminando la subjetividad humana en el proceso de valoración.
             </p>
-            {pageState === 'result' && (
+          {pageState === 'saving' && (
+            <div className="bg-card border rounded-xl p-12 text-center space-y-4">
+              <Loader2 size={32} className="animate-spin text-primary mx-auto" />
+              <p className="text-sm font-bold text-foreground">Guardando evaluación...</p>
+              <p className="text-xs text-muted-foreground">Persistiendo el reporte de auditoría en la base de datos.</p>
+            </div>
+          )}
+
+          {pageState === 'error' && (
+            <div className="bg-card border border-destructive/30 rounded-xl p-8 text-center space-y-4">
+              <AlertTriangle size={32} className="text-destructive mx-auto" />
+              <p className="text-sm font-bold text-foreground">Error en la evaluación</p>
+              <p className="text-xs text-muted-foreground">{aiError || 'Ocurrió un error inesperado.'}</p>
+              <button onClick={handleReset} className="px-6 py-2 bg-primary text-primary-foreground font-bold rounded-xl">
+                Intentar de nuevo
+              </button>
+            </div>
+          )}
+
+          {pageState === 'result' && (
               <div className="mt-3 bg-white/70 rounded-lg p-3 border border-indigo-100">
                 <p className="text-[10px] font-bold text-indigo-800 flex items-center gap-1">
                   <CheckCircle2 size={12} className="text-green-600" /> Evaluación completada
