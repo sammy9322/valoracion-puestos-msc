@@ -145,6 +145,27 @@ const WizardEvaluacion: React.FC = () => {
     setEditingFactor(null);
   };
 
+  const handleDownloadReport = async () => {
+    if (!report) return;
+    try {
+      const res = await api.post('/valoracion/pipeline/report', { report }, {
+        responseType: 'blob',
+        timeout: 30000
+      });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'informe-evaluacion.pdf';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (error: any) {
+      console.error('[Download Report Error]:', error);
+      setAiError(error.response?.data?.detail || error.response?.data?.error || error.message || 'Error al descargar el PDF');
+    }
+  };
+
   const handleGradeChange = (factorKey: string, grado: number) => {
     const factor = FACTORS_CONFIG.find(f => f.key === factorKey);
     if (!factor) return;
@@ -367,22 +388,12 @@ const WizardEvaluacion: React.FC = () => {
                 >
                   <Save size={16} /> Guardar Evaluación
                 </button>
-                {savedEvaluacionId ? (
-                  <a
-                    href={`/api/evaluaciones/${savedEvaluacionId}/report`}
-                    download
-                    className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
-                  >
-                    <Download size={16} /> Descargar Informe PDF
-                  </a>
-                ) : (
-                  <button
-                    disabled
-                    className="flex-1 py-3 bg-primary text-primary-foreground font-bold rounded-xl flex items-center justify-center gap-2 transition-all opacity-40 cursor-not-allowed"
-                  >
-                    <Download size={16} /> Descargar Informe PDF
-                  </button>
-                )}
+                <button
+                  onClick={handleDownloadReport}
+                  className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
+                >
+                  <Download size={16} /> Descargar Informe PDF
+                </button>
               </div>
             </div>
           )}

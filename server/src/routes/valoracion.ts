@@ -1,6 +1,8 @@
 import { Router } from 'express';
 import { runValuationPipeline } from '../services/valuationPipeline';
 import { FACTOR_CONFIG, POINTS_MAP } from '../config/factorTables';
+import { generateEvaluationReport } from '../services/reportGenerator';
+import { enrich as enrichProc } from '../services/procedimientosService';
 import prisma from '../db';
 
 const router = Router();
@@ -123,6 +125,62 @@ router.post('/pipeline/save', async (req, res) => {
   } catch (error: any) {
     console.error('[Pipeline Save Error]:', error);
     res.status(500).json({ error: 'Error al guardar el reporte de auditoría', detail: error.message });
+  }
+});
+
+router.post('/pipeline/report', async (req, res) => {
+  try {
+    const { report } = req.body;
+    if (!report || !report.puesto_id || !report.evaluacion) {
+      return res.status(400).json({ error: 'Datos de reporte incompletos' });
+    }
+
+    const ev = report.evaluacion;
+    const puesto = await prisma.puesto.findUnique({ where: { id: report.puesto_id } });
+    if (!puesto) return res.status(404).json({ error: 'Puesto no encontrado' });
+
+    const procCtx = await enrichProc(puesto).catch(() => undefined);
+
+    const fp = (k: string) => {
+      const grade = Number(ev[k]);
+      return POINTS_MAP[k]?.[grade] ?? 0;
+    };
+
+    const evaluacionPdf = {
+      puesto,
+      grado_dificultad: Number(ev.dificultad),
+      puntos_dificultad: fp('dificultad'),
+      justif_dificultad: ev.dificultad_just || '',
+      grado_supervision: Number(ev.supervision),
+      puntos_supervision: fp('supervision'),
+      justif_supervision: ev.supervision_just || '',
+      grado_responsabilidad: Number(ev.responsabilidad),
+      puntos_responsabilidad: fp('responsabilidad'),
+      justif_responsabilidad: ev.responsabilidad_just || '',
+      grado_condiciones: Number(ev.condiciones),
+      puntos_condiciones: fp('condiciones'),
+      justif_condiciones: ev.condiciones_just || '',
+      grado_consecuencia_error: Number(ev.error),
+      puntos_consecuencia_error: fp('error'),
+      justif_consecuencia_error: ev.error_just || '',
+      grado_requisitos: Number(ev.requisitos),
+      puntos_requisitos: fp('requisitos'),
+      justif_requisitos: ev.requisitos_just || '',
+      puntos_totales: report.totalPuntos,
+      motor: report.auditoria?.motor || 'llm',
+      buildVersion: report.auditoria?.buildVersion || '',
+      fecha_evaluacion: new Date()
+    };
+
+    const doc = generateEvaluationReport(evaluacionPdf, procCtx ?? undefined);
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="informe-evaluacion-${puesto.nombre.replace(/\s+/g, '-').toLowerCase()}.pdf"`);
+    doc.pipe(res);
+    doc.end();
+  } catch (error: any) {
+    console.error('[Pipeline Report Error]:', error);
+    res.status(500).json({ error: 'Error al generar el PDF', detail: error.message });
   }
 });
 
