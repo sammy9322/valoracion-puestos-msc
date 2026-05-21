@@ -120,11 +120,15 @@ const WizardEvaluacion: React.FC = () => {
     setPageState('saving');
     try {
       const res = await api.post('/valoracion/pipeline/save', { report });
-      setSavedEvaluacionId(res.data.evaluacion_id);
+      const id = res.data.evaluacion_id;
+      console.log('[Save] evaluacion_id:', id);
+      if (!id) throw new Error('El servidor no devolvió un ID de evaluación');
+      setSavedEvaluacionId(id);
       setPageState('saved');
     } catch (error: any) {
-      setAiError(error.response?.data?.detail || error.response?.data?.error || 'Error al guardar la evaluación');
-      setPageState('result');
+      console.error('[Save] Error:', error);
+      setAiError(error.response?.data?.detail || error.response?.data?.error || error.message || 'Error al guardar la evaluación');
+      setPageState('error');
     }
   };
 
@@ -393,13 +397,12 @@ const WizardEvaluacion: React.FC = () => {
                 <p className="text-sm text-green-600 mt-1">La evaluación del agente IA ha sido registrada en el sistema.</p>
               </div>
               <div className="flex justify-center gap-3 pt-2">
-                <a
-                  href={`/api/evaluaciones/${savedEvaluacionId}/report`}
-                  download
-                  className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl flex items-center gap-2 shadow-lg"
+                <button
+                  onClick={() => { window.location.href = `/api/evaluaciones/${savedEvaluacionId}/report`; }}
+                  className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl inline-flex items-center gap-2 shadow-lg cursor-pointer"
                 >
                   <Download size={16} /> Descargar Informe PDF
-                </a>
+                </button>
                 <button onClick={handleReset} className="px-6 py-2.5 border rounded-xl font-bold text-muted-foreground hover:text-foreground flex items-center gap-2">
                   <RotateCcw size={16} /> Nueva Evaluación
                 </button>
