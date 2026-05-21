@@ -89,6 +89,10 @@ model Evaluacion {
   aprobado_por_user         User?     @relation("EvaluacionesAprobadas", fields: [aprobado_por], references: [id])
   aprobado_por              String?
 
+  motor                     String?
+  buildVersion              String?
+  auditoria                 Json?
+
   fecha_evaluacion          DateTime  @default(now())
   fecha_aprobacion          DateTime?
   version                   Int       @default(1)

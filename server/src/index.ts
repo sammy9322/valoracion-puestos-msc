@@ -10,6 +10,7 @@ import calculosRouter from './routes/calculos';
 import asignacionesRouter from './routes/asignaciones';
 import auditoriaRouter from './routes/auditoria';
 import manualRouter from './routes/manual';
+import valoracionRouter from './routes/valoracion';
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -25,6 +26,7 @@ app.use('/api/calculos', calculosRouter);
 app.use('/api/asignaciones', asignacionesRouter);
 app.use('/api/auditoria', auditoriaRouter);
 app.use('/api/manual', manualRouter);
+app.use('/api/valoracion', valoracionRouter);
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', message: 'API Valoración de Puestos MSC is running' });

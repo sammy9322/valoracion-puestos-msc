@@ -3,6 +3,8 @@ import { Sparkles, CheckCircle2, AlertTriangle, Info, ShieldAlert, FileText, Sav
 import api from '../services/api';
 import { getEstratoCompleto } from '../constants/categorias';
 import type { EstratoResult } from '../constants/categorias';
+import EvidenceReport from '../components/evaluation/EvidenceReport';
+import AdjustmentPanel from '../components/evaluation/AdjustmentPanel';
 
 const FACTORS_CONFIG = [
   { key: 'dificultad', label: 'Dificultad de Funciones', icon: Target, points: [0, 40, 80, 120, 160, 200], maxPts: 200, desc: 'Complejidad de las tareas, iniciativa y juicio requerido.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica y decisiones críticas.'] },
@@ -42,6 +44,7 @@ const WizardEvaluacion: React.FC = () => {
   const [factorPoints, setFactorPoints] = useState<Record<string, number>>({});
   const [editingFactor, setEditingFactor] = useState<string | null>(null);
 
+  const [report, setReport] = useState<any>(null);
   const [analisis, setAnalisis] = useState<AIAnalysis>({});
   const [procedimientosCount, setProcedimientosCount] = useState(0);
   const [procContribution, setProcContribution] = useState<string[]>([]);
@@ -61,6 +64,7 @@ const WizardEvaluacion: React.FC = () => {
 
   const handlePuestoSelect = useCallback(async (id: string) => {
     setSelectedPuestoId(id);
+    setReport(null);
     setAnalisis({});
     setFactorPoints({});
     setTotalPuntos(0);
@@ -87,62 +91,39 @@ const WizardEvaluacion: React.FC = () => {
     setPageState('evaluating');
     setAiError(null);
     try {
-      const res = await api.post('/evaluaciones/ai-evaluate', { puesto_id: selectedPuestoId }, { timeout: 120000 });
-      const { analisis: data } = res.data;
+      const res = await api.post('/valoracion/pipeline', { puesto_id: selectedPuestoId }, { timeout: 120000 });
+      const { report } = res.data;
+      
+      setReport(report);
+      
       const newAnalisis: AIAnalysis = {};
       const factorKeys = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
-      const justMap: Record<string, string> = {
-        dificultad: 'dificultad_just',
-        supervision: 'supervision_just',
-        responsabilidad: 'responsabilidad_just',
-        condiciones: 'condiciones_just',
-        error: 'error_just',
-        requisitos: 'requisitos_just'
-      };
       for (const key of factorKeys) {
         newAnalisis[key] = {
-          grado: data[key] || 1,
-          justificacion: data[justMap[key]] || ''
+          grado: report.evaluacion[key],
+          justificacion: report.evaluacion[`${key}_just`]
         };
       }
+      
       setAnalisis(newAnalisis);
-      setSavedEvaluacionId(res.data.evaluacion.id);
-      setTotalPuntos(res.data.totalPuntos || 0);
-      setFactorPoints(res.data.factorPoints || {});
-      setProcedimientosCount(res.data.procedimientosCount || 0);
-      setProcContribution(res.data.procContribution || []);
+      setTotalPuntos(report.totalPuntos);
       setPageState('result');
     } catch (error: any) {
-      const msg = error.response?.data?.error || error.message || 'Error al comunicarse con el agente IA';
+      const msg = error.response?.data?.detail || error.response?.data?.error || error.message || 'Error al comunicarse con el pipeline de auditoría';
       setAiError(msg);
       setPageState('error');
     }
   };
 
   const handleSave = async () => {
-    if (!savedEvaluacionId) return;
+    if (!report) return;
     setPageState('saving');
     try {
-      const payload: any = { estado: 'aprobada' };
-      for (const factor of FACTORS_CONFIG) {
-        const a = analisis[factor.key];
-        if (!a) continue;
-        const key = factor.key;
-        payload[key] = a.grado;
-        const justMap: Record<string, string> = {
-          dificultad: 'difficulty_just',
-          supervision: 'supervision_just',
-          responsabilidad: 'resp_just',
-          condiciones: 'condiciones_just',
-          error: 'error_just',
-          requisitos: 'requisitos_just'
-        };
-        payload[justMap[key]] = a.justificacion;
-      }
-      await api.put(`/evaluaciones/${savedEvaluacionId}`, payload);
+      const res = await api.post('/valoracion/pipeline/save', { report });
+      setSavedEvaluacionId(res.data.evaluacion_id);
       setPageState('saved');
     } catch (error: any) {
-      setAiError(error.response?.data?.error || 'Error al guardar la evaluación');
+      setAiError(error.response?.data?.detail || error.response?.data?.error || 'Error al guardar la evaluación');
       setPageState('result');
     }
   };
@@ -153,6 +134,7 @@ const WizardEvaluacion: React.FC = () => {
   };
 
   const handleReset = () => {
+    setReport(null);
     setAnalisis({});
     setFactorPoints({});
     setTotalPuntos(0);
@@ -183,6 +165,22 @@ const WizardEvaluacion: React.FC = () => {
       ...prev,
       [factorKey]: { ...prev[factorKey], grado }
     }));
+  };
+
+  const handleHumanAdjustment = (factorKey: string, grade: number, justification: string) => {
+    handleGradeChange(factorKey, grade);
+    setAnalisis(prev => ({
+      ...prev,
+      [factorKey]: { grado: grade, justificacion: justification }
+    }));
+    setEditingFactor(null);
+    // Mark as human override in report if available
+    if (report) {
+      setReport(prev => ({
+        ...prev,
+        auditoria: { ...prev.auditoria, humanOverridden: true }
+      }));
+    }
   };
 
   const totalMax = FACTORS_CONFIG.reduce((sum, f) => sum + f.points[5], 0);
@@ -307,27 +305,16 @@ const WizardEvaluacion: React.FC = () => {
                         </div>
                       )}
 
-                      {isEditing && (
-                        <div className="space-y-3 pt-2">
-                          <div className="flex gap-2">
-                            {[1, 2, 3, 4, 5].map(g => (
-                              <button
-                                key={g}
-                                onClick={() => handleGradeChange(factor.key, g)}
-                                className={`flex-1 py-2.5 rounded-lg text-center text-xs font-bold border-2 transition-all cursor-pointer ${
-                                  a.grado === g
-                                    ? 'border-primary bg-primary/5 text-primary'
-                                    : 'border-slate-200 text-muted-foreground hover:border-slate-300'
-                                }`}
-                              >
-                                <div>G{g}</div>
-                                <div className="text-[10px] font-normal">{linearPts(g, factor.maxPts)} pts</div>
-                              </button>
-                            ))}
-                          </div>
-                          <p className="text-[10px] text-muted-foreground italic">{factor.grades[a.grado]}</p>
-                        </div>
-                      )}
+                       {isEditing && (
+                         <AdjustmentPanel 
+                           factorKey={factor.key} 
+                           currentGrade={a.grado} 
+                           currentJustification={a.justificacion} 
+                           onSave={(grade, justification) => handleHumanAdjustment(factor.key, grade, justification)} 
+                           onCancel={() => setEditingFactor(null)} 
+                         />
+                       )}
+
                     </div>
                   </div>
                 );
@@ -354,6 +341,10 @@ const WizardEvaluacion: React.FC = () => {
                     )}
                   </div>
                 )}
+              </div>
+
+              <div className="mt-6">
+                <EvidenceReport report={report} />
               </div>
 
               {procedimientosCount > 0 && (

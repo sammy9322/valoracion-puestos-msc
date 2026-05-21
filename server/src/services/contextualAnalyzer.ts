@@ -432,16 +432,16 @@ export function evalProcedimientos(procCtx:any):{ref:string[];acc:TaggedAccion[]
   const fuentes:{campo?:string;label:string;codigo?:string;nombre?:string}[]=[
     {campo:procCtx.textoCompleto,label:'texto completo'},
     ...(procCtx.procedimientos||[]).flatMap((p:any)=>[
-      {campo:p.proposito,label:\`proposito ${p.nombre||p.codigo}\`,codigo:p.codigo,nombre:p.nombre},
-      {campo:p.alcance,label:\`alcance ${p.nombre||p.codigo}\`,codigo:p.codigo,nombre:p.nombre},
+      {campo:p.proposito,label:`proposito ${p.nombre||p.codigo}`,codigo:p.codigo,nombre:p.nombre},
+      {campo:p.alcance,label:`alcance ${p.nombre||p.codigo}`,codigo:p.codigo,nombre:p.nombre},
     ]),
-    ...(procCtx.pasos||[]).map((s:any)=>({campo:s.descripcion,label:\`paso ${s.procedimiento_codigo}\`,codigo:s.procedimiento_codigo,nombre:s.procedimiento_nombre})),
-    ...(procCtx.politicas||[]).map((p:any)=>({campo:p.politica,label:\`politica ${p.procedimiento_codigo}\`,codigo:p.procedimiento_codigo,nombre:p.procedimiento_nombre})),
+    ...(procCtx.pasos||[]).map((s:any)=>({campo:s.descripcion,label:`paso ${s.procedimiento_codigo}`,codigo:s.procedimiento_codigo,nombre:s.procedimiento_nombre})),
+    ...(procCtx.politicas||[]).map((p:any)=>({campo:p.politica,label:`politica ${p.procedimiento_codigo}`,codigo:p.procedimiento_codigo,nombre:p.procedimiento_nombre})),
   ];
   for(const f of fuentes){
     if(!f.campo)continue;
     const ex=extraerAcciones(f.campo);
-    if(ex.length)ref.push(\`${ex.length} de ${f.label}\`);
+    if(ex.length)ref.push(`${ex.length} de ${f.label}`);
     const tagged = ex.map(a => ({...a, fuente: 'procedimiento' as const, procCodigo: f.codigo, procNombre: f.nombre}));
     acc.push(...tagged);
   }

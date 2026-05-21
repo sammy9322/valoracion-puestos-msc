@@ -154,16 +154,17 @@ router.post('/ai-evaluate', async (req, res) => {
             }
         });
 
-        // Store motor/buildVersion via raw SQL (columns may not exist yet)
+        // Store motor/buildVersion via typed Prisma API
         try {
-            await prisma.$executeRawUnsafe(
-                `UPDATE "Evaluacion" SET "motor" = $1, "buildVersion" = $2 WHERE "id" = $3`,
-                result.motor || 'rule-based',
-                result.buildVersion || BUILD_VERSION,
-                evaluacion.id
-            );
+            await prisma.evaluacion.update({
+                where: { id: evaluacion.id },
+                data: {
+                    motor: result.motor || 'rule-based',
+                    buildVersion: result.buildVersion || BUILD_VERSION,
+                }
+            });
         } catch (_e) {
-            // columns don't exist yet — safe to ignore
+            console.warn('[Evaluacion] Could not save motor/buildVersion, columns may not exist yet:', _e);
         }
 
         await prisma.auditoria.create({
@@ -278,19 +279,19 @@ router.get('/:id/report', async (req, res) => {
             return res.status(404).json({ error: 'Evaluación no encontrada' });
         }
 
-        // Read motor/buildVersion via raw SQL (columns may not exist in old records)
+        // Read motor/buildVersion via typed Prisma API
         let motor: string | undefined;
         let buildVersion: string | undefined;
         try {
-            const row: any = await prisma.$queryRawUnsafe(
-                `SELECT "motor", "buildVersion" FROM "Evaluacion" WHERE "id" = $1`,
-                id
-            );
-            if (row?.length) {
-                motor = row[0].motor;
-                buildVersion = row[0].buildVersion;
-            }
-        } catch (_e) { /* columns don't exist yet */ }
+            const extended = await prisma.evaluacion.findUnique({
+                where: { id },
+                select: { motor: true, buildVersion: true }
+            });
+            motor = extended?.motor ?? undefined;
+            buildVersion = extended?.buildVersion ?? undefined;
+        } catch (_e) {
+            console.warn('[Evaluacion] Could not read motor/buildVersion, columns may not exist yet');
+        }
         (evaluacion as any).motor = motor;
         (evaluacion as any).buildVersion = buildVersion;
 
