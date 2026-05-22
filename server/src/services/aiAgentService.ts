@@ -339,10 +339,10 @@ export const aiAgentService = {
             result.interviewContext = interviewCtx;
           } catch (error: any) {
             console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
-            result = ruleBasedEvaluation(puesto, procCtx);
+            result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
           }
         } else {
-          result = ruleBasedEvaluation(puesto, procCtx);
+          result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
         }
         return result;
     },
@@ -351,7 +351,7 @@ export const aiAgentService = {
         const procCtx = await enrichProc(puesto).catch(() => null);
         const procText = procCtx ? procCtx.textoCompleto : undefined;
         if (!ollamaAvailable) {
-          const result = ruleBasedEvaluation(puesto, procCtx);
+          const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
           return result.data;
         }
 
@@ -364,7 +364,7 @@ export const aiAgentService = {
             return raw as EvaluationSuggestion;
         } catch (error: any) {
             console.warn('[AI Service] Error en suggestEvaluation, usando rule-based:', error.message);
-            const result = ruleBasedEvaluation(puesto, procCtx);
+            const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
             return result.data;
         }
     }
