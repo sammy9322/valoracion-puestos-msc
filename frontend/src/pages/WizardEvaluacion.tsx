@@ -306,8 +306,9 @@ const WizardEvaluacion: React.FC = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".txt"
+                  accept=".txt,text/plain"
                   hidden
+                  onClick={e => e.stopPropagation()}
                   onChange={e => setPlaudFile(e.target.files?.[0] || null)}
                 />
                 <div className="flex items-center gap-3">
