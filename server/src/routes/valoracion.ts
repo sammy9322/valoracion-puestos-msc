@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { runValuationPipeline } from '../services/valuationPipeline';
 import { FACTOR_CONFIG, POINTS_MAP } from '../config/factorTables';
+import { generateHtmlReport } from '../services/htmlReportGenerator';
 import { generateEvaluationReport } from '../services/reportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
 import { parseEntrevistaMD } from '../services/interviewParser';
@@ -157,7 +158,7 @@ router.post('/pipeline/report', async (req, res) => {
       return POINTS_MAP[k]?.[grade] ?? 0;
     };
 
-    const evaluacionPdf = {
+    const evaluacionPdf: any = {
       puesto,
       analisis_multifuente: report.analisis_multifuente,
       alerta_global: report.alerta_global,
@@ -185,15 +186,33 @@ router.post('/pipeline/report', async (req, res) => {
       fecha_evaluacion: new Date()
     };
 
-    const doc = generateEvaluationReport(evaluacionPdf, procCtx ?? undefined);
+    // Formatear para que el iterador del HTML funcione
+    evaluacionPdf.factores = [
+      { factor: 'Dificultad de las Funciones', puntos: evaluacionPdf.puntos_dificultad, justificacion: evaluacionPdf.justif_dificultad },
+      { factor: 'Supervisión Ejercida', puntos: evaluacionPdf.puntos_supervision, justificacion: evaluacionPdf.justif_supervision },
+      { factor: 'Responsabilidad', puntos: evaluacionPdf.puntos_responsabilidad, justificacion: evaluacionPdf.justif_responsabilidad },
+      { factor: 'Condiciones de Trabajo', puntos: evaluacionPdf.puntos_condiciones, justificacion: evaluacionPdf.justif_condiciones },
+      { factor: 'Consecuencia de Errores', puntos: evaluacionPdf.puntos_consecuencia_error, justificacion: evaluacionPdf.justif_consecuencia_error },
+      { factor: 'Requisitos', puntos: evaluacionPdf.puntos_requisitos, justificacion: evaluacionPdf.justif_requisitos },
+    ];
 
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename="informe-evaluacion-${puesto.nombre.replace(/\s+/g, '-').toLowerCase()}.pdf"`);
-    doc.pipe(res);
-    doc.end();
+    const format = req.query.format;
+    
+    if (format === 'pdf') {
+      const doc = generateEvaluationReport(evaluacionPdf, procCtx ?? undefined);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="informe-evaluacion-${puesto.nombre.replace(/\s+/g, '-').toLowerCase()}.pdf"`);
+      doc.pipe(res);
+      doc.end();
+    } else {
+      const html = generateHtmlReport(evaluacionPdf, procCtx ?? undefined);
+      res.setHeader('Content-Type', 'text/html');
+      res.setHeader('Content-Disposition', `attachment; filename="informe-evaluacion-${puesto.nombre.replace(/\s+/g, '-').toLowerCase()}.html"`);
+      res.send(html);
+    }
   } catch (error: any) {
     console.error('[Pipeline Report Error]:', error);
-    res.status(500).json({ error: 'Error al generar el PDF', detail: error.message });
+    res.status(500).json({ error: 'Error al generar el Informe', detail: error.message });
   }
 });
 

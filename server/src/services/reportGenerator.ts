@@ -241,9 +241,11 @@ class ReportGenerator {
   }
 
   private addContradictionAlert(texto: string): void {
-    this.checkPage(50);
+    this.doc.fontSize(8).font('Helvetica');
+    const th = this.doc.heightOfString(texto, { width: CW - 28, lineGap: 2 });
+    const bannerH = Math.max(36, th + 28);
+    this.checkPage(bannerH + 15);
     // Warning banner
-    const bannerH = 36;
     this.doc.save();
     this.doc.fillColor('#fffbeb').roundedRect(MG, this.y, CW, bannerH, 6).fill();
     this.doc.strokeColor('#fbbf24').lineWidth(1).roundedRect(MG, this.y, CW, bannerH, 6).stroke();
@@ -252,9 +254,9 @@ class ReportGenerator {
     this.doc.fillColor('#f59e0b').roundedRect(MG, this.y, 4, bannerH, 2).fill();
 
     this.doc.fontSize(9).font('Helvetica-Bold').fillColor('#92400e');
-    this.doc.text('\u26A0 ALERTA DE CONTRADICCIÓN', MG + 14, this.y + 6);
+    this.doc.text('\u26A0 ALERTA DE CONTRADICCIÓN', MG + 14, this.y + 8);
     this.doc.fontSize(8).font('Helvetica').fillColor('#92400e');
-    this.doc.text(texto, MG + 14, this.y + 19, { width: CW - 28 });
+    this.doc.text(texto, MG + 14, this.y + 20, { width: CW - 28, lineGap: 2 });
     this.doc.restore();
     this.y += bannerH + 12;
   }
@@ -703,22 +705,27 @@ class ReportGenerator {
       // Evidence comparison block (multifuente)
       const multifuenteData = evaluacion.analisis_multifuente?.find((m: any) => m.factor === factor);
       if (multifuenteData && (multifuenteData.cita_documental || multifuenteData.cita_entrevista)) {
-        this.checkPage(50);
+        const halfW = (CW - 12) / 2;
+        const docOpts = { width: halfW - 24, align: 'justify' as const, lineGap: 2.5 };
+        const entOpts = { width: halfW - 24, align: 'justify' as const, lineGap: 2.5 };
+
+        this.doc.fontSize(7.5).font('Helvetica-Oblique');
+        const docH = multifuenteData.cita_documental ? this.doc.heightOfString(`"${multifuenteData.cita_documental}"`, docOpts) + 30 : 0;
+        const entH = multifuenteData.cita_entrevista ? this.doc.heightOfString(`"${multifuenteData.cita_entrevista}"`, entOpts) + 30 : 0;
+        const evH = Math.max(45, docH, entH);
+
+        // Make sure we have enough space for the whole block plus the title
+        this.checkPage(evH + 30);
 
         // Section label
         this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
         this.doc.text('EVIDENCIA MULTIFUENTE', MG, this.y);
-        this.y += 8;
+        this.y += 10;
 
-        const halfW = (CW - 12) / 2;
+        const colY = this.y;
 
         // Documental column
         if (multifuenteData.cita_documental) {
-          const docOpts = { width: halfW - 20, align: 'justify' as const, lineGap: 2.5 };
-          const docH = this.doc.heightOfString(multifuenteData.cita_documental, docOpts) + 30;
-          const evH = Math.max(50, docH);
-          const colY = this.y;
-
           this.doc.save();
           this.doc.fillColor('#eff6ff').roundedRect(MG, colY, halfW, evH, 4).fill();
           this.doc.fillColor('#3b82f6').roundedRect(MG, colY, 3, evH, 1.5).fill();
@@ -726,35 +733,27 @@ class ReportGenerator {
           this.doc.restore();
 
           this.doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#1e40af');
-          this.doc.text('EVIDENCIA DOCUMENTAL (MANUAL)', MG + 12, colY + 6);
+          this.doc.text('EVIDENCIA DOCUMENTAL (MANUAL)', MG + 12, colY + 8);
           this.doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#1e3a5f');
-          this.doc.text(`"${multifuenteData.cita_documental}"`, MG + 12, colY + 16, docOpts);
+          this.doc.text(`"${multifuenteData.cita_documental}"`, MG + 12, colY + 20, docOpts);
         }
 
         // Entrevista column
         if (multifuenteData.cita_entrevista) {
-          const entOpts = { width: halfW - 20, align: 'justify' as const, lineGap: 2.5 };
-          const entH = this.doc.heightOfString(multifuenteData.cita_entrevista, entOpts) + 30;
-          const evH = Math.max(50, entH);
-          const colY = this.y;
-
+          const entX = MG + halfW + 12;
           this.doc.save();
-          this.doc.fillColor('#faf5ff').roundedRect(MG + halfW + 12, colY, halfW, evH, 4).fill();
-          this.doc.fillColor('#8b5cf6').roundedRect(MG + halfW + 12, colY, 3, evH, 1.5).fill();
-          this.doc.strokeColor('#e9d5ff').lineWidth(0.5).roundedRect(MG + halfW + 12, colY, halfW, evH, 4).stroke();
+          this.doc.fillColor('#faf5ff').roundedRect(entX, colY, halfW, evH, 4).fill();
+          this.doc.fillColor('#8b5cf6').roundedRect(entX, colY, 3, evH, 1.5).fill();
+          this.doc.strokeColor('#e9d5ff').lineWidth(0.5).roundedRect(entX, colY, halfW, evH, 4).stroke();
           this.doc.restore();
 
           this.doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#6b21a8');
-          this.doc.text('EVIDENCIA TESTIMONIAL (ENTREVISTA)', MG + halfW + 24, colY + 6);
+          this.doc.text('EVIDENCIA TESTIMONIAL (ENTREVISTA)', entX + 12, colY + 8);
           this.doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#4c1d95');
-          this.doc.text(`"${multifuenteData.cita_entrevista}"`, MG + halfW + 24, colY + 16, entOpts);
+          this.doc.text(`"${multifuenteData.cita_entrevista}"`, entX + 12, colY + 20, entOpts);
         }
 
-        this.y += Math.max(
-          multifuenteData.cita_documental ? this.doc.heightOfString(multifuenteData.cita_documental, { width: halfW - 20, align: 'justify', lineGap: 2.5 }) + 30 + 8 : 0,
-          multifuenteData.cita_entrevista ? this.doc.heightOfString(multifuenteData.cita_entrevista, { width: halfW - 20, align: 'justify', lineGap: 2.5 }) + 30 + 8 : 0
-        );
-        this.y += 10;
+        this.y = colY + evH + 15;
       }
     }
   }

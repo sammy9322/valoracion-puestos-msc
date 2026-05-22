@@ -168,7 +168,7 @@ const WizardEvaluacion: React.FC = () => {
   const handleDownloadReport = async () => {
     if (!report) return;
     try {
-      const res = await api.post('/valoracion/pipeline/report', {
+      const res = await api.post('/valoracion/pipeline/report?format=html', {
         report: {
           ...report,
           analisis_multifuente: analisisMultifuente,
@@ -178,17 +178,17 @@ const WizardEvaluacion: React.FC = () => {
         responseType: 'blob',
         timeout: 30000
       });
-      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'text/html' }));
       const a = document.createElement('a');
       a.href = url;
-      a.download = 'informe-evaluacion.pdf';
+      a.download = `informe-evaluacion-${report.puesto?.nombre?.replace(/\\s+/g, '-').toLowerCase() || 'msc'}.html`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error: any) {
       console.error('[Download Report Error]:', error);
-      setAiError(error.response?.data?.detail || error.response?.data?.error || error.message || 'Error al descargar el PDF');
+      setAiError(error.response?.data?.detail || error.response?.data?.error || error.message || 'Error al descargar el Informe');
     }
   };
 
@@ -492,11 +492,12 @@ const WizardEvaluacion: React.FC = () => {
                   <Save size={16} /> Guardar Evaluación
                 </button>
                 <button
-                  onClick={handleDownloadReport}
-                  className="flex-1 py-3 bg-primary hover:bg-primary/90 text-primary-foreground font-bold rounded-xl flex items-center justify-center gap-2 transition-all shadow-lg"
-                >
-                  <Download size={16} /> Descargar Informe PDF
-                </button>
+                onClick={handleDownloadReport}
+                className="flex-1 flex items-center justify-center gap-2 px-6 py-4 bg-primary text-primary-foreground font-bold rounded-xl shadow-lg shadow-primary/20 hover:bg-primary/90 transition-all"
+              >
+                <Download size={20} />
+                Descargar Informe Interactivo (HTML)
+              </button>
               </div>
             </div>
           )}
@@ -515,14 +516,14 @@ const WizardEvaluacion: React.FC = () => {
                   onClick={() => {
                     const a = document.createElement('a');
                     a.href = `/api/evaluaciones/${savedEvaluacionId}/report`;
-                    a.download = `informe-evaluacion.pdf`;
+                    a.download = `informe-evaluacion.html`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
                   }}
                   className="px-6 py-2.5 bg-primary text-primary-foreground font-bold rounded-xl inline-flex items-center gap-2 shadow-lg cursor-pointer"
                 >
-                  <Download size={16} /> Descargar Informe PDF
+                  <Download size={16} /> Descargar Informe Interactivo (HTML)
                 </button>
                 <button onClick={handleReset} className="px-6 py-2.5 border rounded-xl font-bold text-muted-foreground hover:text-foreground flex items-center gap-2">
                   <RotateCcw size={16} /> Nueva Evaluación

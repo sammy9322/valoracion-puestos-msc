@@ -2,6 +2,7 @@ import { Router } from 'express';
 import prisma from '../db';
 import { aiAgentService, POINTS_MAP, BUILD_VERSION } from '../services/aiAgentService';
 import { generateEvaluationReport } from '../services/reportGenerator';
+import { generateHtmlReport } from '../services/htmlReportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
 import { parseEntrevistaMD } from '../services/interviewParser';
 import multer from 'multer';
@@ -290,10 +291,11 @@ router.put('/:id', async (req, res) => {
     }
 });
 
-// GET Reporte PDF de una evaluación
+// GET Reporte PDF/HTML de una evaluación
 router.get('/:id/report', async (req, res) => {
     try {
         const { id } = req.params;
+        const format = req.query.format;
 
         const evaluacion = await prisma.evaluacion.findUnique({
             where: { id },
@@ -323,17 +325,25 @@ router.get('/:id/report', async (req, res) => {
         (evaluacion as any).buildVersion = buildVersion;
 
         const procCtx = await enrichProc(evaluacion.puesto).catch(() => undefined);
-        const doc = generateEvaluationReport(evaluacion, procCtx ?? undefined);
 
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename="informe-evaluacion-${evaluacion.puesto.nombre.replace(/\s+/g, '-').toLowerCase()}.pdf"`);
+        const puestoNombre = evaluacion.puesto.nombre.replace(/\s+/g, '-').toLowerCase();
 
-        doc.pipe(res);
-        doc.end();
+        if (format === 'pdf') {
+            const doc = generateEvaluationReport(evaluacion, procCtx ?? undefined);
+            res.setHeader('Content-Type', 'application/pdf');
+            res.setHeader('Content-Disposition', `attachment; filename="informe-evaluacion-${puestoNombre}.pdf"`);
+            doc.pipe(res);
+            doc.end();
+        } else {
+            const html = generateHtmlReport(evaluacion, procCtx ?? undefined);
+            res.setHeader('Content-Type', 'text/html');
+            res.setHeader('Content-Disposition', `attachment; filename="informe-evaluacion-${puestoNombre}.html"`);
+            res.send(html);
+        }
 
     } catch (error: any) {
-        console.error('Error generando PDF:', error);
-        res.status(500).json({ error: 'Error al generar el informe PDF', detail: error?.message || error?.toString() });
+        console.error('Error generando informe:', error);
+        res.status(500).json({ error: 'Error al generar el informe', detail: error?.message || error?.toString() });
     }
 });
 
