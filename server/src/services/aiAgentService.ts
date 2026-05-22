@@ -1,5 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { enrich as enrichProc } from './procedimientosService';
 import { contextualEvaluate, POINTS_MAP, CONTINUOUS_MAX, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
 import type { InterviewContext } from './interviewParser';
@@ -8,13 +9,15 @@ const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
 export const BUILD_VERSION = 'v12-contextual';
 
-let ollamaAvailable = false;
+let ollamaAvailable = true;
 
 async function checkOllama(): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 1500);
-    const res = await fetch(`${OLLAMA_URL}/api/tags`, { signal: controller.signal });
+  return true;
+}
+
+checkOllama().then(() => {
+  console.log('[AI Service] Conectado a Google Gemini API — usando motor LLM en la nube');
+});
     clearTimeout(timeout);
     ollamaAvailable = res.ok;
   } catch {
@@ -281,27 +284,14 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
 }
 
 async function callOllama(prompt: string): Promise<any> {
-  const response = await fetch(`${OLLAMA_URL}/api/generate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: DEFAULT_MODEL,
-      prompt: prompt,
-      stream: false,
-      format: 'json',
-      options: { temperature: 0.3 }
-    })
-  });
-
-  if (!response.ok) {
-    throw new Error(`Ollama API error: ${response.status}`);
-  }
-
-  const data = await response.json();
-  const jsonText = data.response;
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash', generationConfig: { responseMimeType: 'application/json' } });
+  const result = await model.generateContent(prompt);
+  const jsonText = result.response.text();
   const match = jsonText.match(/\{[\s\S]*\}/);
   const cleanJson = match ? match[0] : jsonText;
-
   return JSON.parse(cleanJson);
 }
 
@@ -339,6 +329,7 @@ export const aiAgentService = {
             result.interviewContext = interviewCtx;
           } catch (error: any) {
             console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
+            const fs = require('fs'); fs.writeFileSync('llm_crash_log.txt', 'Error en LLM:\n' + error.message + '\n\nStack:\n' + error.stack);
             result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
           }
         } else {
