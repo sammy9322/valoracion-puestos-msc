@@ -104,8 +104,7 @@ const WizardEvaluacion: React.FC = () => {
         formData.append('plaudTranscript', plaudFile);
       }
       const res = await api.post('/valoracion/pipeline', formData, {
-        timeout: 120000,
-        headers: { 'Content-Type': 'multipart/form-data' }
+        timeout: 120000
       });
       const { report, analisis_multifuente: amf, alerta_global: ag } = res.data;
 
