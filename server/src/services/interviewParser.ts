@@ -1,4 +1,10 @@
-import { InterviewContext } from './aiAgentService';
+export interface InterviewContext {
+  entrevistado: string;
+  puesto: string;
+  fecha_entrevista: string;
+  factores: Array<any>;
+  alertas: string[];
+}
 
 export async function parseEntrevistaMD(input: Buffer | string, options?: { filename?: string }): Promise<InterviewContext> {
   try {

@@ -18,23 +18,9 @@ async function checkOllama(): Promise<boolean> {
 checkOllama().then(() => {
   console.log('[AI Service] Conectado a Google Gemini API — usando motor LLM en la nube');
 });
-    clearTimeout(timeout);
-    ollamaAvailable = res.ok;
-  } catch {
-    ollamaAvailable = false;
-  }
-  return ollamaAvailable;
-}
-
-checkOllama().then(available => {
-  if (available) {
-    console.log(`[AI Service] Ollama detectado en ${OLLAMA_URL} — usando motor LLM`);
-  } else {
-    console.log(`[AI Service] Ollama no disponible en ${OLLAMA_URL} — usando motor rule-based`);
-  }
-});
 
 export { POINTS_MAP, CONTINUOUS_MAX, FactorKeywordDetail } from './contextualAnalyzer';
+export type { InterviewContext };
 
 export function getEngineStatus(): { ollamaAvailable: boolean; activeEngine: 'llm' | 'rule-based' } {
   return { ollamaAvailable, activeEngine: ollamaAvailable ? 'llm' : 'rule-based' };

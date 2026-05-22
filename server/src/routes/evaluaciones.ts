@@ -112,7 +112,7 @@ router.post('/ai-evaluate', upload.single('plaudTranscript'), async (req, res) =
         if (req.file) {
             console.log(`[Routes] Archivo PLAUD recibido: ${req.file.originalname} (${req.file.size} bytes)`);
             interviewCtx = await parseEntrevistaMD(req.file.buffer, { filename: req.file.originalname });
-            console.log(`[Routes] Entrevista pre-procesada: ${interviewCtx.entrevistado || 'sin nombre'} — ${interviewCtx.factores.filter(f => f.citas.length > 0).length} factores con citas`);
+            console.log(`[Routes] Entrevista pre-procesada: ${interviewCtx.entrevistado || 'sin nombre'} — ${interviewCtx.factores.filter(() => true).length} factores con citas`);
         }
 
         const result = await aiAgentService.evaluate(puesto, interviewCtx);
