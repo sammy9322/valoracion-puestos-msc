@@ -315,8 +315,7 @@ export const aiAgentService = {
             result.interviewContext = interviewCtx;
           } catch (error: any) {
             console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
-            const fs = require('fs'); fs.writeFileSync('llm_crash_log.txt', 'Error en LLM:\n' + error.message + '\n\nStack:\n' + error.stack);
-            result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+            result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Gemini fallu00F3, revisa tu API KEY en Vercel). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
           }
         } else {
           result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
