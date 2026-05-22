@@ -159,6 +159,8 @@ router.post('/pipeline/report', async (req, res) => {
 
     const evaluacionPdf = {
       puesto,
+      analisis_multifuente: report.analisis_multifuente,
+      alerta_global: report.alerta_global,
       grado_dificultad: Number(ev.dificultad),
       puntos_dificultad: fp('dificultad'),
       justif_dificultad: ev.dificultad_just || '',

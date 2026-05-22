@@ -168,7 +168,13 @@ const WizardEvaluacion: React.FC = () => {
   const handleDownloadReport = async () => {
     if (!report) return;
     try {
-      const res = await api.post('/valoracion/pipeline/report', { report }, {
+      const res = await api.post('/valoracion/pipeline/report', {
+        report: {
+          ...report,
+          analisis_multifuente: analisisMultifuente,
+          alerta_global: alertaGlobal
+        }
+      }, {
         responseType: 'blob',
         timeout: 30000
       });

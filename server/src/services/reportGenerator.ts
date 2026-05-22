@@ -176,7 +176,91 @@ class ReportGenerator {
     this.y = 40;
   }
 
+  private addCoverPage(puesto: any): void {
+    const cy = PH / 2 - 120;
+
+    // Full background institutional color block
+    this.doc.rect(0, 0, PW, PH).fill('#f8fafc');
+
+    // Top decorative band
+    this.doc.rect(0, 0, PW, 8).fill(C.accent);
+    this.doc.rect(0, PH - 8, PW, 8).fill(C.accent);
+
+    // Left vertical accent bar
+    this.doc.fillColor(C.accent).rect(70, 180, 4, 200).fill();
+
+    // Institution shield lines
+    this.doc.fillColor(C.accent).fontSize(10).font('Helvetica');
+    this.doc.text('——', PW / 2, cy - 60, { align: 'center' });
+
+    // Main title
+    this.doc.fontSize(13).font('Helvetica-Bold').fillColor(C.muted);
+    this.doc.text('MUNICIPALIDAD DE SAN CARLOS', PW / 2, cy - 40, { align: 'center' });
+
+    this.doc.fontSize(9).font('Helvetica').fillColor(C.muted);
+    this.doc.text('Dirección de Gestión de Talento Humano', PW / 2, cy - 22, { align: 'center' });
+
+    // Document type label
+    this.doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff');
+    const labelW = 180;
+    this.doc.fillColor(C.accent).roundedRect(PW / 2 - labelW / 2, cy + 8, labelW, 22, 4).fill();
+    this.doc.fillColor('#ffffff').text('INFORME OFICIAL DE VALORACIÓN SALARIAL', PW / 2, cy + 14, { align: 'center', width: labelW - 10 });
+
+    // Spacer
+    this.y = cy + 60;
+
+    // Puesto name
+    this.doc.fontSize(16).font('Helvetica-Bold').fillColor(C.text);
+    const puestoName = puesto?.nombre || 'No especificado';
+    this.doc.text(puestoName.toUpperCase(), PW / 2, this.y, { align: 'center' });
+    this.y += 22;
+
+    // Area
+    this.doc.fontSize(10).font('Helvetica').fillColor(C.muted);
+    this.doc.text(puesto?.area || '', PW / 2, this.y, { align: 'center' });
+    this.y += 30;
+
+    // Decorative separator
+    this.doc.fillColor(C.lightBorder).rect(PW / 2 - 30, this.y, 60, 1).fill();
+    this.y += 20;
+
+    // Date and code
+    this.doc.fontSize(9).font('Helvetica').fillColor(C.muted);
+    this.doc.text(`Fecha de emisión: ${new Date().toLocaleDateString('es-CR')}`, PW / 2, this.y, { align: 'center' });
+    this.y += 14;
+    this.doc.text(`Código: INF-VAL-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 1000)).padStart(3, '0')}`, PW / 2, this.y, { align: 'center' });
+
+    // Bottom info
+    this.doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#94a3b8');
+    this.doc.text('Documento generado electrónicamente por el Sistema Integral de RRHH', PW / 2, PH - 60, { align: 'center' });
+    this.doc.text('Metodología MSC — Puntos por Factores', PW / 2, PH - 48, { align: 'center' });
+
+    this.doc.addPage();
+    this.y = MG;
+    this.pageNum = 0;
+  }
+
+  private addContradictionAlert(texto: string): void {
+    this.checkPage(50);
+    // Warning banner
+    const bannerH = 36;
+    this.doc.save();
+    this.doc.fillColor('#fffbeb').roundedRect(MG, this.y, CW, bannerH, 6).fill();
+    this.doc.strokeColor('#fbbf24').lineWidth(1).roundedRect(MG, this.y, CW, bannerH, 6).stroke();
+
+    // Left warning accent bar
+    this.doc.fillColor('#f59e0b').roundedRect(MG, this.y, 4, bannerH, 2).fill();
+
+    this.doc.fontSize(9).font('Helvetica-Bold').fillColor('#92400e');
+    this.doc.text('\u26A0 ALERTA DE CONTRADICCIÓN', MG + 14, this.y + 6);
+    this.doc.fontSize(8).font('Helvetica').fillColor('#92400e');
+    this.doc.text(texto, MG + 14, this.y + 19, { width: CW - 28 });
+    this.doc.restore();
+    this.y += bannerH + 12;
+  }
+
   private addInstitutionalHeader(): void {
+    this.checkPage(50);
     // Elegant left vertical brand bar (4px wide, 42px high, rounded pill)
     this.doc.fillColor(C.accent).roundedRect(MG, this.y, 4, 42, 2).fill();
     
@@ -615,6 +699,63 @@ class ReportGenerator {
       } else {
         this.y += 10;
       }
+
+      // Evidence comparison block (multifuente)
+      const multifuenteData = evaluacion.analisis_multifuente?.find((m: any) => m.factor === factor);
+      if (multifuenteData && (multifuenteData.cita_documental || multifuenteData.cita_entrevista)) {
+        this.checkPage(50);
+
+        // Section label
+        this.doc.fontSize(8).font('Helvetica-Bold').fillColor(C.muted);
+        this.doc.text('EVIDENCIA MULTIFUENTE', MG, this.y);
+        this.y += 8;
+
+        const halfW = (CW - 12) / 2;
+
+        // Documental column
+        if (multifuenteData.cita_documental) {
+          const docOpts = { width: halfW - 20, align: 'justify' as const, lineGap: 2.5 };
+          const docH = this.doc.heightOfString(multifuenteData.cita_documental, docOpts) + 30;
+          const evH = Math.max(50, docH);
+          const colY = this.y;
+
+          this.doc.save();
+          this.doc.fillColor('#eff6ff').roundedRect(MG, colY, halfW, evH, 4).fill();
+          this.doc.fillColor('#3b82f6').roundedRect(MG, colY, 3, evH, 1.5).fill();
+          this.doc.strokeColor('#bfdbfe').lineWidth(0.5).roundedRect(MG, colY, halfW, evH, 4).stroke();
+          this.doc.restore();
+
+          this.doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#1e40af');
+          this.doc.text('EVIDENCIA DOCUMENTAL (MANUAL)', MG + 12, colY + 6);
+          this.doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#1e3a5f');
+          this.doc.text(`"${multifuenteData.cita_documental}"`, MG + 12, colY + 16, docOpts);
+        }
+
+        // Entrevista column
+        if (multifuenteData.cita_entrevista) {
+          const entOpts = { width: halfW - 20, align: 'justify' as const, lineGap: 2.5 };
+          const entH = this.doc.heightOfString(multifuenteData.cita_entrevista, entOpts) + 30;
+          const evH = Math.max(50, entH);
+          const colY = this.y;
+
+          this.doc.save();
+          this.doc.fillColor('#faf5ff').roundedRect(MG + halfW + 12, colY, halfW, evH, 4).fill();
+          this.doc.fillColor('#8b5cf6').roundedRect(MG + halfW + 12, colY, 3, evH, 1.5).fill();
+          this.doc.strokeColor('#e9d5ff').lineWidth(0.5).roundedRect(MG + halfW + 12, colY, halfW, evH, 4).stroke();
+          this.doc.restore();
+
+          this.doc.fontSize(6.5).font('Helvetica-Bold').fillColor('#6b21a8');
+          this.doc.text('EVIDENCIA TESTIMONIAL (ENTREVISTA)', MG + halfW + 24, colY + 6);
+          this.doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#4c1d95');
+          this.doc.text(`"${multifuenteData.cita_entrevista}"`, MG + halfW + 24, colY + 16, entOpts);
+        }
+
+        this.y += Math.max(
+          multifuenteData.cita_documental ? this.doc.heightOfString(multifuenteData.cita_documental, { width: halfW - 20, align: 'justify', lineGap: 2.5 }) + 30 + 8 : 0,
+          multifuenteData.cita_entrevista ? this.doc.heightOfString(multifuenteData.cita_entrevista, { width: halfW - 20, align: 'justify', lineGap: 2.5 }) + 30 + 8 : 0
+        );
+        this.y += 10;
+      }
     }
   }
 
@@ -782,10 +923,17 @@ class ReportGenerator {
       ? 'Motor de Reglas Contextuales (MSC)'
       : 'Agente Evaluador IA (Ollama)';
 
+    this.addCoverPage(puesto);
+
     this.addInstitutionalHeader();
     
     this.addSectionTitle('1. Identificación del Puesto y Datos de Registro');
     this.addMetadataGrid(puesto, motorText, evaluacion.buildVersion);
+
+    if (evaluacion.alerta_global) {
+      this.addContradictionAlert(evaluacion.alerta_global);
+    }
+
     this.addFunctionsCard('Descripción Detallada de Funciones Evaluadas', puesto.descripcion_funciones);
     
     this.addSectionTitle('2. Resumen Metodológico MSC');

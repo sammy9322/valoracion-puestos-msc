@@ -3,6 +3,8 @@ import { z } from 'zod';
 export const ValuationReportSchema = z.object({
   puesto_id: z.string(),
   totalPuntos: z.number(),
+  analisis_multifuente: z.any().optional(),
+  alerta_global: z.string().optional(),
   evaluacion: z.object({
     dificultad: z.number().min(1).max(5),
     dificultad_just: z.string().min(10),
