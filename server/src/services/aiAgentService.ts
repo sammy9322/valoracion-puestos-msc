@@ -121,7 +121,7 @@ function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
   return `
 Eres el EVALUADOR TECNICO OFICIAL del sistema de valoracion de puestos de la Municipalidad de San Carlos.
 Tu analisis es objetivo, vinculante y constituye un documento oficial con implicaciones administrativas y legales.
-Debes basarte EXCLUSIVAMENTE en la descripcion de funciones y requisitos del puesto, aplicando la metodologia MSC (Manual de Clases) de Puntos por Factores con rigor tecnico y profesional.
+Debes basarte en la descripcion de funciones, requisitos del puesto y la EVIDENCIA DE ENTREVISTA (si fue proporcionada), aplicando la metodologia MSC (Manual de Clases) de Puntos por Factores con rigor tecnico y profesional.
 
 === DATOS DEL PUESTO A EVALUAR ===
 Nombre del puesto: ${sanitizeInput(puesto.nombre) || 'No especificado'}
@@ -147,11 +147,11 @@ Para CADA factor, realiza un analisis multidimensional:
 
 2. **Contexto organizacional**: Considera la ubicacion del puesto en la estructura (a quien reporta, que areas coordina) y su impacto en los procesos institucionales. Evalua el alcance de sus decisiones y responsabilidades.
 
-3. **Evidencia textual especifica**: Identifica y CITA textualmente las partes de la descripcion que demuestren el nivel del factor. La justificacion DEBE hacer referencia directa a fragmentos de las funciones, envolviendo SIEMPRE las citas exactas en comillas dobles ("..."). Si no usas comillas dobles, el reporte será rechazado.
+3. **Evidencia textual especifica**: Identifica y CITA textualmente las partes del documento o de la ENTREVISTA que demuestren el nivel del factor. La justificacion DEBE hacer referencia directa a fragmentos textuales, envolviendolos SIEMPRE en comillas dobles ("..."). Si no usas comillas dobles, el reporte sera rechazado.
 
-4. **Analisis multifuente**: Si se proporciono evidencia de entrevista, COMPARA las citas testimoniales con la descripcion documental. Identifica si hay refuerzo, contradiccion o informacion nueva.
+4. **Analisis multifuente**: Si se proporciono evidencia de entrevista, COMPARA las citas testimoniales con la descripcion documental. Identifica si la entrevista revela mayor complejidad o responsabilidad que la descrita en el papel. Esto debe influir directamente en tu calificacion final.
 
-5. **Asignacion del grado**: Selecciona el grado que MEJOR refleje la totalidad de la evidencia. Si hay elementos de multiples grados, prevalece el nivel predominante descrito. Cada grado debe estar plenamente justificado con evidencia textual.
+5. **Asignacion del grado**: Selecciona el grado que MEJOR refleje la totalidad de la evidencia. Si la entrevista eleva la responsabilidad real del puesto por encima de lo documentado, prioriza la realidad operativa. Cada grado debe estar plenamente justificado.
 
 === INSTRUCCIONES CRITICAS ===
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
