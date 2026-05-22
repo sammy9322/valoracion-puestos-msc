@@ -102,20 +102,19 @@ function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
 
   let interviewSection = '';
   if (interviewCtx && interviewCtx.factores) {
-    const factoresConCitas = interviewCtx.factores.filter(f => f.citas.length > 0);
-    if (factoresConCitas.length > 0) {
-      interviewSection = `\n=== EVIDENCIA DE ENTREVISTA AL OCUPANTE ===\nA continuacion se presentan citas textuales extraidas de una entrevista al ocupante actual del puesto. Evalua si esta evidencia testimonial complementa, contradice o refuerza la descripcion documental.\n\n`;
-      for (const f of factoresConCitas) {
-        interviewSection += `Factor: ${f.factor}\n`;
-        interviewSection += `Resumen: ${f.resumen_entrevista}\n`;
-        for (const c of f.citas) {
-          interviewSection += `- Cita: "${c.cita_textual}" (${c.contexto}, relevancia: ${c.relevancia})\n`;
-        }
-        interviewSection += '\n';
+    interviewSection = `\n=== EVIDENCIA DE ENTREVISTA AL OCUPANTE ===\nA continuacion se presentan datos extraidos de una entrevista al ocupante actual del puesto. Evalua si esta evidencia testimonial complementa, contradice o refuerza la descripcion documental.\n\n`;
+    
+    for (const f of interviewCtx.factores) {
+      interviewSection += `Factor: ${f.factor}\n`;
+      interviewSection += `Resumen: ${f.resumen_entrevista}\n`;
+      for (const c of f.citas) {
+        interviewSection += `- Cita: "${c.cita_textual}" (${c.contexto}, relevancia: ${c.relevancia})\n`;
       }
-      if (interviewCtx.alertas.length > 0) {
-        interviewSection += `Alertas de la entrevista:\n${interviewCtx.alertas.map(a => `- ${a}`).join('\n')}\n\n`;
-      }
+      interviewSection += '\n';
+    }
+    
+    if (interviewCtx.alertas && interviewCtx.alertas.length > 0) {
+      interviewSection += `Alertas de la entrevista:\n${interviewCtx.alertas.map(a => `- ${a}`).join('\n')}\n\n`;
     }
   }
 

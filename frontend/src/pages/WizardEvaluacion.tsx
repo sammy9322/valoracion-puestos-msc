@@ -298,9 +298,8 @@ const WizardEvaluacion: React.FC = () => {
             )}
 
             {pageState === 'select' && (
-              <div
-                className={`border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer ${plaudFile ? 'border-green-300 bg-green-50/50' : 'border-slate-200 hover:border-primary/30 bg-muted/20'}`}
-                onClick={() => fileInputRef.current?.click()}
+              <label
+                className={`block border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer ${plaudFile ? 'border-green-300 bg-green-50/50' : 'border-slate-200 hover:border-primary/30 bg-muted/20'}`}
                 onDragOver={(e) => e.preventDefault()}
                 onDrop={(e) => {
                   e.preventDefault();
@@ -312,9 +311,12 @@ const WizardEvaluacion: React.FC = () => {
                 <input
                   ref={fileInputRef}
                   type="file"
-                  hidden
-                  onClick={e => e.stopPropagation()}
-                  onChange={e => setPlaudFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                  onChange={e => {
+                    if (e.target.files && e.target.files.length > 0) {
+                      setPlaudFile(e.target.files[0]);
+                    }
+                  }}
                 />
                 <div className="flex items-center gap-3">
                   {plaudFile ? (
@@ -345,7 +347,7 @@ const WizardEvaluacion: React.FC = () => {
                     </>
                   )}
                 </div>
-              </div>
+              </label>
             )}
           </div>
 
@@ -545,9 +547,9 @@ const WizardEvaluacion: React.FC = () => {
               <p className="text-[10px] text-muted-foreground bg-muted/50 rounded px-2 py-1 mt-1 break-all select-all font-mono">
                 {window.location.origin}/api/evaluaciones/{savedEvaluacionId}/report
               </p>
-            </div>
-          )}
-        </div>
+              </div>
+            )}
+          </div>
 
         <aside className="lg:w-80 space-y-4">
           <div className="bg-card border rounded-xl p-5 space-y-4">
