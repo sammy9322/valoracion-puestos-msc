@@ -4,9 +4,9 @@ import { validateObjectivity } from './guardrails';
 import { aiAgentService } from './aiAgentService';
 import { calculateConfidence } from './confidenceCalculator';
 
-export async function runValuationPipeline(puesto: any): Promise<ValuationReport & { warnings: string[] }> {
+export async function runValuationPipeline(puesto: any, interviewCtx?: any): Promise<ValuationReport & { warnings: string[]; analisis_multifuente?: any; alerta_global?: string }> {
   // 1. Documentation Collection (Contextual Enrichment)
-  const evaluationResult = await aiAgentService.evaluate(puesto);
+  const evaluationResult = await aiAgentService.evaluate(puesto, interviewCtx);
   
   // 2. LLM Call & Response (Using existing aiAgentService as engine)
   const rawData = evaluationResult.data;
@@ -50,6 +50,8 @@ export async function runValuationPipeline(puesto: any): Promise<ValuationReport
 
   return {
     ...report,
-    warnings
+    warnings,
+    analisis_multifuente: evaluationResult.analisis_multifuente,
+    alerta_global: evaluationResult.alerta_global
   };
 }

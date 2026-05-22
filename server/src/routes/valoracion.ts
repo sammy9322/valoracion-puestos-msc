@@ -3,11 +3,14 @@ import { runValuationPipeline } from '../services/valuationPipeline';
 import { FACTOR_CONFIG, POINTS_MAP } from '../config/factorTables';
 import { generateEvaluationReport } from '../services/reportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
+import { parseEntrevistaMD } from '../services/interviewParser';
 import prisma from '../db';
+import multer from 'multer';
 
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const router = Router();
 
-router.post('/pipeline', async (req, res) => {
+router.post('/pipeline', upload.single('plaudTranscript'), async (req, res) => {
   try {
     const { puesto_id } = req.body;
     if (!puesto_id) return res.status(400).json({ error: 'puesto_id es requerido' });
@@ -15,11 +18,19 @@ router.post('/pipeline', async (req, res) => {
     const puesto = await prisma.puesto.findUnique({ where: { id: puesto_id } });
     if (!puesto) return res.status(404).json({ error: 'Puesto no encontrado' });
 
-    const report = await runValuationPipeline(puesto);
-    
+    let interviewCtx = undefined;
+    if (req.file) {
+      console.log(`[Valoracion] Archivo PLAUD recibido: ${req.file.originalname} (${req.file.size} bytes)`);
+      interviewCtx = await parseEntrevistaMD(req.file.buffer, { filename: req.file.originalname });
+    }
+
+    const report = await runValuationPipeline(puesto, interviewCtx);
+
     res.json({
       success: true,
-      report: report
+      report: report,
+      analisis_multifuente: report.analisis_multifuente,
+      alerta_global: report.alerta_global
     });
   } catch (error: any) {
     console.error('[Pipeline Error]:', error);
@@ -97,7 +108,7 @@ router.post('/pipeline/save', async (req, res) => {
           motor: report.auditoria.motor || 'llm',
           buildVersion: report.auditoria.buildVersion || '',
           auditoria: report,
-        }
+        } as any
       });
     } catch (_e) {
       console.warn('[Valoracion] Could not save audit metadata:', _e);

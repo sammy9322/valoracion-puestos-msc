@@ -175,7 +175,7 @@ router.post('/ai-evaluate', upload.single('plaudTranscript'), async (req, res) =
                 data: {
                     motor: result.motor || 'rule-based',
                     buildVersion: result.buildVersion || BUILD_VERSION,
-                }
+                } as any
             });
         } catch (_e) {
             console.warn('[Evaluacion] Could not save motor/buildVersion, columns may not exist yet:', _e);
@@ -304,16 +304,18 @@ router.get('/:id/report', async (req, res) => {
             return res.status(404).json({ error: 'Evaluación no encontrada' });
         }
 
-        // Read motor/buildVersion via typed Prisma API
+        // Read motor/buildVersion via raw SQL (columns may not exist in model)
         let motor: string | undefined;
         let buildVersion: string | undefined;
         try {
-            const extended = await prisma.evaluacion.findUnique({
-                where: { id },
-                select: { motor: true, buildVersion: true }
-            });
-            motor = extended?.motor ?? undefined;
-            buildVersion = extended?.buildVersion ?? undefined;
+            const row: any = await prisma.$queryRawUnsafe(
+                `SELECT "motor", "buildVersion" FROM "Evaluacion" WHERE "id" = $1`,
+                id
+            );
+            if (row?.length) {
+                motor = row[0].motor;
+                buildVersion = row[0].buildVersion;
+            }
         } catch (_e) {
             console.warn('[Evaluacion] Could not read motor/buildVersion, columns may not exist yet');
         }
