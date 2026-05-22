@@ -98,6 +98,9 @@ model Evaluacion {
   version                   Int       @default(1)
   estado                    String    @default("borrador")
   
+  analisis_multifuente      Json?
+  alerta_global             String?
+
   asignaciones              AsignacionSalario[]
 }
 

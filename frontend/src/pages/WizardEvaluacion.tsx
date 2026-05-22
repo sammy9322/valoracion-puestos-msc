@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Sparkles, CheckCircle2, AlertTriangle, Info, ShieldAlert, FileText, Save, Download, RotateCcw, Loader2, Target, Thermometer, GraduationCap, Briefcase } from 'lucide-react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { Sparkles, CheckCircle2, AlertTriangle, Info, ShieldAlert, FileText, Save, Download, RotateCcw, Loader2, Target, Thermometer, GraduationCap, Briefcase, Upload, X } from 'lucide-react';
 import api from '../services/api';
 import { getEstratoCompleto } from '../constants/categorias';
 import type { EstratoResult } from '../constants/categorias';
@@ -48,6 +48,10 @@ const WizardEvaluacion: React.FC = () => {
   const [analisis, setAnalisis] = useState<AIAnalysis>({});
   const [procedimientosCount, setProcedimientosCount] = useState(0);
   const [procContribution, setProcContribution] = useState<string[]>([]);
+  const [plaudFile, setPlaudFile] = useState<File | null>(null);
+  const [analisisMultifuente, setAnalisisMultifuente] = useState<any[] | null>(null);
+  const [alertaGlobal, setAlertaGlobal] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -70,6 +74,9 @@ const WizardEvaluacion: React.FC = () => {
     setTotalPuntos(0);
     setProcedimientosCount(0);
     setProcContribution([]);
+    setAnalisisMultifuente(null);
+    setAlertaGlobal(null);
+    setPlaudFile(null);
     setPageState('select');
     setAiError(null);
     setSavedEvaluacionId(null);
@@ -91,11 +98,19 @@ const WizardEvaluacion: React.FC = () => {
     setPageState('evaluating');
     setAiError(null);
     try {
-      const res = await api.post('/valoracion/pipeline', { puesto_id: selectedPuestoId }, { timeout: 120000 });
-      const { report } = res.data;
-      
+      const formData = new FormData();
+      formData.append('puesto_id', selectedPuestoId);
+      if (plaudFile) {
+        formData.append('plaudTranscript', plaudFile);
+      }
+      const res = await api.post('/valoracion/pipeline', formData, {
+        timeout: 120000,
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      const { report, analisis_multifuente: amf, alerta_global: ag } = res.data;
+
       setReport(report);
-      
+
       const newAnalisis: AIAnalysis = {};
       const factorKeys = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
       for (const key of factorKeys) {
@@ -104,9 +119,14 @@ const WizardEvaluacion: React.FC = () => {
           justificacion: report.evaluacion[`${key}_just`]
         };
       }
-      
+
       setAnalisis(newAnalisis);
+      setAnalisisMultifuente(amf || null);
+      setAlertaGlobal(ag || null);
       setTotalPuntos(report.totalPuntos);
+      setFactorPoints(res.data.factorPoints || {});
+      setProcedimientosCount(res.data.procedimientosCount || 0);
+      setProcContribution(res.data.procContribution || []);
       setPageState('result');
     } catch (error: any) {
       const msg = error.response?.data?.detail || error.response?.data?.error || error.message || 'Error al comunicarse con el pipeline de auditoría';
@@ -271,6 +291,50 @@ const WizardEvaluacion: React.FC = () => {
                 El agente IA está analizando la descripción de funciones contra la rúbrica MSC...
               </div>
             )}
+
+            {pageState === 'select' && (
+              <div
+                className={`border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer ${plaudFile ? 'border-green-300 bg-green-50/50' : 'border-slate-200 hover:border-primary/30 bg-muted/20'}`}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept=".txt"
+                  hidden
+                  onChange={e => setPlaudFile(e.target.files?.[0] || null)}
+                />
+                <div className="flex items-center gap-3">
+                  {plaudFile ? (
+                    <>
+                      <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                        <FileText size={16} className="text-green-700" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold text-foreground truncate">{plaudFile.name}</p>
+                        <p className="text-[10px] text-muted-foreground">{(plaudFile.size / 1024).toFixed(1)} KB — Transcripción PLAUD cargada</p>
+                      </div>
+                      <button
+                        onClick={e => { e.stopPropagation(); setPlaudFile(null); if (fileInputRef.current) fileInputRef.current.value = ''; }}
+                        className="w-6 h-6 bg-slate-200 hover:bg-slate-300 rounded-full flex items-center justify-center shrink-0"
+                      >
+                        <X size={12} />
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <div className="w-8 h-8 bg-slate-100 rounded-lg flex items-center justify-center">
+                        <Upload size={16} className="text-slate-500" />
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-xs font-bold text-foreground">Transcripción PLAUD (Opcional)</p>
+                        <p className="text-[10px] text-muted-foreground">Sube un archivo .txt con la transcripción de la entrevista</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
 
           {pageState === 'result' && (
@@ -285,14 +349,32 @@ const WizardEvaluacion: React.FC = () => {
                 </button>
               </div>
 
+              {alertaGlobal && (
+                <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-start gap-2 text-xs text-orange-800">
+                  <AlertTriangle size={15} className="text-orange-500 shrink-0 mt-0.5" />
+                  <span className="font-medium">{alertaGlobal}</span>
+                </div>
+              )}
+
+              {analisisMultifuente && analisisMultifuente.some((m: any) => m.contradiccion) && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 flex items-start gap-2 text-xs text-red-800">
+                  <ShieldAlert size={15} className="text-red-500 shrink-0 mt-0.5" />
+                  <span className="font-medium">Se detectaron <strong>{analisisMultifuente.filter((m: any) => m.contradiccion).length} contradiccion(es)</strong> entre la evidencia documental y la entrevista. Los factores marcados requieren revisión manual antes de aprobar.</span>
+                </div>
+              )}
+
               {FACTORS_CONFIG.map((factor, idx) => {
                 const a = analisis[factor.key];
                 if (!a) return null;
                 const isEditing = editingFactor === factor.key;
                 const Icon = factor.icon;
+                const mf = analisisMultifuente?.find((m: any) => m.factor === factor.key);
+                const fuenteLabel = mf?.fuente_principal === 'mixta' ? 'Enriquecido con Entrevista' : mf?.fuente_principal === 'entrevista' ? 'Solo Entrevista' : '100% Documental';
+                const fuenteBadgeColor = mf?.fuente_principal === 'mixta' ? 'bg-purple-100 text-purple-700 border-purple-200' : mf?.fuente_principal === 'entrevista' ? 'bg-amber-100 text-amber-700 border-amber-200' : 'bg-blue-100 text-blue-700 border-blue-200';
+                const tieneContradiccion = mf?.contradiccion;
 
                 return (
-                  <div key={factor.key} className="bg-card border rounded-xl overflow-hidden transition-all">
+                  <div key={factor.key} className={`bg-card border rounded-xl overflow-hidden transition-all ${tieneContradiccion ? 'border-orange-400 ring-1 ring-orange-200' : ''}`}>
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div className="flex items-center gap-2">
@@ -305,6 +387,12 @@ const WizardEvaluacion: React.FC = () => {
                             {procContribution.includes(factor.key) && (
                               <span className="inline-flex items-center gap-0.5 mt-0.5 text-[9px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded leading-tight">
                                 <FileText size={10} /> Proc
+                              </span>
+                            )}
+                            {mf && (
+                              <span className={`inline-flex items-center gap-0.5 mt-0.5 text-[9px] font-bold px-1.5 py-0.5 rounded leading-tight border ${fuenteBadgeColor}`}>
+                                {mf.fuente_principal === 'mixta' ? <Sparkles size={10} /> : <FileText size={10} />}
+                                {fuenteLabel}
                               </span>
                             )}
                           </div>
@@ -325,6 +413,16 @@ const WizardEvaluacion: React.FC = () => {
                         </div>
                       )}
 
+                      {tieneContradiccion && (
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg px-3 py-2 text-xs text-orange-800 leading-relaxed mb-2 flex items-start gap-2">
+                          <AlertTriangle size={14} className="text-orange-500 shrink-0 mt-0.5" />
+                          <div>
+                            <span className="font-bold">Requiere validación manual — </span>
+                            {mf?.detalle_contradiccion || 'Contradicción detectada entre la evidencia documental y la entrevista.'}
+                          </div>
+                        </div>
+                      )}
+
                        {isEditing && (
                          <AdjustmentPanel 
                            factorKey={factor.key} 
@@ -334,7 +432,6 @@ const WizardEvaluacion: React.FC = () => {
                            onCancel={() => setEditingFactor(null)} 
                          />
                        )}
-
                     </div>
                   </div>
                 );

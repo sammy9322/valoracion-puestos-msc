@@ -1,7 +1,8 @@
 import dotenv from 'dotenv';
 dotenv.config();
 import { enrich as enrichProc } from './procedimientosService';
-import { contextualEvaluate, POINTS_MAP, CONTINUOUS_MAX, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult } from './contextualAnalyzer';
+import { contextualEvaluate, POINTS_MAP, CONTINUOUS_MAX, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
+import type { InterviewContext } from './interviewParser';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
@@ -53,7 +54,7 @@ function sanitizeInput(text: string): string {
     .trim();
 }
 
-function buildPrompt(puesto: any): string {
+function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
   const gradeTable = Object.entries({
     dificultad: [
       'Grado 1 (0 pts): Tareas simples y repetitivas, poca iniciativa.',
@@ -99,6 +100,25 @@ function buildPrompt(puesto: any): string {
     ]
   }).map(([factor, grades]) => `${FACTOR_NAMES[factor] || factor}:\n${grades.map(g => `  ${g}`).join('\n')}`).join('\n\n');
 
+  let interviewSection = '';
+  if (interviewCtx && interviewCtx.factores) {
+    const factoresConCitas = interviewCtx.factores.filter(f => f.citas.length > 0);
+    if (factoresConCitas.length > 0) {
+      interviewSection = `\n=== EVIDENCIA DE ENTREVISTA AL OCUPANTE ===\nA continuacion se presentan citas textuales extraidas de una entrevista al ocupante actual del puesto. Evalua si esta evidencia testimonial complementa, contradice o refuerza la descripcion documental.\n\n`;
+      for (const f of factoresConCitas) {
+        interviewSection += `Factor: ${f.factor}\n`;
+        interviewSection += `Resumen: ${f.resumen_entrevista}\n`;
+        for (const c of f.citas) {
+          interviewSection += `- Cita: "${c.cita_textual}" (${c.contexto}, relevancia: ${c.relevancia})\n`;
+        }
+        interviewSection += '\n';
+      }
+      if (interviewCtx.alertas.length > 0) {
+        interviewSection += `Alertas de la entrevista:\n${interviewCtx.alertas.map(a => `- ${a}`).join('\n')}\n\n`;
+      }
+    }
+  }
+
   return `
 Eres el EVALUADOR TECNICO OFICIAL del sistema de valoracion de puestos de la Municipalidad de San Carlos.
 Tu analisis es objetivo, vinculante y constituye un documento oficial con implicaciones administrativas y legales.
@@ -115,7 +135,7 @@ ${sanitizeInput(puesto.descripcion_funciones) || 'No especificadas'}
 === REQUISITOS DEL PUESTO ===
 Educacion requerida: ${sanitizeInput(puesto.educacion_requerida) || 'No especificada'}
 Experiencia requerida: ${sanitizeInput(puesto.experiencia_requerida) || 'No especificada'}
-
+${interviewSection}
 === ESCALA DE GRADOS POR FACTOR ===
 Cada factor se califica del 1 (minimo) al 5 (maximo).
 
@@ -130,7 +150,9 @@ Para CADA factor, realiza un analisis multidimensional:
 
 3. **Evidencia textual especifica**: Identifica y CITA textualmente las partes de la descripcion que demuestren el nivel del factor. La justificacion DEBE hacer referencia directa a fragmentos de las funciones, envolviendo SIEMPRE las citas exactas en comillas dobles ("..."). Si no usas comillas dobles, el reporte será rechazado.
 
-4. **Asignacion del grado**: Selecciona el grado que MEJOR refleje la totalidad de la evidencia. Si hay elementos de multiples grados, prevalece el nivel predominante descrito. Cada grado debe estar plenamente justificado con evidencia textual.
+4. **Analisis multifuente**: Si se proporciono evidencia de entrevista, COMPARA las citas testimoniales con la descripcion documental. Identifica si hay refuerzo, contradiccion o informacion nueva.
+
+5. **Asignacion del grado**: Selecciona el grado que MEJOR refleje la totalidad de la evidencia. Si hay elementos de multiples grados, prevalece el nivel predominante descrito. Cada grado debe estar plenamente justificado con evidencia textual.
 
 === INSTRUCCIONES CRITICAS ===
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
@@ -138,19 +160,59 @@ Para CADA factor, realiza un analisis multidimensional:
 - Cada justificacion debe tener entre 2 y 4 oraciones. Es OBLIGATORIO incluir al menos una cita textual exacta usando comillas dobles ("cita").
 - No justifiques con palabras sueltas; explica POR QUE ese fragmento demuestra el nivel asignado.
 - Si no hay evidencia clara, asigna el grado mas conservador (1).
+- Cuando exista evidencia de entrevista, incluye en la justificacion si la entrevista refuerza o contradice la evidencia documental.
 - Devuelve UNICAMENTE el objeto JSON, sin texto adicional ni codigo.
 
 === EJEMPLO DE JUSTIFICACION TECNICA ADECUADA ===
 "dificultad_just": "Las funciones describen que el puesto 'analiza y evalua informacion tecnica para la toma de decisiones departamentales', lo cual evidencia un nivel de analisis y juicio profesional (Grado 3). Adicionalmente, se menciona 'coordina la ejecucion de programas operativos', lo que requiere planificacion de alcance medio. No se identifican funciones de diseno estrategico o direccion institucional que justifiquen un nivel superior."
 
 === FORMATO JSON REQUERIDO ===
-{ "dificultad": <1-5>, "dificultad_just": "<justificacion tecnica>", "supervision": <1-5>, "supervision_just": "<justificacion tecnica>", "responsabilidad": <1-5>, "responsabilidad_just": "<justificacion tecnica>", "condiciones": <1-5>, "condiciones_just": "<justificacion tecnica>", "error": <1-5>, "error_just": "<justificacion tecnica>", "requisitos": <1-5>, "requisitos_just": "<justificacion tecnica>" }
+{
+  "dificultad": <1-5>,
+  "dificultad_just": "<justificacion tecnica>",
+  "dificultad_cita_documental": "<cita textual de las funciones>",
+  "dificultad_fuente": "documental|entrevista|mixta",
+  "dificultad_cita_entrevista": "<cita textual de la entrevista si aplica o ''>",
+
+  "supervision": <1-5>,
+  "supervision_just": "<justificacion tecnica>",
+  "supervision_cita_documental": "<cita textual>",
+  "supervision_fuente": "documental|entrevista|mixta",
+  "supervision_cita_entrevista": "<cita o ''>",
+
+  "responsabilidad": <1-5>,
+  "responsabilidad_just": "<justificacion tecnica>",
+  "responsabilidad_cita_documental": "<cita textual>",
+  "responsabilidad_fuente": "documental|entrevista|mixta",
+  "responsabilidad_cita_entrevista": "<cita o ''>",
+
+  "condiciones": <1-5>,
+  "condiciones_just": "<justificacion tecnica>",
+  "condiciones_cita_documental": "<cita textual>",
+  "condiciones_fuente": "documental|entrevista|mixta",
+  "condiciones_cita_entrevista": "<cita o ''>",
+
+  "error": <1-5>,
+  "error_just": "<justificacion tecnica>",
+  "error_cita_documental": "<cita textual>",
+  "error_fuente": "documental|entrevista|mixta",
+  "error_cita_entrevista": "<cita o ''>",
+
+  "requisitos": <1-5>,
+  "requisitos_just": "<justificacion tecnica>",
+  "requisitos_cita_documental": "<cita textual>",
+  "requisitos_fuente": "documental|entrevista|mixta",
+  "requisitos_cita_entrevista": "<cita o ''>",
+
+  "alertas_contradiccion": ["<alerta si hay contradiccion entre fuentes>"]
+}
 `;
 }
 
 function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' | 'rule-based' = 'llm'): AIEvaluationResult {
   const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
   const errors: string[] = [];
+  const analisis_multifuente: MultiFuenteEntry[] = [];
 
   for (const factor of FACTORS) {
     const grado = Number(suggestion[factor]);
@@ -163,6 +225,38 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
       errors.push(`${justKey}: justificacion muy corta o vacia`);
       suggestion[justKey] = suggestion[justKey] || 'Analisis basado en la descripcion de funciones del puesto.';
     }
+
+    // Extraer campos multifuente
+    const citaDocKey = `${factor}_cita_documental`;
+    const citaEntKey = `${factor}_cita_entrevista`;
+    const fuenteKey = `${factor}_fuente`;
+    const citaDocumental = suggestion[citaDocKey] || '';
+    const citaEntrevista = suggestion[citaEntKey] || '';
+    const fuentePrincipal: 'documental' | 'entrevista' | 'mixta' =
+      (['documental', 'entrevista', 'mixta'].includes(suggestion[fuenteKey]))
+        ? suggestion[fuenteKey]
+        : (citaEntrevista ? 'mixta' : 'documental');
+
+    // Detectar contradiccion: si hay cita de entrevista que contradice lo documental
+    const contradiccion = !!(citaEntrevista && citaDocumental && (
+      suggestion[`${factor}_contradiccion`] === true ||
+      suggestion[`${factor}_contradiccion`] === 'true'
+    ));
+
+    analisis_multifuente.push({
+      factor,
+      grado: Number(suggestion[factor]),
+      puntos: POINTS_MAP[factor][Number(suggestion[factor])] || 0,
+      justificacion_documental: suggestion[justKey] || '',
+      cita_documental: citaDocumental,
+      justificacion_entrevista: undefined,
+      cita_entrevista: citaEntrevista || undefined,
+      fuente_principal: fuentePrincipal,
+      contradiccion,
+      detalle_contradiccion: contradiccion
+        ? `La evidencia documental y la entrevista difieren en el factor ${factor}.`
+        : undefined
+    });
   }
 
   let totalPuntos = 0;
@@ -170,13 +264,20 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
     totalPuntos += POINTS_MAP[factor][suggestion[factor]];
   }
 
+  const alertasContradiccion: string[] = suggestion.alertas_contradiccion || [];
+  const alertaGlobal = alertasContradiccion.length > 0
+    ? `Se detectaron ${alertasContradiccion.length} alertas de contradiccion entre fuentes.`
+    : undefined;
+
   return {
     success: errors.length === 0,
     data: suggestion as EvaluationSuggestion,
     totalPuntos,
     puesto_id,
     analisis_completo: errors.length === 0,
-    motor
+    motor,
+    analisis_multifuente,
+    alerta_global: alertaGlobal
   };
 }
 
@@ -219,21 +320,24 @@ function calculateFactorPoints(data: EvaluationSuggestion): Record<string, numbe
 export const aiAgentService = {
     getEngineStatus,
 
-    async evaluate(puesto: any): Promise<AIEvaluationResult> {
+    async evaluate(puesto: any, interviewCtx?: InterviewContext): Promise<AIEvaluationResult> {
         const procCtx = await enrichProc(puesto).catch(() => null);
         const procText = procCtx ? procCtx.textoCompleto : undefined;
         let result: AIEvaluationResult;
         if (ollamaAvailable) {
           try {
-            const enrichedPuesto = procText
-              ? { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}` }
-              : puesto;
-            const prompt = buildPrompt(enrichedPuesto);
+            let funcionesConProcedimientos = puesto.descripcion_funciones;
+            if (procText) {
+              funcionesConProcedimientos = `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}`;
+            }
+            const enrichedPuesto = { ...puesto, descripcion_funciones: funcionesConProcedimientos };
+            const prompt = buildPrompt(enrichedPuesto, interviewCtx);
             const raw = await callOllama(prompt);
             result = validateAndCalculate(raw, puesto.id, 'llm');
             result.factorPoints = calculateFactorPoints(result.data);
             if (procCtx) result.procedimientosCount = procCtx.totalProcedimientos;
             result.buildVersion = BUILD_VERSION;
+            result.interviewContext = interviewCtx;
           } catch (error: any) {
             console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
             result = ruleBasedEvaluation(puesto, procCtx);

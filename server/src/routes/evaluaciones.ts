@@ -3,7 +3,10 @@ import prisma from '../db';
 import { aiAgentService, POINTS_MAP, BUILD_VERSION } from '../services/aiAgentService';
 import { generateEvaluationReport } from '../services/reportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
+import { parseEntrevistaMD } from '../services/interviewParser';
+import multer from 'multer';
 
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const router = Router();
 
 // POST Guardar nueva evaluación (Wizard — legacy)
@@ -88,8 +91,8 @@ router.post('/', async (req, res) => {
     }
 });
 
-// POST Evaluación automática con IA (nuevo flujo objetivo)
-router.post('/ai-evaluate', async (req, res) => {
+// POST Evaluación automática con IA (nuevo flujo objetivo + multifuente)
+router.post('/ai-evaluate', upload.single('plaudTranscript'), async (req, res) => {
     try {
         const { puesto_id } = req.body;
         if (!puesto_id) {
@@ -103,7 +106,15 @@ router.post('/ai-evaluate', async (req, res) => {
             return res.status(404).json({ error: 'Puesto no encontrado' });
         }
 
-        const result = await aiAgentService.evaluate(puesto);
+        // Si se subió un archivo de transcripción PLAUD, pre-procesarlo
+        let interviewCtx = undefined;
+        if (req.file) {
+            console.log(`[Routes] Archivo PLAUD recibido: ${req.file.originalname} (${req.file.size} bytes)`);
+            interviewCtx = await parseEntrevistaMD(req.file.buffer, { filename: req.file.originalname });
+            console.log(`[Routes] Entrevista pre-procesada: ${interviewCtx.entrevistado || 'sin nombre'} — ${interviewCtx.factores.filter(f => f.citas.length > 0).length} factores con citas`);
+        }
+
+        const result = await aiAgentService.evaluate(puesto, interviewCtx);
 
         let user = await prisma.user.findFirst();
         if (!user) {
@@ -150,7 +161,10 @@ router.post('/ai-evaluate', async (req, res) => {
                 justif_requisitos: result.data.requisitos_just || '',
 
                 puntos_totales: result.totalPuntos,
-                estado: 'borrador'
+                estado: 'borrador',
+
+                analisis_multifuente: (result.analisis_multifuente as any) || undefined,
+                alerta_global: result.alerta_global || undefined
             }
         });
 
@@ -173,7 +187,13 @@ router.post('/ai-evaluate', async (req, res) => {
                 registro_id: evaluacion.id,
                 accion: 'EVALUACION_IA',
                 datos_antes: JSON.stringify({ puesto_id: puesto.id, nombre: puesto.nombre }),
-                datos_despues: JSON.stringify({ evaluacion_id: evaluacion.id, total_puntos: result.totalPuntos, analisis: result.data }),
+                datos_despues: JSON.stringify({
+                    evaluacion_id: evaluacion.id,
+                    total_puntos: result.totalPuntos,
+                    analisis: result.data,
+                    analisis_multifuente: result.analisis_multifuente,
+                    alerta_global: result.alerta_global
+                }),
                 usuario_id: user.id,
                 timestamp: new Date()
             }
@@ -194,8 +214,13 @@ router.post('/ai-evaluate', async (req, res) => {
             factorPoints: result.factorPoints || {},
             procContribution: result.procContribution || [],
             motor: result.motor,
+            interviewContext: interviewCtx,
+            analisis_multifuente: result.analisis_multifuente,
+            alerta_global: result.alerta_global,
             debug: {
                 procedimientosEncontrados: result.procedimientosCount || 0,
+                entrevistaProcesada: !!interviewCtx,
+                contradiccionesDetectadas: result.analisis_multifuente?.filter(e => e.contradiccion).length || 0,
                 grados: {
                     dificultad: result.data.dificultad,
                     supervision: result.data.supervision,

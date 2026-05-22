@@ -95,6 +95,19 @@ export interface FactorKeywordDetail {
   factor: string; keywords: string[]; procKeywords: string[]; grado: number;
 }
 
+export interface MultiFuenteEntry {
+  factor: string;
+  grado: number;
+  puntos: number;
+  justificacion_documental: string;
+  cita_documental: string;
+  justificacion_entrevista?: string;
+  cita_entrevista?: string;
+  fuente_principal: 'documental' | 'entrevista' | 'mixta';
+  contradiccion: boolean;
+  detalle_contradiccion?: string;
+}
+
 export interface AIEvaluationResult {
   success: boolean;
   data: EvaluationSuggestion;
@@ -106,6 +119,9 @@ export interface AIEvaluationResult {
   factorPoints?: Record<string, number>;
   buildVersion?: string;
   procContribution?: string[];
+  interviewContext?: any;
+  analisis_multifuente?: MultiFuenteEntry[];
+  alerta_global?: string;
 }
 
 const VERB_LEXICON: Record<string, VerbClass> = {
