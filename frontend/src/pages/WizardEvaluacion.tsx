@@ -301,11 +301,17 @@ const WizardEvaluacion: React.FC = () => {
               <div
                 className={`border-2 border-dashed rounded-xl p-4 transition-all cursor-pointer ${plaudFile ? 'border-green-300 bg-green-50/50' : 'border-slate-200 hover:border-primary/30 bg-muted/20'}`}
                 onClick={() => fileInputRef.current?.click()}
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                    setPlaudFile(e.dataTransfer.files[0]);
+                  }
+                }}
               >
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept=".txt,text/plain"
                   hidden
                   onClick={e => e.stopPropagation()}
                   onChange={e => setPlaudFile(e.target.files?.[0] || null)}
