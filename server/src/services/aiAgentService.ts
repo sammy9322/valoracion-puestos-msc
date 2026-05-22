@@ -157,9 +157,9 @@ Para CADA factor, realiza un analisis multidimensional:
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
 - Cada grado debe ser un numero entero entre 1 y 5.
 - Cada justificacion debe tener entre 2 y 4 oraciones. Es OBLIGATORIO incluir al menos una cita textual exacta usando comillas dobles ("cita").
-- No justifiques con palabras sueltas; explica POR QUE ese fragmento demuestra el nivel asignado.
+- OBLIGATORIO MULTIFUENTE: Si existe EVIDENCIA DE ENTREVISTA para el factor, ESTAS OBLIGADO a cambiar el campo "_fuente" a "mixta" o "entrevista". ¡NUNCA uses "documental" si la entrevista aporto contexto!
+- OBLIGATORIO CITAS MIXTAS: Si usas "mixta", ESTAS OBLIGADO a llenar el campo "_cita_entrevista" con la cita textual de la entrevista y explicar en tu justificacion si la entrevista refuerza o contradice el documento.
 - Si no hay evidencia clara, asigna el grado mas conservador (1).
-- Cuando exista evidencia de entrevista, incluye en la justificacion si la entrevista refuerza o contradice la evidencia documental.
 - Devuelve UNICAMENTE el objeto JSON, sin texto adicional ni codigo.
 
 === EJEMPLO DE JUSTIFICACION TECNICA ADECUADA ===
