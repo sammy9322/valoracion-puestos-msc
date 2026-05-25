@@ -464,6 +464,17 @@ export function evalProcedimientos(procCtx:any):{ref:string[];acc:TaggedAccion[]
   return{ref,acc};
 }
 
+function determinarSeriePorNombre(nombre: string): string {
+  const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n)) return 'Jefatura';
+  if (/profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n)) return 'Profesional';
+  if (/tecnico|técnico|dibujante|soporte|inspector/i.test(n)) return 'Tecnica';
+  if (/policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) return 'Policia';
+  if (/auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) return 'Administrativa';
+  if (/operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) return 'Operativa';
+  return 'Operativa';
+}
+
 export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
   const fx=puesto.descripcion_funciones||'',ed=puesto.educacion_requerida||'';
   const pf=analizarTituloCompuesto(puesto.nombre||'',puesto.area||'');
@@ -490,6 +501,20 @@ export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
   let total=0;const fp:Record<string,number>={};
   for(const f of['dificultad','supervision','responsabilidad','condiciones','error','requisitos']){const g=res[f].grado;const pts=POINTS_MAP[f][g];total+=pts;fp[f]=pts;}
   const pc:string[]=pr.ref.length?['dificultad','responsabilidad']:[];
-  return{success:true,data,totalPuntos:total,puesto_id:puesto.id,analisis_completo:true,motor:'rule-based',procedimientosCount:procCtx?.totalProcedimientos||0,factorPoints:fp,buildVersion:'v12-contextual',procContribution:pc};
+
+  // Acotación de alerta global
+  const seriePuesto = determinarSeriePorNombre(puesto.nombre || '');
+  let maxPuntosPermitidos = 1000;
+  if (seriePuesto === 'Operativa') maxPuntosPermitidos = 355;
+  else if (seriePuesto === 'Administrativa') maxPuntosPermitidos = 355;
+  else if (seriePuesto === 'Policia') maxPuntosPermitidos = 345;
+  else if (seriePuesto === 'Tecnica') maxPuntosPermitidos = 390;
+  else if (seriePuesto === 'Profesional') maxPuntosPermitidos = 610;
+  else if (seriePuesto === 'Jefatura') maxPuntosPermitidos = 880;
+  let alerta_global = undefined;
+  if (total > maxPuntosPermitidos) {
+    alerta_global = `Advertencia de Acotación Jerárquica: Los puntos calculados (${total}) exceden la escala natural de la serie ${seriePuesto} (${maxPuntosPermitidos} pts). La clase se ha acotado en la visualización para mantener la coherencia organizativa.`;
+  }
+  return{success:true,data,totalPuntos:total,puesto_id:puesto.id,analisis_completo:true,motor:'rule-based',procedimientosCount:procCtx?.totalProcedimientos||0,factorPoints:fp,buildVersion:'v12-contextual',procContribution:pc,alerta_global};
 }
 

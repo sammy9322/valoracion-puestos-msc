@@ -230,7 +230,7 @@ const WizardEvaluacion: React.FC = () => {
 
   const totalMax = FACTORS_CONFIG.reduce((sum, f) => sum + f.points[5], 0);
   const porcentaje = totalMax > 0 ? Math.round((totalPuntos / totalMax) * 100) : 0;
-  const estrato = useMemo<EstratoResult | null>(() => getEstratoCompleto(totalPuntos), [totalPuntos]);
+  const estrato = useMemo<EstratoResult | null>(() => getEstratoCompleto(totalPuntos, puestoDetails?.nombre), [totalPuntos, puestoDetails?.nombre]);
 
   if (loading) {
     return <div className="p-20 text-center animate-pulse text-muted-foreground font-medium">Cargando catálogo de puestos...</div>;
@@ -367,6 +367,14 @@ const WizardEvaluacion: React.FC = () => {
                 <div className="bg-orange-50 border border-orange-200 rounded-xl p-3 flex items-start gap-2 text-xs text-orange-800">
                   <AlertTriangle size={15} className="text-orange-500 shrink-0 mt-0.5" />
                   <span className="font-medium">{alertaGlobal}</span>
+                </div>
+              )}
+              {estrato && puestoDetails && totalPuntos > estrato.clase.puntos && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2 text-xs text-blue-800 animate-in fade-in duration-300">
+                  <Info size={15} className="text-blue-500 shrink-0 mt-0.5" />
+                  <span className="font-medium">
+                    <strong>Acotación Jerárquica Activa:</strong> Por la naturaleza organizativa del puesto ({estrato.clase.serie}), la clase de valoración se ha acotado automáticamente al estrato máximo permitido (<strong>{estrato.clase.nombre}</strong> con {estrato.clase.puntos} pts) para resguardar la coherencia jerárquica municipal, previniendo ascensos indebidos a escalas profesionales o de jefatura.
+                  </span>
                 </div>
               )}
 

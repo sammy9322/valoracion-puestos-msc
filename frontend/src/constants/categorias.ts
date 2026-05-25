@@ -51,21 +51,70 @@ export const ESTRATOS_MUNICIPALES: ClaseMunicipal[] = [
   { nombre: 'Profesional Jefe 5 (Prohib.)', puntos: 880, serie: 'Jefatura', color: 'bg-rose-50 border-rose-200 text-rose-700' },
   ];
 
+export function determinarSeriePorNombre(nombre: string): string {
+  const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n)) {
+    return 'Jefatura';
+  }
+  if (/profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n)) {
+    return 'Profesional';
+  }
+  if (/tecnico|técnico|dibujante|soporte|inspector/i.test(n)) {
+    return 'Tecnica';
+  }
+  if (/policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) {
+    return 'Policia';
+  }
+  if (/auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) {
+    return 'Administrativa';
+  }
+  if (/operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) {
+    return 'Operativa';
+  }
+  return 'Operativa'; // Conservador por defecto
+}
+
 /**
- * Encuentra el estrato mas cercano por puntaje sin excederlo.
- * Prefiere clases sin "(Prohib.)" cuando hay empate.
+ * Encuentra el estrato más cercano por puntaje sin excederlo y aplicando la acotación de serie.
  */
-export const getEstratoSugerido = (puntos: number): ClaseMunicipal | null => {
-      if (!puntos) return null;
+export const getEstratoSugerido = (puntos: number, nombrePuesto?: string): ClaseMunicipal | null => {
+  if (!puntos) return null;
 
-      const candidatos = [...ESTRATOS_MUNICIPALES]
-          .filter(e => e.puntos <= puntos)
-          .sort((a, b) => {
-            if (b.puntos !== a.puntos) return b.puntos - a.puntos;
-            return a.nombre.includes('(Prohib.)') ? 1 : -1;
-          });
+  let seriePermitida: string | null = null;
+  if (nombrePuesto) {
+    seriePermitida = determinarSeriePorNombre(nombrePuesto);
+  }
 
-      return candidatos.length > 0 ? candidatos[0] : null;
+  let candidatos = [...ESTRATOS_MUNICIPALES];
+
+  if (seriePermitida) {
+    const ordenSeries = ['Operativa', 'Administrativa', 'Policia', 'Tecnica', 'Profesional', 'Jefatura'];
+    const indexPermitido = ordenSeries.indexOf(seriePermitida);
+    // Filtrar para no permitir clases que pertenezcan a series de jerarquía superior
+    candidatos = candidatos.filter(e => {
+      const idx = ordenSeries.indexOf(e.serie);
+      return idx <= indexPermitido;
+    });
+  }
+
+  const filtered = candidatos
+    .filter(e => e.puntos <= puntos)
+    .sort((a, b) => {
+      if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+      return a.nombre.includes('(Prohib.)') ? 1 : -1;
+    });
+
+  if (filtered.length > 0) {
+    return filtered[0];
+  }
+
+  // Si no hay clases con puntaje inferior al asignado, devolvemos la clase base de la serie permitida
+  if (seriePermitida) {
+    const claseMinima = ESTRATOS_MUNICIPALES.find(e => e.serie === seriePermitida);
+    if (claseMinima) return claseMinima;
+  }
+
+  return candidatos.length > 0 ? candidatos[0] : null;
 };
 
 export type EstratoResult = {
@@ -74,8 +123,8 @@ export type EstratoResult = {
   alternativaNoProhibida: ClaseMunicipal | null;
 };
 
-export function getEstratoCompleto(puntos: number): EstratoResult | null {
-  const clase = getEstratoSugerido(puntos);
+export function getEstratoCompleto(puntos: number, nombrePuesto?: string): EstratoResult | null {
+  const clase = getEstratoSugerido(puntos, nombrePuesto);
   if (!clase) return null;
   return {
     clase,

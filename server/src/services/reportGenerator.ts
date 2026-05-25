@@ -130,13 +130,60 @@ const ESTRATOS_MUNICIPALES = [
   { nombre: 'Profesional Jefe 5 (Prohib.)', puntos: 880, serie: 'Jefatura' },
 ];
 
-function getClaseSugerida(puntos: number): { nombre: string; serie: string } | null {
-  const np = ESTRATOS_MUNICIPALES
+function determinarSeriePorNombre(nombre: string): string {
+  const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  if (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n)) {
+    return 'Jefatura';
+  }
+  if (/profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n)) {
+    return 'Profesional';
+  }
+  if (/tecnico|técnico|dibujante|soporte|inspector/i.test(n)) {
+    return 'Tecnica';
+  }
+  if (/policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) {
+    return 'Policia';
+  }
+  if (/auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) {
+    return 'Administrativa';
+  }
+  if (/operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) {
+    return 'Operativa';
+  }
+  return 'Operativa';
+}
+
+function getClaseSugerida(puntos: number, nombrePuesto?: string): { nombre: string; serie: string } | null {
+  let seriePermitida: string | null = null;
+  if (nombrePuesto) {
+    seriePermitida = determinarSeriePorNombre(nombrePuesto);
+  }
+
+  let candidatos = [...ESTRATOS_MUNICIPALES];
+
+  if (seriePermitida) {
+    const ordenSeries = ['Operativa', 'Administrativa', 'Policia', 'Tecnica', 'Profesional', 'Jefatura'];
+    const indexPermitido = ordenSeries.indexOf(seriePermitida);
+    candidatos = candidatos.filter(e => {
+      const idx = ordenSeries.indexOf(e.serie);
+      return idx <= indexPermitido;
+    });
+  }
+
+  const np = candidatos
     .filter(e => e.puntos <= puntos && !e.nombre.includes('(Prohib.)'))
     .sort((a, b) => b.puntos - a.puntos);
   if (np.length) return np[0];
-  const pr = ESTRATOS_MUNICIPALES.filter(e => e.puntos <= puntos).sort((a, b) => b.puntos - a.puntos);
-  return pr[0] || null;
+
+  const pr = candidatos.filter(e => e.puntos <= puntos).sort((a, b) => b.puntos - a.puntos);
+  if (pr.length) return pr[0];
+
+  if (seriePermitida) {
+    const claseMinima = ESTRATOS_MUNICIPALES.find(e => e.serie === seriePermitida);
+    if (claseMinima) return claseMinima;
+  }
+
+  return ESTRATOS_MUNICIPALES.length > 0 ? ESTRATOS_MUNICIPALES[0] : null;
 }
 
 class ReportGenerator {
@@ -762,7 +809,7 @@ class ReportGenerator {
     this.addSectionTitle('6. Conclusión y Dictamen Técnico');
     
     const pct = Math.round((totalPuntos / 1000) * 100);
-    const clase = getClaseSugerida(totalPuntos);
+    const clase = getClaseSugerida(totalPuntos, evaluacion.puesto?.nombre);
     
     let cat = '', desc = '';
     if (pct <= 20) {
