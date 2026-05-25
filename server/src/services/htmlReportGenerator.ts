@@ -1,25 +1,19 @@
 import type { ProcedimientosContext } from './procedimientosService';
 import { extraerAcciones, evalProcedimientos, TaggedAccion } from './contextualAnalyzer';
-
-const ESTRATOS = [
-  { min: 0, max: 150, nombre: 'Operativo Básico' },
-  { min: 151, max: 300, nombre: 'Operativo Calificado' },
-  { min: 301, max: 450, nombre: 'Técnico Básico' },
-  { min: 451, max: 600, nombre: 'Técnico Especializado' },
-  { min: 601, max: 750, nombre: 'Profesional Básico' },
-  { min: 751, max: 850, nombre: 'Profesional Avanzado' },
-  { min: 851, max: 1000, nombre: 'Directivo / Jefatura' }
-];
-
-function getEstrato(pts: number) {
-  return ESTRATOS.find(e => pts >= e.min && pts <= e.max) || ESTRATOS[ESTRATOS.length - 1];
-}
+import { getClaseSugerida } from './reportGenerator';
 
 export function generateHtmlReport(evaluacion: any, procedimientos?: ProcedimientosContext): string {
   const puesto = evaluacion.puesto || {};
   const totalPuntos = evaluacion.puntos_totales || 0;
   const proc = procedimientos || evaluacion._procedimientos;
-  const clase = getEstrato(totalPuntos);
+  
+  // Resolver la clase exacta según el Manual de Clases y Metodología MSC
+  const sugerida = getClaseSugerida(totalPuntos, puesto.nombre, puesto.educacion_requerida, puesto.codigo_clase_msc);
+  const clase = {
+    nombre: sugerida ? sugerida.nombre : 'No determinada',
+    serie: sugerida ? sugerida.serie : 'General'
+  };
+
   const dateStr = evaluacion.fecha_evaluacion ? new Date(evaluacion.fecha_evaluacion).toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' }) : new Date().toLocaleDateString('es-CR', { year: 'numeric', month: 'long', day: 'numeric' });
   const hash = Buffer.from(dateStr).toString('hex').slice(0, 24).toUpperCase();
   const buildVersion = evaluacion.buildVersion || 'v12-contextual';
@@ -36,7 +30,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Informe de Valoración - ${puesto.nombre || 'Puesto'}</title>
+  <title>Valoración de puestos mediante metodología por puntos - ${puesto.nombre || 'Puesto'}</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @media print {
@@ -69,7 +63,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
       <!-- Cabecera Institucional -->
       <div class="flex justify-between items-start mb-12">
         <div>
-          <h1 class="text-3xl font-black text-gray-900 tracking-tight uppercase">Informe Oficial de Valoración Salarial</h1>
+          <h1 class="text-3xl font-black text-gray-900 tracking-tight uppercase">Valoración de puestos mediante metodología por puntos</h1>
           <p class="text-blue-600 font-semibold mt-1 uppercase tracking-widest text-sm">Municipalidad de San Carlos</p>
         </div>
         <div class="text-right text-xs text-gray-500 font-mono">
@@ -96,7 +90,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
           </div>
           <div>
             <p class="text-xs text-gray-500 uppercase">Motor de Evaluación</p>
-            <p class="font-medium text-gray-800">${!evaluacion.motor || evaluacion.motor === 'rule-based' ? 'Motor de Reglas Contextuales MSC' : 'Agente de IA (Ollama)'}</p>
+            <p class="font-medium text-gray-800">${!evaluacion.motor || evaluacion.motor === 'rule-based' ? 'Motor de Reglas Contextuales MSC' : 'Agente de IA (Google Gemini API)'}</p>
           </div>
         </div>
       </div>
@@ -142,14 +136,48 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
       <div class="mb-8">
         <h2 class="text-xs uppercase tracking-widest text-gray-400 font-bold mb-3">2. Metodología Aplicada</h2>
         <p class="text-sm text-gray-600 leading-relaxed text-justify">
-          La valoración técnica se efectuó mediante el Manual de Clases y Metodología de Puntos por Factores oficial de la Municipalidad de San Carlos. Se evaluaron seis factores clave con base en la naturaleza sustantiva de las tareas, jerarquía, autonomía y complejidad.
+          La valoración técnica se efectuó mediante el Manual de Clases y Metodología de Puntos por Factores oficial de la Municipalidad de San Carlos. Esta metodología pondera seis factores clave acumulando un máximo de 1000 puntos: Dificultad de Funciones (200 pts máx.), Supervisión Ejercida (150 pts máx.), Responsabilidad por Activos, Valores y Datos (200 pts máx.), Condiciones de Trabajo (100 pts máx.), Consecuencia de los Errores (150 pts máx.), y Requisitos Formativos y de Experiencia (200 pts máx.). El cálculo se fundamenta en un análisis técnico cruzado de tres fuentes de información: la Ficha Oficial de Puestos, la Entrevista al Ocupante y la inyección transaccional de los Procedimientos Operativos del departamento desde Supabase, garantizando la máxima objetividad, trazabilidad y consistencia jerárquica.
         </p>
       </div>
+
+      <!-- Análisis de Contradicciones y Discrepancias Técnicas -->
+      ${(() => {
+        const contradicciones = (evaluacion.analisis_multifuente || []).filter((m: any) => m.contradiccion);
+        if (contradicciones.length === 0) return '';
+        return `
+        <div class="mb-8 avoid-break border-l-4 border-amber-500 bg-amber-50/50 p-6 rounded-r-xl border border-gray-200 shadow-sm">
+          <h2 class="text-xs uppercase tracking-widest text-amber-800 font-bold mb-3">3. Análisis de Discrepancias y Contradicciones de Fuentes</h2>
+          <p class="text-sm text-gray-700 leading-relaxed mb-4 text-justify">
+            Se identificaron ${contradicciones.length} discrepancias sustantivas entre la Ficha Oficial del Puesto y la realidad operativa capturada en la entrevista o en los flujos procedimentales. A continuación, se detalla la resolución técnica adoptada para cada factor:
+          </p>
+          <div class="space-y-4">
+            ${contradicciones.map((c: any) => `
+              <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <h4 class="text-xs font-bold text-gray-800 uppercase mb-2 tracking-wide">${c.factor} (Grado Sugerido: ${c.grado})</h4>
+                <div class="grid grid-cols-2 gap-4 text-xs mb-3">
+                  <div class="bg-blue-50/30 p-2.5 rounded border border-blue-100">
+                    <p class="font-bold text-blue-800 uppercase mb-1">Evidencia Documental (Ficha)</p>
+                    <p class="text-blue-900 italic">"${c.cita_documental || 'No especificada'}"</p>
+                  </div>
+                  <div class="bg-purple-50/30 p-2.5 rounded border border-purple-100">
+                    <p class="font-bold text-purple-800 uppercase mb-1">Evidencia Testimonial (Entrevista)</p>
+                    <p class="text-purple-900 italic">"${c.cita_entrevista || 'No especificada'}"</p>
+                  </div>
+                </div>
+                <p class="text-xs text-gray-600 leading-relaxed text-justify">
+                  <strong>Resolución Metodológica:</strong> ${c.justificacion_documental}
+                </p>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+        `;
+      })()}
     </div>
 
     <!-- SALTO DE PÁGINA PARA EL DETALLE -->
     <div class="page-break p-12">
-      <h2 class="text-xl font-black text-gray-900 uppercase mb-6">3. Desglose de Evaluación por Factores</h2>
+      <h2 class="text-xl font-black text-gray-900 uppercase mb-6">4. Desglose de Evaluación por Factores</h2>
       
       <div class="space-y-10">
         ${evaluacion.factores?.map((f: any) => {
@@ -198,7 +226,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
     <!-- SALTO DE PÁGINA PARA FIRMAS -->
     <div class="page-break p-12 flex flex-col justify-between h-full">
       <div>
-        <h2 class="text-xl font-black text-gray-900 uppercase mb-6">4. Dictamen Técnico y Recomendaciones</h2>
+        <h2 class="text-xl font-black text-gray-900 uppercase mb-6">5. Dictamen Técnico y Recomendaciones</h2>
         <p class="text-sm text-gray-700 leading-relaxed text-justify mb-6">
           Conforme al análisis técnico de las funciones descritas y la metodología oficial de Puntos por Factores, 
           el puesto obtiene una valoración de <strong>${totalPuntos} puntos</strong>, dictaminando su clasificación en la clase <strong>${clase.nombre}</strong>. 

@@ -96,7 +96,7 @@ function getGradeColor(gr: number): string {
   return '#8b5cf6'; // Purple / Directivo
 }
 
-const ESTRATOS_MUNICIPALES = [
+export const ESTRATOS_MUNICIPALES = [
   { nombre: 'Operativo Municipal 1', puntos: 140, serie: 'Operativa' },
   { nombre: 'Operativo Municipal 2', puntos: 170, serie: 'Operativa' },
   { nombre: 'Operativo Municipal 3', puntos: 210, serie: 'Operativa' },
@@ -130,7 +130,7 @@ const ESTRATOS_MUNICIPALES = [
   { nombre: 'Profesional Jefe 5 (Prohib.)', puntos: 880, serie: 'Jefatura' },
 ];
 
-function determinarSerie(nombre: string, educacion?: string, claseMsc?: string): string {
+export function determinarSerie(nombre: string, educacion?: string, claseMsc?: string): string {
   const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const ed = (educacion || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const cl = (claseMsc || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -180,7 +180,7 @@ function determinarSerie(nombre: string, educacion?: string, claseMsc?: string):
   return 'Operativa'; // Conservador por defecto
 }
 
-function getClaseSugerida(puntos: number, nombrePuesto?: string, educacionPuesto?: string, claseMsc?: string): { nombre: string; serie: string } | null {
+export function getClaseSugerida(puntos: number, nombrePuesto?: string, educacionPuesto?: string, claseMsc?: string): { nombre: string; serie: string } | null {
   let seriePermitida: string | null = null;
   if (nombrePuesto) {
     seriePermitida = determinarSerie(nombrePuesto, educacionPuesto, claseMsc);
@@ -278,7 +278,7 @@ class ReportGenerator {
     this.doc.fontSize(7.5).font('Helvetica-Bold').fillColor('#ffffff');
     const labelW = 180;
     this.doc.fillColor(C.accent).roundedRect(PW / 2 - labelW / 2, cy + 8, labelW, 22, 4).fill();
-    this.doc.fillColor('#ffffff').text('INFORME OFICIAL DE VALORACIÓN SALARIAL', PW / 2, cy + 14, { align: 'center', width: labelW - 10 });
+    this.doc.fillColor('#ffffff').text('VALORACIÓN DE PUESTOS', PW / 2, cy + 14, { align: 'center', width: labelW - 10 });
 
     // Spacer
     this.y = cy + 60;
@@ -307,7 +307,7 @@ class ReportGenerator {
     // Bottom info
     this.doc.fontSize(7.5).font('Helvetica-Oblique').fillColor('#94a3b8');
     this.doc.text('Documento generado electrónicamente por el Sistema Integral de RRHH', PW / 2, PH - 60, { align: 'center' });
-    this.doc.text('Metodología MSC — Puntos por Factores', PW / 2, PH - 48, { align: 'center' });
+    this.doc.text('Metodología de Puntos por Factores — Municipalidad de San Carlos', PW / 2, PH - 48, { align: 'center' });
 
     this.doc.addPage();
     this.y = MG;
@@ -457,7 +457,7 @@ class ReportGenerator {
   }
 
   private addProcedimientosBlock(procedimientos: ProcedimientosContext): void {
-    this.addSectionTitle('3. Contexto Operativo (Procedimientos Asociados)');
+    this.addSectionTitle('4. Contexto Operativo (Procedimientos Asociados)');
     
     this.checkPage(20);
     this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
@@ -704,7 +704,7 @@ class ReportGenerator {
   }
 
   private addFactorDetail(evaluacion: any, allAcc: TaggedAccion[]): void {
-    this.addSectionTitle('5. Detalle Técnico y Fundamentación por Factor');
+    this.addSectionTitle('6. Detalle Técnico y Fundamentación por Factor');
     
     for (const factor of FACTORS) {
       const d = FACTOR_DISPLAY[factor];
@@ -833,7 +833,7 @@ class ReportGenerator {
   }
 
   private addConclusionHero(evaluacion: any, totalPuntos: number): void {
-    this.addSectionTitle('6. Conclusión y Dictamen Técnico');
+    this.addSectionTitle('7. Conclusión y Dictamen Técnico');
     
     const pct = Math.round((totalPuntos / 1000) * 100);
     const clase = getClaseSugerida(totalPuntos, evaluacion.puesto?.nombre, evaluacion.puesto?.educacion_requerida, evaluacion.puesto?.codigo_clase_msc);
@@ -910,7 +910,7 @@ class ReportGenerator {
     this.doc.text('RESOLUCIÓN Y DICTAMEN TÉCNICO', MG, this.y);
     this.y += 10;
 
-    const motorTexto = !evaluacion.motor || evaluacion.motor === 'rule-based' ? 'el motor de reglas contextuales v12' : 'el agente de inteligencia artificial';
+    const motorTexto = !evaluacion.motor || evaluacion.motor === 'rule-based' ? 'el motor de reglas contextuales v12' : 'el agente de inteligencia artificial (Google Gemini API)';
     const dtxt = `Conforme al análisis técnico de las funciones descritas y la metodología oficial de Puntos por Factores de la Municipalidad de San Carlos, el puesto "${evaluacion.puesto?.nombre || ''}" obtiene una valoración de ${totalPuntos} puntos. Con base en esta puntuación objetiva y auditable, se dictamina su clasificación en la clase "${clase?.nombre || 'No determinada'}" (Serie ${clase?.serie || 'General'}). La valoración fue ejecutada de forma sistemática por ${motorTexto}, garantizando total objetividad, trazabilidad y cumplimiento normativo.`;
     
     this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
@@ -994,7 +994,7 @@ class ReportGenerator {
 
     const motorText = !evaluacion.motor || evaluacion.motor === 'rule-based'
       ? 'Motor de Reglas Contextuales (MSC)'
-      : 'Agente Evaluador IA (Ollama)';
+      : 'Agente de IA (Google Gemini API)';
 
     this.addCoverPage(puesto);
 
@@ -1009,19 +1009,75 @@ class ReportGenerator {
 
     this.addFunctionsCard('Descripción Detallada de Funciones Evaluadas', puesto.descripcion_funciones);
     
-    this.addSectionTitle('2. Resumen Metodológico MSC');
-    const metText = 'La valoración técnica de la plaza se efectuó mediante el Manual de Clases y Metodología de Puntos por Factores oficial de la Municipalidad de San Carlos. Se evalúan seis factores clave ponderados: Dificultad de las Funciones (200 pts máx.), Supervisión Ejercida (150 pts máx.), Responsabilidad por Activos, Valores y Datos (200 pts máx.), Condiciones de Trabajo (100 pts máx.), Consecuencia y Trascendencia de los Errores (150 pts máx.), y Requisitos Formativos y de Experiencia (200 pts máx.). La escala total acumula un máximo de 1000 puntos. El análisis evalúa la naturaleza sustantiva de las tareas, la jerarquía institucional, la autonomía de acción y los pisos mínimos del área del puesto.';
+    this.addSectionTitle('2. Metodología Aplicada: Puntos por Factores');
+    const metText1 = 'La valoración técnica del puesto se realizó conforme al Manual de Clases y la Metodología Oficial de Puntos por Factores de la Municipalidad de San Carlos. Esta metodología asigna puntuaciones objetivas a seis factores compensables cuyo peso relativo refleja la complejidad funcional, jerárquica y de riesgo de cada plaza:';
     const metOpts = { width: CW, align: 'justify' as const, lineGap: 3.5 };
-    const mh = this.doc.heightOfString(metText, metOpts);
     this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
-    this.doc.text(metText, MG, this.y, metOpts);
-    this.y += mh + 15;
+    const mh1 = this.doc.heightOfString(metText1, metOpts);
+    this.doc.text(metText1, MG, this.y, metOpts);
+    this.y += mh1 + 8;
+
+    // Factor table mini
+    const factorList = [
+      '• Factor 1 — Dificultad de las Funciones: evalúa la complejidad, variedad y naturaleza analítica de las tareas (máx. 200 pts).',
+      '• Factor 2 — Supervisión Ejercida: mide el nivel de autoridad jerárquica y la amplitud del control de personal (máx. 150 pts).',
+      '• Factor 3 — Responsabilidad por Activos, Valores y Datos: pondera la custodia de recursos institucionales, financieros e informativos (máx. 200 pts).',
+      '• Factor 4 — Condiciones de Trabajo: considera la exposición a riesgos físicos, ambientales o ergonómicos (máx. 100 pts).',
+      '• Factor 5 — Consecuencia y Trascendencia del Error: evalúa el impacto institucional de errores en la ejecución de funciones (máx. 150 pts).',
+      '• Factor 6 — Requisitos Formativos y de Experiencia: califica la educación formal, certificaciones y experiencia necesaria (máx. 200 pts).'
+    ];
+    this.doc.fontSize(8.5).font('Helvetica').fillColor(C.text);
+    for (const fl of factorList) {
+      const flh = this.doc.heightOfString(fl, { width: CW - 10, lineGap: 2 });
+      this.checkPage(flh + 4);
+      this.doc.text(fl, MG + 10, this.y, { width: CW - 10, lineGap: 2 });
+      this.y += flh + 3;
+    }
+    this.y += 6;
+
+    // Source synthesis
+    const metText2 = 'Escala total: 1000 puntos. La evaluación sintetiza tres fuentes de información para cada factor: (1) la Ficha Descriptiva del puesto registrada en el sistema, (2) los datos recopilados en la Entrevista de Valoración al ocupante o jefatura inmediata, y (3) los Procedimientos Institucionales registrados en Supabase donde el puesto participa activamente. Esta triangulación garantiza que la puntuación no dependa de una sola fuente, aumentando la objetividad y auditabilidad del resultado.';
+    this.doc.fontSize(9.5).font('Helvetica').fillColor(C.text);
+    const mh2 = this.doc.heightOfString(metText2, metOpts);
+    this.checkPage(mh2 + 10);
+    this.doc.text(metText2, MG, this.y, metOpts);
+    this.y += mh2 + 15;
+
+    // 3. Discrepancy analysis (if contradictions detected)
+    const multifuente = evaluacion.analisis_multifuente || [];
+    const contradicciones = multifuente.filter((a: any) => a.tipo === 'contradiccion');
+    if (contradicciones.length > 0) {
+      this.addSectionTitle('3. Análisis de Contradicciones y Discrepancias Técnicas');
+      this.doc.fontSize(9).font('Helvetica-Oblique').fillColor(C.muted);
+      const introDisc = 'Durante la triangulación de fuentes se detectaron las siguientes discrepancias entre la Ficha Descriptiva, la Entrevista de Valoración y/o los Procedimientos Institucionales. Estas contradicciones fueron tomadas en cuenta para la ponderación final de cada factor afectado.';
+      const idh = this.doc.heightOfString(introDisc, { width: CW, lineGap: 3 });
+      this.doc.text(introDisc, MG, this.y, { width: CW, lineGap: 3 });
+      this.y += idh + 10;
+
+      for (const c of contradicciones) {
+        this.checkPage(60);
+        // Discrepancy card
+        const cardH = 50;
+        this.doc.fillColor('#fef3c7').roundedRect(MG + 5, this.y, CW - 10, cardH, 4).fill();
+        this.doc.fillColor('#d97706').roundedRect(MG + 5, this.y, 3, cardH, 1.5).fill();
+        
+        this.doc.fillColor('#92400e').fontSize(8.5).font('Helvetica-Bold');
+        this.doc.text(`⚠ Factor: ${c.factor || 'General'}`, MG + 15, this.y + 8, { width: CW - 30 });
+        
+        this.doc.fillColor('#78350f').fontSize(8).font('Helvetica');
+        const descText = c.detalle || c.descripcion || 'Discrepancia detectada entre fuentes.';
+        this.doc.text(descText, MG + 15, this.y + 22, { width: CW - 30, lineGap: 2 });
+        
+        this.y += cardH + 8;
+      }
+      this.y += 10;
+    }
 
     if (procedimientos) {
       this.addProcedimientosBlock(procedimientos);
     }
     
-    this.addSectionTitle('4. Resumen Grafico de Puntuacion por Factor');
+    this.addSectionTitle('5. Resumen Gráfico de Puntuación por Factor');
     this.addFactorsTable(evaluacion);
     
     const fx = puesto.descripcion_funciones || '';
