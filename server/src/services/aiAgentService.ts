@@ -66,46 +66,46 @@ function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
 
   const gradeTable = Object.entries({
     dificultad: [
-      'Grado 1 (0 pts): Tareas simples y repetitivas, poca iniciativa.',
-      'Grado 2 (40 pts): Tareas variadas pero estandarizadas.',
-      'Grado 3 (80 pts): Requiere analisis y juicio para resolver problemas tecnicos.',
-      'Grado 4 (120 pts): Alta complejidad, planeacion y coordinacion institucional.',
-      'Grado 5 (160 pts): Direccion estrategica y toma de decisiones criticas.'
+      'Grado 1 (40 pts): Tareas simples y repetitivas, poca iniciativa.',
+      'Grado 2 (80 pts): Tareas variadas pero estandarizadas.',
+      'Grado 3 (120 pts): Requiere analisis y juicio para resolver problemas tecnicos.',
+      'Grado 4 (160 pts): Alta complejidad, planeacion y coordinacion institucional.',
+      'Grado 5 (200 pts): Direccion estrategica y toma de decisiones criticas.'
     ],
     supervision: [
-      'Grado 1 (0 pts): No ejerce supervision.',
-      'Grado 2 (30 pts): Supervision ocasional de tareas simples.',
-      'Grado 3 (60 pts): Supervision de un grupo de trabajo operativo.',
-      'Grado 4 (90 pts): Jefatura de una unidad o departamento.',
-      'Grado 5 (120 pts): Direccion de un area tecnica o administrativa mayor.'
+      'Grado 1 (30 pts): No ejerce supervision.',
+      'Grado 2 (60 pts): Supervision ocasional de tareas simples.',
+      'Grado 3 (90 pts): Supervision de un grupo de trabajo operativo.',
+      'Grado 4 (120 pts): Jefatura de una unidad o departamento.',
+      'Grado 5 (150 pts): Direccion de un area tecnica o administrativa mayor.'
     ],
     responsabilidad: [
-      'Grado 1 (0 pts): Baja responsabilidad por valores o equipo.',
-      'Grado 2 (40 pts): Responsabilidad moderada por materiales y herramientas.',
-      'Grado 3 (80 pts): Custodia de informacion sensible o fondos fijos.',
-      'Grado 4 (120 pts): Responsabilidad por presupuestos o activos de alto valor.',
-      'Grado 5 (160 pts): Responsabilidad total por la gestion de un proceso clave.'
+      'Grado 1 (40 pts): Baja responsabilidad por valores o equipo.',
+      'Grado 2 (80 pts): Responsabilidad moderada por materiales y herramientas.',
+      'Grado 3 (120 pts): Custodia de informacion sensible o fondos fijos.',
+      'Grado 4 (160 pts): Responsabilidad por presupuestos o activos de alto valor.',
+      'Grado 5 (200 pts): Responsabilidad total por la gestion de un proceso clave.'
     ],
     condiciones: [
-      'Grado 1 (0 pts): Ambiente de oficina normal, riesgos minimos.',
-      'Grado 2 (20 pts): Esfuerzo fisico moderado o ambiente algo incomodo.',
-      'Grado 3 (40 pts): Exposicion a condiciones climaticas o ruido constante.',
-      'Grado 4 (60 pts): Riesgo de accidentes laborales o manejo de quimicos.',
-      'Grado 5 (80 pts): Condiciones de alta peligrosidad o insalubridad constante.'
+      'Grado 1 (20 pts): Ambiente de oficina normal, riesgos minimos.',
+      'Grado 2 (40 pts): Esfuerzo fisico moderado o ambiente algo incomodo.',
+      'Grado 3 (60 pts): Exposicion a condiciones climaticas o ruido constante.',
+      'Grado 4 (80 pts): Riesgo de accidentes laborales o manejo de quimicos.',
+      'Grado 5 (100 pts): Condiciones de alta peligrosidad o insalubridad constante.'
     ],
     error: [
-      'Grado 1 (0 pts): Error facil de detectar y corregir.',
-      'Grado 2 (30 pts): Error causa retrasos menores en el flujo de trabajo.',
-      'Grado 3 (60 pts): Error afecta a otros departamentos o al servicio al cliente.',
-      'Grado 4 (90 pts): Error causa perdidas economicas o legales significativas.',
-      'Grado 5 (120 pts): Error compromete la estabilidad institucional o seguridad publica.'
+      'Grado 1 (30 pts): Error facil de detectar y corregir.',
+      'Grado 2 (60 pts): Error causa retrasos menores en el flujo de trabajo.',
+      'Grado 3 (90 pts): Error afecta a otros departamentos o al servicio al cliente.',
+      'Grado 4 (120 pts): Error causa perdidas economicas o legales significativas.',
+      'Grado 5 (150 pts): Error compromete la estabilidad institucional o seguridad publica.'
     ],
     requisitos: [
-      'Grado 1 (0 pts): Educacion basica o primaria.',
-      'Grado 2 (40 pts): Bachillerato en Educacion Media o Tecnico basico.',
-      'Grado 3 (80 pts): Diplomado o Tecnico superior especializado.',
-      'Grado 4 (120 pts): Bachillerato Universitario o Licenciatura profesional.',
-      'Grado 5 (160 pts): Grado de Maestria o especializacion avanzada requerida.'
+      'Grado 1 (40 pts): Educacion basica o primaria.',
+      'Grado 2 (80 pts): Bachillerato en Educacion Media o Tecnico basico.',
+      'Grado 3 (120 pts): Diplomado o Tecnico superior especializado.',
+      'Grado 4 (160 pts): Bachillerato Universitario o Licenciatura profesional.',
+      'Grado 5 (200 pts): Grado de Maestria o especializacion avanzada requerida.'
     ]
   }).map(([factor, grades]) => `${FACTOR_NAMES[factor] || factor}:\n${grades.map(g => `  ${g}`).join('\n')}`).join('\n\n');
 

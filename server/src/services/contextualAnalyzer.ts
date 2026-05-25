@@ -132,6 +132,7 @@ const VERB_LEXICON: Record<string, VerbClass> = {
   operar:{cat:'ejecucion',base:2},tramitar:{cat:'ejecucion',base:2},llenar:{cat:'ejecucion',base:2},
   registrar:{cat:'ejecucion',base:2},recibir:{cat:'ejecucion',base:2},enviar:{cat:'ejecucion',base:2},
   atender:{cat:'ejecucion',base:2},asistir:{cat:'ejecucion',base:2},apoyar:{cat:'ejecucion',base:2},
+  colaborar:{cat:'ejecucion',base:2},prestar:{cat:'ejecucion',base:2},participar:{cat:'ejecucion',base:2},
   analizar:{cat:'analisis',base:3},auditar:{cat:'analisis',base:3},fiscalizar:{cat:'analisis',base:3},controlar:{cat:'analisis',base:3},vigilar:{cat:'analisis',base:3},evaluar:{cat:'analisis',base:3},diagnosticar:{cat:'analisis',base:3},
   inspeccionar:{cat:'analisis',base:3},revisar:{cat:'analisis',base:3},verificar:{cat:'analisis',base:3},
   supervisar:{cat:'analisis',base:3},coordinar:{cat:'analisis',base:3},resolver:{cat:'analisis',base:3},
@@ -195,19 +196,29 @@ function frases(t:string):string[]{
 }
 
 export function extraerAcciones(texto:string):Accion[]{
-  const n=norm(texto); const r:Accion[]=[]; const seen=new Set<string>();
+  const r:Accion[]=[]; const seen=new Set<string>();
   const verbKeys=Object.keys(VERB_LEXICON);
-  const V=new RegExp(`\\b(${verbKeys.join('|')})\\s+(?:a|de|al|la|el|los|las|un|una|del|en|por|su|sus|este|esta|estos|estas)\\s+((?:[a-z]+\\s+(?:de|del|de\\s+la|de\\s+los|de\\s+las|en|para|por|con|sin|bajo|mediante)\\s+)*[a-z]{3,50}?)(?=\\s*(?:,|;|\\.|$|para|con\\s+(?:el\\s+)?fin|mediante|segun|as[ií]|o\\s+bien))`,'gi');
-  // Pattern 2: "responsable de + objeto"
-  const R=/responsable\s+(?:de\s+|del?\s+)((?:[a-z]+\s+(?:de|del|de\s+la|de\s+los|de\s+las|en|para|por)\s+)*[a-z]{3,50}?)(?=\s*(?:,|;|\.|$))/gi;
-  // Pattern 3: "encargado de + objeto"
-  const E=/encargad[oa]\s+(?:de\s+|del?\s+)((?:[a-z]+\s+(?:de|del|de\s+la|de\s+los|de\s+las|en|para|por)\s+)*[a-z]{3,50}?)(?=\s*(?:,|;|\.|$))/gi;
-  for(const s of frases(n)){
-    for(const re of[V,R,E]){
-      re.lastIndex=0;let m;
-      while((m=re.exec(s))!==null){
-        const vb=m[1]||'',ob=(m[2]||m[1]||'').trim().replace(/\s{2,}/g,' '),key=`${vb}:${ob.slice(0,30)}`;
-        if(!seen.has(key)&&vb.length>2&&ob.length>3){seen.add(key);r.push({verbo:vb,verboNorm:vb,objeto:ob,oracion:s});}
+
+  // Regex en español optimizado para extraer Verbo + Preposición (opcional) + Objeto
+  const V=new RegExp(`\\b(${verbKeys.join('|')})\\b\\s+(?:(?:a|de|al|la|el|los|las|un|una|del|en|por|su|sus|este|esta|estos|estas|para|con|sin|bajo|mediante|sobre)\\s+)?([a-z0-9\\s]{3,100})`,'i');
+  // Segmentar oraciones ANTES de normalizar (para que los puntos y saltos de línea delimiten bien)
+  const sentences = frases(texto);
+  for(const s of sentences) {
+    const sNorm = norm(s);
+    V.lastIndex = 0;
+    let m = V.exec(sNorm);
+    if (m) {
+      const vb = m[1].toLowerCase();
+      const ob = m[2].trim();
+      const key = `${vb}:${ob.slice(0,30)}`;
+      if (!seen.has(key) && vb.length > 2 && ob.length > 3) {
+        seen.add(key);
+        r.push({
+          verbo: m[1],
+          verboNorm: vb,
+          objeto: ob,
+          oracion: s // Preserva la oración original legible
+        });
       }
     }
   }
