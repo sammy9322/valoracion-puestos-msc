@@ -51,38 +51,65 @@ export const ESTRATOS_MUNICIPALES: ClaseMunicipal[] = [
   { nombre: 'Profesional Jefe 5 (Prohib.)', puntos: 880, serie: 'Jefatura', color: 'bg-rose-50 border-rose-200 text-rose-700' },
   ];
 
-export function determinarSeriePorNombre(nombre: string): string {
+export function determinarSerie(nombre: string, educacion?: string, claseMsc?: string): string {
   const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n)) {
+  const ed = (educacion || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const cl = (claseMsc || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // 1. Jefatura (debe excluir estrictamente asistentes/auxiliares)
+  if (/jefe|jefatura|director|gerente|subdirector|coordinador|encargado/i.test(cl) || 
+      (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n) && !/asistente|auxiliar/i.test(n))) {
+    if (/asistente|auxiliar/i.test(n)) {
+      return 'Profesional'; // Cae a profesional si requiere educación profesional
+    }
     return 'Jefatura';
   }
-  if (/profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n)) {
+
+  // 2. Profesional (según educación académica o clase explícita de la ficha)
+  if (/profesional/i.test(cl) || 
+      /profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n) ||
+      /bachiller\s+universitario|licenciatura|grado\s+universitario|universitario|licenciado|maestria|postgrado|especializacion/i.test(ed)) {
     return 'Profesional';
   }
-  if (/tecnico|técnico|dibujante|soporte|inspector/i.test(n)) {
+
+  // 3. Técnica
+  if (/tecnico|técnico/i.test(cl) || 
+      /tecnico|técnico|dibujante|soporte|inspector/i.test(n) || 
+      /diplomado|tecnico\s+superior/i.test(ed) ||
+      /tecnico/i.test(ed)) {
     return 'Tecnica';
   }
-  if (/policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) {
+
+  // 4. Policía
+  if (/policia|policía/i.test(cl) || 
+      /policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) {
     return 'Policia';
   }
-  if (/auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) {
+
+  // 5. Administrativa
+  if (/administrativo|auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero/i.test(cl) || 
+      /auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) {
     return 'Administrativa';
   }
-  if (/operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) {
+
+  // 6. Operativa
+  if (/operativo|operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero/i.test(cl) || 
+      /operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) {
     return 'Operativa';
   }
+
   return 'Operativa'; // Conservador por defecto
 }
 
 /**
  * Encuentra el estrato más cercano por puntaje sin excederlo y aplicando la acotación de serie.
  */
-export const getEstratoSugerido = (puntos: number, nombrePuesto?: string): ClaseMunicipal | null => {
+export const getEstratoSugerido = (puntos: number, nombrePuesto?: string, claseMsc?: string, educacion?: string): ClaseMunicipal | null => {
   if (!puntos) return null;
 
   let seriePermitida: string | null = null;
   if (nombrePuesto) {
-    seriePermitida = determinarSeriePorNombre(nombrePuesto);
+    seriePermitida = determinarSerie(nombrePuesto, educacion, claseMsc);
   }
 
   let candidatos = [...ESTRATOS_MUNICIPALES];
@@ -123,8 +150,8 @@ export type EstratoResult = {
   alternativaNoProhibida: ClaseMunicipal | null;
 };
 
-export function getEstratoCompleto(puntos: number, nombrePuesto?: string): EstratoResult | null {
-  const clase = getEstratoSugerido(puntos, nombrePuesto);
+export function getEstratoCompleto(puntos: number, nombrePuesto?: string, claseMsc?: string, educacion?: string): EstratoResult | null {
+  const clase = getEstratoSugerido(puntos, nombrePuesto, claseMsc, educacion);
   if (!clase) return null;
   return {
     clase,

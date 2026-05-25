@@ -472,18 +472,57 @@ export function evalProcedimientos(procCtx:any):{ref:string[];acc:TaggedAccion[]
     const tagged = ex.map(a => ({...a, fuente: 'procedimiento' as const, procCodigo: f.codigo, procNombre: f.nombre}));
     acc.push(...tagged);
   }
-  return{ref,acc};
+  return {ref, acc};
 }
 
-function determinarSeriePorNombre(nombre: string): string {
+export function determinarSerie(nombre: string, educacion?: string, claseMsc?: string): string {
   const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n)) return 'Jefatura';
-  if (/profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n)) return 'Profesional';
-  if (/tecnico|técnico|dibujante|soporte|inspector/i.test(n)) return 'Tecnica';
-  if (/policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) return 'Policia';
-  if (/auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) return 'Administrativa';
-  if (/operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) return 'Operativa';
-  return 'Operativa';
+  const ed = (educacion || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const cl = (claseMsc || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // 1. Jefatura (debe excluir estrictamente asistentes/auxiliares)
+  if (/jefe|jefatura|director|gerente|subdirector|coordinador|encargado/i.test(cl) || 
+      (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n) && !/asistente|auxiliar/i.test(n))) {
+    if (/asistente|auxiliar/i.test(n)) {
+      return 'Profesional'; // Cae a profesional si requiere educación profesional
+    }
+    return 'Jefatura';
+  }
+
+  // 2. Profesional (según educación académica o clase explícita de la ficha)
+  if (/profesional/i.test(cl) || 
+      /profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n) ||
+      /bachiller\s+universitario|licenciatura|grado\s+universitario|universitario|licenciado|maestria|postgrado|especializacion/i.test(ed)) {
+    return 'Profesional';
+  }
+
+  // 3. Técnica
+  if (/tecnico|técnico/i.test(cl) || 
+      /tecnico|técnico|dibujante|soporte|inspector/i.test(n) || 
+      /diplomado|tecnico\s+superior/i.test(ed) ||
+      /tecnico/i.test(ed)) {
+    return 'Tecnica';
+  }
+
+  // 4. Policía
+  if (/policia|policía/i.test(cl) || 
+      /policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) {
+    return 'Policia';
+  }
+
+  // 5. Administrativa
+  if (/administrativo|auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero/i.test(cl) || 
+      /auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) {
+    return 'Administrativa';
+  }
+
+  // 6. Operativa
+  if (/operativo|operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero/i.test(cl) || 
+      /operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) {
+    return 'Operativa';
+  }
+
+  return 'Operativa'; // Conservador por defecto
 }
 
 export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
@@ -514,7 +553,7 @@ export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
   const pc:string[]=pr.ref.length?['dificultad','responsabilidad']:[];
 
   // Acotación de alerta global
-  const seriePuesto = determinarSeriePorNombre(puesto.nombre || '');
+  const seriePuesto = determinarSerie(puesto.nombre || '', ed, puesto.codigo_clase_msc);
   let maxPuntosPermitidos = 1000;
   if (seriePuesto === 'Operativa') maxPuntosPermitidos = 355;
   else if (seriePuesto === 'Administrativa') maxPuntosPermitidos = 355;

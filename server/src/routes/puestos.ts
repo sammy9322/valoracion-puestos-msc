@@ -75,6 +75,7 @@ router.post('/', async (req, res) => {
                 descripcion_funciones: data.descripcion_funciones,
                 educacion_requerida: data.educacion_requerida,
                 experiencia_requerida: data.experiencia_requerida,
+                codigo_clase_msc: data.estrato, // Mapeo de estrato a codigo_clase_msc
                 es_puesto_clave: data.es_puesto_clave || false,
                 estado: 'borrador'
             }
@@ -84,6 +85,32 @@ router.post('/', async (req, res) => {
     catch (error) {
         console.error(error);
         res.status(500).json({ error: 'Error al crear la ficha de puesto' });
+    }
+});
+
+// PUT Update Puesto
+router.put('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const data = req.body;
+        const actualizado = await prisma.puesto.update({
+            where: { id },
+            data: {
+                nombre: data.nombre,
+                area: data.area,
+                reporta_a: data.reporta_a,
+                descripcion_funciones: data.descripcion_funciones,
+                educacion_requerida: data.educacion_requerida,
+                experiencia_requerida: data.experiencia_requerida,
+                codigo_clase_msc: data.estrato, // Mapeo de estrato a codigo_clase_msc
+                es_puesto_clave: data.es_puesto_clave !== undefined ? data.es_puesto_clave : undefined
+            }
+        });
+        res.json(actualizado);
+    }
+    catch (error) {
+        console.error(error);
+        res.status(500).json({ error: 'Error al actualizar la ficha de puesto' });
     }
 });
 

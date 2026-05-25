@@ -43,27 +43,7 @@ function sanitizeInput(text: string): string {
     .trim();
 }
 
-function determinarSeriePorNombre(nombre: string): string {
-  const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n)) return 'Jefatura';
-  if (/profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n)) return 'Profesional';
-  if (/tecnico|técnico|dibujante|soporte|inspector/i.test(n)) return 'Tecnica';
-  if (/policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) return 'Policia';
-  if (/auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) return 'Administrativa';
-  if (/operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) return 'Operativa';
-  return 'Operativa';
-}
-
 function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
-  const seriePuesto = determinarSeriePorNombre(puesto.nombre || '');
-  let limitePuntosText = '';
-  if (seriePuesto === 'Operativa') limitePuntosText = 'MÁXIMO 355 PUNTOS (Serie Operativa). Tienes estrictamente prohibido superar este puntaje total. Ajusta los grados de factores para que la suma total sea menor o igual a 355 puntos.';
-  else if (seriePuesto === 'Administrativa') limitePuntosText = 'MÁXIMO 355 PUNTOS (Serie Administrativa). Tienes estrictamente prohibido superar este puntaje total. Ajusta los grados de factores para que la suma total sea menor o igual a 355 puntos.';
-  else if (seriePuesto === 'Policia') limitePuntosText = 'MÁXIMO 345 PUNTOS (Serie Policía). Tienes estrictamente prohibido superar este puntaje total. Ajusta los grados de factores para que la suma total sea menor o igual a 345 puntos.';
-  else if (seriePuesto === 'Tecnica') limitePuntosText = 'MÁXIMO 390 PUNTOS (Serie Técnica). Tienes estrictamente prohibido superar este puntaje total. Ajusta los grados de factores para que la suma total sea menor o igual a 390 puntos.';
-  else if (seriePuesto === 'Profesional') limitePuntosText = 'MÁXIMO 610 PUNTOS (Serie Profesional). Tienes estrictamente prohibido superar este puntaje total. Ajusta los grados de factores para que la suma total sea menor o igual a 610 puntos.';
-  else if (seriePuesto === 'Jefatura') limitePuntosText = 'MÁXIMO 880 PUNTOS (Serie Jefatura). Ajusta los grados de factores para que la suma total sea menor o igual a 880 puntos.';
-
   const gradeTable = Object.entries({
     dificultad: [
       'Grado 1 (40 pts): Tareas simples y repetitivas, poca iniciativa.',
@@ -131,12 +111,6 @@ function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
 Eres el EVALUADOR TECNICO OFICIAL del sistema de valoracion de puestos de la Municipalidad de San Carlos.
 Tu analisis es objetivo, vinculante y constituye un documento oficial con implicaciones administrativas y legales.
 Debes basarte en la descripcion de funciones, requisitos del puesto y la EVIDENCIA DE ENTREVISTA (si fue proporcionada), aplicando la metodologia MSC (Manual de Clases) de Puntos por Factores con rigor tecnico y profesional.
-
-=== CONTEXTO DE SERIE Y ACOTACIÓN JERÁRQUICA ===
-El puesto bajo análisis pertenece a la serie: ${seriePuesto.toUpperCase()}.
-Para resguardar el orden jerárquico de la Municipalidad, tienes la instrucción ineludible de evaluar este puesto de acuerdo a los límites de su serie natural:
-- Límite de la Serie del Puesto: ${limitePuntosText}
-¡IMPORTANTE! Si asignas grados muy altos que hagan que la puntuación total supere el límite de su serie, el puesto se clasificaría incorrectamente en una serie superior (ej: un operario como profesional o jefe), lo cual es ilegal y metodológicamente inválido. Por ende, debes sopesar con rigor los factores y acotar racionalmente los grados hacia abajo para que el total acumulado respete este límite físico.
 
 === DATOS DEL PUESTO A EVALUAR ===
 Nombre del puesto: ${sanitizeInput(puesto.nombre) || 'No especificado'}

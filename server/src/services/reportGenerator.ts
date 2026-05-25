@@ -130,33 +130,60 @@ const ESTRATOS_MUNICIPALES = [
   { nombre: 'Profesional Jefe 5 (Prohib.)', puntos: 880, serie: 'Jefatura' },
 ];
 
-function determinarSeriePorNombre(nombre: string): string {
+function determinarSerie(nombre: string, educacion?: string, claseMsc?: string): string {
   const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
-  if (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n)) {
+  const ed = (educacion || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  const cl = (claseMsc || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+
+  // 1. Jefatura (debe excluir estrictamente asistentes/auxiliares)
+  if (/jefe|jefatura|director|gerente|subdirector|coordinador|encargado/i.test(cl) || 
+      (/director|gerente|subdirector|jefe|jefatura|coordinador|encargado/i.test(n) && !/asistente|auxiliar/i.test(n))) {
+    if (/asistente|auxiliar/i.test(n)) {
+      return 'Profesional'; // Cae a profesional si requiere educación profesional
+    }
     return 'Jefatura';
   }
-  if (/profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n)) {
+
+  // 2. Profesional (según educación académica o clase explícita de la ficha)
+  if (/profesional/i.test(cl) || 
+      /profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista/i.test(n) ||
+      /bachiller\s+universitario|licenciatura|grado\s+universitario|universitario|licenciado|maestria|postgrado|especializacion/i.test(ed)) {
     return 'Profesional';
   }
-  if (/tecnico|técnico|dibujante|soporte|inspector/i.test(n)) {
+
+  // 3. Técnica
+  if (/tecnico|técnico/i.test(cl) || 
+      /tecnico|técnico|dibujante|soporte|inspector/i.test(n) || 
+      /diplomado|tecnico\s+superior/i.test(ed) ||
+      /tecnico/i.test(ed)) {
     return 'Tecnica';
   }
-  if (/policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) {
+
+  // 4. Policía
+  if (/policia|policía/i.test(cl) || 
+      /policia|policía|seguridad|vigilante|guardia|transito|tránsito/i.test(n)) {
     return 'Policia';
   }
-  if (/auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) {
+
+  // 5. Administrativa
+  if (/administrativo|auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero/i.test(cl) || 
+      /auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo/i.test(n)) {
     return 'Administrativa';
   }
-  if (/operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) {
+
+  // 6. Operativa
+  if (/operativo|operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero/i.test(cl) || 
+      /operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea/i.test(n)) {
     return 'Operativa';
   }
-  return 'Operativa';
+
+  return 'Operativa'; // Conservador por defecto
 }
 
-function getClaseSugerida(puntos: number, nombrePuesto?: string): { nombre: string; serie: string } | null {
+function getClaseSugerida(puntos: number, nombrePuesto?: string, educacionPuesto?: string, claseMsc?: string): { nombre: string; serie: string } | null {
   let seriePermitida: string | null = null;
   if (nombrePuesto) {
-    seriePermitida = determinarSeriePorNombre(nombrePuesto);
+    seriePermitida = determinarSerie(nombrePuesto, educacionPuesto, claseMsc);
   }
 
   let candidatos = [...ESTRATOS_MUNICIPALES];
@@ -809,7 +836,7 @@ class ReportGenerator {
     this.addSectionTitle('6. Conclusión y Dictamen Técnico');
     
     const pct = Math.round((totalPuntos / 1000) * 100);
-    const clase = getClaseSugerida(totalPuntos, evaluacion.puesto?.nombre);
+    const clase = getClaseSugerida(totalPuntos, evaluacion.puesto?.nombre, evaluacion.puesto?.educacion_requerida, evaluacion.puesto?.codigo_clase_msc);
     
     let cat = '', desc = '';
     if (pct <= 20) {

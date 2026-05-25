@@ -230,7 +230,7 @@ const WizardEvaluacion: React.FC = () => {
 
   const totalMax = FACTORS_CONFIG.reduce((sum, f) => sum + f.points[5], 0);
   const porcentaje = totalMax > 0 ? Math.round((totalPuntos / totalMax) * 100) : 0;
-  const estrato = useMemo<EstratoResult | null>(() => getEstratoCompleto(totalPuntos, puestoDetails?.nombre), [totalPuntos, puestoDetails?.nombre]);
+  const estrato = useMemo<EstratoResult | null>(() => getEstratoCompleto(totalPuntos, puestoDetails?.nombre, puestoDetails?.codigo_clase_msc, puestoDetails?.educacion_requerida), [totalPuntos, puestoDetails?.nombre, puestoDetails?.codigo_clase_msc, puestoDetails?.educacion_requerida]);
 
   if (loading) {
     return <div className="p-20 text-center animate-pulse text-muted-foreground font-medium">Cargando catálogo de puestos...</div>;
