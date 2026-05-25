@@ -2,10 +2,18 @@ import pdf from 'pdf-parse';
 import mammoth from 'mammoth';
 import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  process.env.VITE_SUPABASE_URL || '',
-  process.env.VITE_SUPABASE_ANON_KEY || ''
-);
+const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
+const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
+
+let client: ReturnType<typeof createClient> | null = null;
+
+function getClient() {
+  if (!client) {
+    if (!supabaseUrl || !supabaseKey) return null;
+    client = createClient(supabaseUrl, supabaseKey);
+  }
+  return client;
+}
 
 export interface CargoParsed {
   nombre: string;
@@ -176,11 +184,14 @@ export async function parseManual(file: Buffer, filename: string): Promise<Manua
   } else throw new Error(`Formato no soportado: ${ext}. Use PDF o DOCX.`);
   
   let officialCargos: any[] = [];
-  try {
-    const { data } = await supabase.from('v_catalogo_puestos').select('*');
-    if (data) officialCargos = data;
-  } catch (err) {
-    console.error('Error al obtener catálogo oficial de Supabase:', err);
+  const db: any = getClient();
+  if (db) {
+    try {
+      const { data } = await db.from('v_catalogo_puestos').select('*');
+      if (data) officialCargos = data;
+    } catch (err) {
+      console.error('Error al obtener catálogo oficial de Supabase:', err);
+    }
   }
 
   const manualResult = parseText(text, officialCargos);
@@ -224,20 +235,18 @@ export async function parseManual(file: Buffer, filename: string): Promise<Manua
         });
       });
 
-      // 2. Enriquecimiento Oficial (Senior Architect / Database Architect)
-      // Extraemos los detalles técnicos directamente de Supabase para los vinculados
-      if (linkedCargoNames.size > 0) {
+      if (linkedCargoNames.size > 0 && db) {
         try {
           console.log(`[Enriquecedor] Obteniendo detalles oficiales para ${linkedCargoNames.size} cargos...`);
           
           // Fetch masivo de funciones y requisitos
           const [resCargos, resClases] = await Promise.all([
-            supabase.from('cargos_puesto').select('nombre, funciones').in('nombre', Array.from(linkedCargoNames)),
-            supabase.from('clases_puesto').select('nombre, naturaleza, estrato, detalle').in('nombre', Array.from(linkedClaseNames))
+            db.from('cargos_puesto').select('nombre, funciones').in('nombre', Array.from(linkedCargoNames)),
+            db.from('clases_puesto').select('nombre, naturaleza, estrato, detalle').in('nombre', Array.from(linkedClaseNames))
           ]);
 
-          const mapCargos = new Map(resCargos.data?.map(c => [clean(c.nombre), c]) || []);
-          const mapClases = new Map(resClases.data?.map(c => [clean(c.nombre), c]) || []);
+          const mapCargos = new Map<string, any>((resCargos.data as any[])?.map((c: any) => [clean(c.nombre), c]) || []);
+          const mapClases = new Map<string, any>((resClases.data as any[])?.map((c: any) => [clean(c.nombre), c]) || []);
 
           manualResult.clases.forEach(clase => {
             const officialClase = mapClases.get(clean(clase.nombre_clase));
