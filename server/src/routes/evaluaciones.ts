@@ -11,13 +11,7 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const router = Router();
 
 async function saveEvaluacion(data: any) {
-  try {
-    return await prisma.evaluacion.create({ data });
-  } catch (_dbErr: any) {
-    console.warn('[Evaluacion] Fallback save without multifuente columns:', _dbErr.message);
-    const { analisis_multifuente, alerta_global, ...safeData } = data;
-    return await prisma.evaluacion.create({ data: safeData });
-  }
+  return await prisma.evaluacion.create({ data });
 }
 
 // POST Guardar nueva evaluación (Wizard — legacy)
@@ -171,10 +165,7 @@ router.post('/ai-evaluate', upload.single('plaudTranscript'), async (req, res) =
             justif_requisitos: result.data.requisitos_just || '',
 
             puntos_totales: result.totalPuntos,
-            estado: 'borrador',
-
-            analisis_multifuente: (result.analisis_multifuente as any) || undefined,
-            alerta_global: result.alerta_global || undefined
+            estado: 'borrador'
         });
 
         // Store motor/buildVersion via typed Prisma API
