@@ -14,16 +14,18 @@ async function saveEvaluacion(data: any) {
   try {
     return await prisma.evaluacion.create({ data });
   } catch (e: any) {
-    console.warn('[Evaluacion] create failed, trying with raw SQL:', e.message);
+    console.warn('[Evaluacion] create failed, falling back to raw SQL:', e.message);
     const safeKeys = Object.keys(data).filter(k =>
       !['analisis_multifuente', 'alerta_global', 'motor', 'buildVersion'].includes(k)
     );
-    const values = safeKeys.map(k => data[k]);
-    const placeholders = safeKeys.map((_, i) => `$${i + 1}`).join(', ');
-    const cols = safeKeys.map(c => `"${c}"`).join(', ');
+    const id = require('crypto').randomUUID();
+    const allKeys = ['id', ...safeKeys];
+    const allValues = [id, ...safeKeys.map(k => data[k])];
+    const placeholders = allKeys.map((_, i) => `$${i + 1}`).join(', ');
+    const cols = allKeys.map(c => `"${c}"`).join(', ');
     const rows: any = await prisma.$queryRawUnsafe(
       `INSERT INTO "Evaluacion" (${cols}) VALUES (${placeholders}) RETURNING *`,
-      ...values
+      ...allValues
     );
     return rows?.[0] as any;
   }
