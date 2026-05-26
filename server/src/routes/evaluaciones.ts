@@ -10,6 +10,27 @@ import multer from 'multer';
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const router = Router();
 
+async function saveEvaluacion(data: any) {
+  try {
+    return await prisma.evaluacion.create({ data });
+  } catch (e: any) {
+    console.warn('[Evaluacion] create failed, falling back to raw SQL:', e.message);
+    const safeKeys = Object.keys(data).filter(k =>
+      !['analisis_multifuente', 'alerta_global', 'motor', 'buildVersion'].includes(k)
+    );
+    const id = require('crypto').randomUUID();
+    const allKeys = ['id', ...safeKeys];
+    const allValues = [id, ...safeKeys.map(k => data[k])];
+    const placeholders = allKeys.map((_, i) => `$${i + 1}`).join(', ');
+    const cols = allKeys.map(c => `"${c}"`).join(', ');
+    const rows: any = await prisma.$queryRawUnsafe(
+      `INSERT INTO "Evaluacion" (${cols}) VALUES (${placeholders}) RETURNING *`,
+      ...allValues
+    );
+    return rows?.[0] as any;
+  }
+}
+
 // POST Guardar nueva evaluación (Wizard — legacy)
 router.post('/', async (req, res) => {
     try {
@@ -50,7 +71,7 @@ router.post('/', async (req, res) => {
 
                 grado_responsabilidad: Number(data.responsabilidad),
                 puntos_responsabilidad: POINTS_MAP.responsabilidad[data.responsabilidad],
-                justif_responsabilidad: data.resp_just || '',
+                justif_responsabilidad: data.responsabilidad_just || '',
 
                 grado_condiciones: Number(data.condiciones),
                 puntos_condiciones: POINTS_MAP.condiciones[data.condiciones],
@@ -65,7 +86,7 @@ router.post('/', async (req, res) => {
                 justif_requisitos: data.requisitos_just || '',
 
                 puntos_totales: calculatedPoints,
-                estado: 'aprobada'
+                estado: 'borrador'
             }
         });
 
@@ -131,42 +152,37 @@ router.post('/ai-evaluate', upload.single('plaudTranscript'), async (req, res) =
 
         const fp = (k: string) => result.factorPoints?.[k] ?? (POINTS_MAP as any)[k][(result.data as any)[k]];
 
-        const evaluacion = await prisma.evaluacion.create({
-            data: {
-                puesto_id: puesto.id,
-                periodo: new Date().getFullYear().toString(),
-                evaluador_id: user.id,
+        const evaluacion = await saveEvaluacion({
+            puesto_id: puesto.id,
+            periodo: new Date().getFullYear().toString(),
+            evaluador_id: user.id,
 
-                grado_dificultad: Number(result.data.dificultad),
-                puntos_dificultad: fp('dificultad'),
-                justif_dificultad: result.data.dificultad_just || '',
+            grado_dificultad: Number(result.data.dificultad),
+            puntos_dificultad: fp('dificultad'),
+            justif_dificultad: result.data.dificultad_just || '',
 
-                grado_supervision: Number(result.data.supervision),
-                puntos_supervision: fp('supervision'),
-                justif_supervision: result.data.supervision_just || '',
+            grado_supervision: Number(result.data.supervision),
+            puntos_supervision: fp('supervision'),
+            justif_supervision: result.data.supervision_just || '',
 
-                grado_responsabilidad: Number(result.data.responsabilidad),
-                puntos_responsabilidad: fp('responsabilidad'),
-                justif_responsabilidad: result.data.responsabilidad_just || '',
+            grado_responsabilidad: Number(result.data.responsabilidad),
+            puntos_responsabilidad: fp('responsabilidad'),
+            justif_responsabilidad: result.data.responsabilidad_just || '',
 
-                grado_condiciones: Number(result.data.condiciones),
-                puntos_condiciones: fp('condiciones'),
-                justif_condiciones: result.data.condiciones_just || '',
+            grado_condiciones: Number(result.data.condiciones),
+            puntos_condiciones: fp('condiciones'),
+            justif_condiciones: result.data.condiciones_just || '',
 
-                grado_consecuencia_error: Number(result.data.error),
-                puntos_consecuencia_error: fp('error'),
-                justif_consecuencia_error: result.data.error_just || '',
+            grado_consecuencia_error: Number(result.data.error),
+            puntos_consecuencia_error: fp('error'),
+            justif_consecuencia_error: result.data.error_just || '',
 
-                grado_requisitos: Number(result.data.requisitos),
-                puntos_requisitos: fp('requisitos'),
-                justif_requisitos: result.data.requisitos_just || '',
+            grado_requisitos: Number(result.data.requisitos),
+            puntos_requisitos: fp('requisitos'),
+            justif_requisitos: result.data.requisitos_just || '',
 
-                puntos_totales: result.totalPuntos,
-                estado: 'borrador',
-
-                analisis_multifuente: (result.analisis_multifuente as any) || undefined,
-                alerta_global: result.alerta_global || undefined
-            }
+            puntos_totales: result.totalPuntos,
+            estado: 'borrador'
         });
 
         // Store motor/buildVersion via typed Prisma API
