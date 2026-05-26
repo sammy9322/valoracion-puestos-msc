@@ -7,7 +7,7 @@ import type { InterviewContext } from './interviewParser';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
-export const BUILD_VERSION = 'v12-contextual';
+export const BUILD_VERSION = 'v13-ensemble-temp0';
 
 let ollamaAvailable = true;
 
@@ -267,16 +267,62 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
   };
 }
 
-async function callOllama(prompt: string): Promise<any> {
+async function callGemini(prompt: string, temperature: number = 0): Promise<any> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-2.5-flash', generationConfig: { responseMimeType: 'application/json' } });
+  const model = genAI.getGenerativeModel({
+    model: 'gemini-2.5-flash',
+    generationConfig: { responseMimeType: 'application/json', temperature }
+  });
   const result = await model.generateContent(prompt);
   const jsonText = result.response.text();
   const match = jsonText.match(/\{[\s\S]*\}/);
   const cleanJson = match ? match[0] : jsonText;
   return JSON.parse(cleanJson);
+}
+
+async function callOllama(prompt: string): Promise<any> {
+  const ENSEMBLE_CALLS = 3;
+  const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
+  const results: any[] = [];
+
+  for (let i = 0; i < ENSEMBLE_CALLS; i++) {
+    try {
+      if (i > 0) await new Promise(r => setTimeout(r, 500));
+      const raw = await callGemini(prompt);
+      for (const f of FACTORS) {
+        if (!raw[f] || raw[f] < 1 || raw[f] > 5) raw[f] = 1;
+      }
+      results.push(raw);
+    } catch {
+      continue;
+    }
+  }
+
+  if (results.length === 0) {
+    throw new Error('All ensemble calls to Gemini failed');
+  }
+
+  if (results.length === 1) {
+    console.warn('[AI Service] Solo 1/3 ensemble calls tuvieron éxito');
+    return results[0];
+  }
+
+  const modeResult: Record<string, number> = {};
+  for (const f of FACTORS) {
+    const grados = results.map(r => r[f]);
+    const freq: Record<number, number> = {};
+    let maxFreq = 0;
+    let mode = grados[0];
+    for (const g of grados) {
+      freq[g] = (freq[g] || 0) + 1;
+      if (freq[g] > maxFreq) { maxFreq = freq[g]; mode = g; }
+    }
+    modeResult[f] = mode;
+  }
+
+  return modeResult;
 }
 
 function calculateFactorPoints(data: EvaluationSuggestion): Record<string, number> {
