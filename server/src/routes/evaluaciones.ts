@@ -11,7 +11,22 @@ const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 
 const router = Router();
 
 async function saveEvaluacion(data: any) {
-  return await prisma.evaluacion.create({ data });
+  try {
+    return await prisma.evaluacion.create({ data });
+  } catch (e: any) {
+    console.warn('[Evaluacion] create failed, trying with raw SQL:', e.message);
+    const safeKeys = Object.keys(data).filter(k =>
+      !['analisis_multifuente', 'alerta_global', 'motor', 'buildVersion'].includes(k)
+    );
+    const values = safeKeys.map(k => data[k]);
+    const placeholders = safeKeys.map((_, i) => `$${i + 1}`).join(', ');
+    const cols = safeKeys.map(c => `"${c}"`).join(', ');
+    const [row] = await prisma.$queryRawUnsafe(
+      `INSERT INTO "Evaluacion" (${cols}) VALUES (${placeholders}) RETURNING *`,
+      ...values
+    );
+    return row as any;
+  }
 }
 
 // POST Guardar nueva evaluación (Wizard — legacy)
