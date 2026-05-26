@@ -21,11 +21,11 @@ async function saveEvaluacion(data: any) {
     const values = safeKeys.map(k => data[k]);
     const placeholders = safeKeys.map((_, i) => `$${i + 1}`).join(', ');
     const cols = safeKeys.map(c => `"${c}"`).join(', ');
-    const [row] = await prisma.$queryRawUnsafe(
+    const rows: any = await prisma.$queryRawUnsafe(
       `INSERT INTO "Evaluacion" (${cols}) VALUES (${placeholders}) RETURNING *`,
       ...values
     );
-    return row as any;
+    return rows?.[0] as any;
   }
 }
 
