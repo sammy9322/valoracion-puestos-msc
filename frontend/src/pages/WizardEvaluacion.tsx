@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Sparkles, CheckCircle2, AlertTriangle, Info, ShieldAlert, FileText, Save, Download, RotateCcw, Loader2, Target, Thermometer, GraduationCap, Briefcase, Upload, X } from 'lucide-react';
+import { Sparkles, CheckCircle2, AlertTriangle, Info, ShieldAlert, FileText, Save, Download, RotateCcw, Loader2, Target, Thermometer, GraduationCap, Briefcase, Upload, X, HelpCircle } from 'lucide-react';
 import api from '../services/api';
 import { getEstratoCompleto } from '../constants/categorias';
 import type { EstratoResult } from '../constants/categorias';
@@ -15,6 +15,7 @@ const FACTORS_CONFIG = [
   { key: 'requisitos', label: 'Requisitos', icon: GraduationCap, points: [0, 40, 80, 120, 160, 200], maxPts: 200, desc: 'Nivel académico y experiencia requerida.', grades: ['', 'Educación básica.', 'Bachillerato / Técnico.', 'Diplomado / Técnico superior.', 'Bachillerato / Licenciatura.', 'Maestría / Especialización.'] }
 ];
 
+// SOURCE OF TRUTH: server/src/config/factorTables.ts — keep values in sync
 const POINTS_MAP: Record<string, number[]> = Object.fromEntries(FACTORS_CONFIG.map(f => [f.key, f.points]));
 
 function linearPts(grado: number, maxPts: number): number {
@@ -51,6 +52,10 @@ const WizardEvaluacion: React.FC = () => {
   const [plaudFile, setPlaudFile] = useState<File | null>(null);
   const [analisisMultifuente, setAnalisisMultifuente] = useState<any[] | null>(null);
   const [alertaGlobal, setAlertaGlobal] = useState<string | null>(null);
+  const [ruleGrades, setRuleGrades] = useState<Record<string, number> | null>(null);
+  const [ruleLoading, setRuleLoading] = useState(false);
+  const [aiGrades, setAiGrades] = useState<Record<string, { grado: number; justificacion: string }> | null>(null);
+  const [showComparison, setShowComparison] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -81,6 +86,9 @@ const WizardEvaluacion: React.FC = () => {
     setAiError(null);
     setSavedEvaluacionId(null);
     setEditingFactor(null);
+    setRuleGrades(null);
+    setAiGrades(null);
+    setShowComparison(false);
     if (!id) {
       setPuestoDetails(null);
       return;
@@ -90,6 +98,44 @@ const WizardEvaluacion: React.FC = () => {
       setPuestoDetails(res.data);
     } catch (e) {
       console.error('Error fetching puesto:', e);
+    }
+
+    // Auto-evaluación con reglas
+    setRuleLoading(true);
+    try {
+      const ruleRes = await api.post('/evaluaciones/rule-evaluate', { puesto_id: id });
+      const { data: ruleData, totalPuntos: ruleTotal, factorPoints: ruleFp } = ruleRes.data;
+      setRuleGrades({
+        dificultad: ruleData.dificultad,
+        supervision: ruleData.supervision,
+        responsabilidad: ruleData.responsabilidad,
+        condiciones: ruleData.condiciones,
+        error: ruleData.error,
+        requisitos: ruleData.requisitos,
+      });
+      const newAnalisis: AIAnalysis = {};
+      const factorKeys = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
+      for (const key of factorKeys) {
+        newAnalisis[key] = {
+          grado: ruleData[key],
+          justificacion: ruleData[`${key}_just`] || ''
+        };
+      }
+      setAnalisis(() => {
+        const withSource: any = {};
+        for (const key of factorKeys) {
+          withSource[key] = { ...newAnalisis[key], _source: 'rules' };
+        }
+        return withSource;
+      });
+      setTotalPuntos(ruleTotal);
+      setFactorPoints(ruleFp || {});
+      setProcedimientosCount(ruleRes.data.procedimientosCount || 0);
+      setProcContribution(ruleRes.data.procContribution || []);
+    } catch (e) {
+      console.error('Error fetching rule evaluation:', e);
+    } finally {
+      setRuleLoading(false);
     }
   }, []);
 
@@ -119,7 +165,13 @@ const WizardEvaluacion: React.FC = () => {
         };
       }
 
-      setAnalisis(newAnalisis);
+      const analisisConFuente: any = {};
+      for (const key of factorKeys) {
+        analisisConFuente[key] = { ...newAnalisis[key], _source: 'ai' };
+      }
+      setAnalisis(analisisConFuente);
+      setAiGrades(newAnalisis);
+      setShowComparison(true);
       setAnalisisMultifuente(amf || null);
       setAlertaGlobal(ag || null);
       setTotalPuntos(report.totalPuntos);
@@ -162,6 +214,9 @@ const WizardEvaluacion: React.FC = () => {
     setAiError(null);
     setSavedEvaluacionId(null);
     setEditingFactor(null);
+    setRuleGrades(null);
+    setAiGrades(null);
+    setShowComparison(false);
   };
 
   const handleDownloadReport = async () => {
@@ -191,7 +246,7 @@ const WizardEvaluacion: React.FC = () => {
     }
   };
 
-  const handleGradeChange = (factorKey: string, grado: number) => {
+  const handleGradeChange = (factorKey: string, grado: number, source: 'rules' | 'manual' | 'ai' = 'manual') => {
     const factor = FACTORS_CONFIG.find(f => f.key === factorKey);
     if (!factor) return;
 
@@ -208,12 +263,12 @@ const WizardEvaluacion: React.FC = () => {
 
     setAnalisis(prev => ({
       ...prev,
-      [factorKey]: { ...prev[factorKey], grado }
+      [factorKey]: { ...prev[factorKey], grado, _source: source }
     }));
   };
 
   const handleHumanAdjustment = (factorKey: string, grade: number, justification: string) => {
-    handleGradeChange(factorKey, grade);
+    handleGradeChange(factorKey, grade, 'manual');
     setAnalisis(prev => ({
       ...prev,
       [factorKey]: { grado: grade, justificacion: justification }
@@ -230,7 +285,7 @@ const WizardEvaluacion: React.FC = () => {
 
   const totalMax = FACTORS_CONFIG.reduce((sum, f) => sum + f.points[5], 0);
   const porcentaje = totalMax > 0 ? Math.round((totalPuntos / totalMax) * 100) : 0;
-  const estrato = useMemo<EstratoResult | null>(() => getEstratoCompleto(totalPuntos, puestoDetails?.nombre, puestoDetails?.codigo_clase_msc, puestoDetails?.educacion_requerida), [totalPuntos, puestoDetails?.nombre, puestoDetails?.codigo_clase_msc, puestoDetails?.educacion_requerida]);
+  const estrato = useMemo<EstratoResult | null>(() => getEstratoCompleto(totalPuntos, puestoDetails?.nombre, puestoDetails?.codigo_clase_msc, puestoDetails?.educacion_requerida, puestoDetails?.estrato), [totalPuntos, puestoDetails?.nombre, puestoDetails?.codigo_clase_msc, puestoDetails?.educacion_requerida, puestoDetails?.estrato]);
 
   if (loading) {
     return <div className="p-20 text-center animate-pulse text-muted-foreground font-medium">Cargando catálogo de puestos...</div>;
@@ -281,12 +336,12 @@ const WizardEvaluacion: React.FC = () => {
               <button
                 onClick={handleEvaluate}
                 disabled={!selectedPuestoId || pageState === 'evaluating'}
-                className="px-6 py-3 bg-primary text-primary-foreground font-bold rounded-xl flex items-center gap-2 shadow-lg shadow-primary/20 hover:opacity-90 disabled:opacity-40 transition-all shrink-0"
+                className="px-5 py-3 bg-white border-2 border-primary/30 text-primary font-bold rounded-xl flex items-center gap-2 hover:bg-primary/5 hover:border-primary/50 disabled:opacity-40 transition-all shrink-0"
               >
                 {pageState === 'evaluating' ? (
-                  <><Loader2 size={18} className="animate-spin" /> Analizando...</>
+                  <><Loader2 size={18} className="animate-spin" /> Segunda Opinión (IA)...</>
                 ) : (
-                  <><Sparkles size={18} /> Evaluar con IA</>
+                  <><HelpCircle size={18} /> Solicitar Segunda Opinión (IA)</>
                 )}
               </button>
             </div>
@@ -348,6 +403,18 @@ const WizardEvaluacion: React.FC = () => {
                   )}
                 </div>
               </label>
+            )}
+            {ruleLoading && (
+              <div className="bg-indigo-50/50 border border-indigo-100 rounded-xl p-3 text-xs text-indigo-700 flex items-center gap-2 animate-pulse">
+                <Loader2 size={14} className="animate-spin text-indigo-500" />
+                Evaluando con reglas de negocio...
+              </div>
+            )}
+            {!ruleLoading && ruleGrades && pageState === 'select' && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-xs text-green-700 flex items-center gap-2">
+                <CheckCircle2 size={14} className="text-green-500" />
+                Grados sugeridos por reglas de negocio — {Object.values(ruleGrades).reduce((a, b) => a + b, 0) > 0 ? 'pre-llenados' : 'disponibles'}
+              </div>
             )}
           </div>
 
@@ -442,6 +509,25 @@ const WizardEvaluacion: React.FC = () => {
                             <span className="font-bold">Requiere validación manual — </span>
                             {mf?.detalle_contradiccion || 'Contradicción detectada entre la evidencia documental y la entrevista.'}
                           </div>
+                        </div>
+                      )}
+
+                      {ruleGrades && (
+                        <div className="mb-2">
+                          {!showComparison || !aiGrades ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 border border-slate-200">
+                              <HelpCircle size={10} /> IA no consultada
+                            </span>
+                          ) : aiGrades[factor.key]?.grado === ruleGrades[factor.key] ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">
+                              <CheckCircle2 size={10} /> Coincide
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-medium bg-amber-50 text-amber-800 border border-amber-200">
+                              <AlertTriangle size={10} className="text-amber-500" />
+                              Reglas: G{ruleGrades[factor.key]} ({POINTS_MAP[factor.key][ruleGrades[factor.key]]} pts) | IA: G{aiGrades[factor.key]?.grado} ({POINTS_MAP[factor.key][aiGrades[factor.key]?.grado as number]} pts) — <strong>Revise manualmente</strong>
+                            </span>
+                          )}
                         </div>
                       )}
 

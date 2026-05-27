@@ -5,25 +5,13 @@ import { enrich as enrichProc } from './procedimientosService';
 import { contextualEvaluate, POINTS_MAP, CONTINUOUS_MAX, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
 import type { InterviewContext } from './interviewParser';
 
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
-const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
 export const BUILD_VERSION = 'v13-ensemble-temp0';
-
-let ollamaAvailable = true;
-
-async function checkOllama(): Promise<boolean> {
-  return true;
-}
-
-checkOllama().then(() => {
-  console.log('[AI Service] Conectado a Google Gemini API — usando motor LLM en la nube');
-});
 
 export { POINTS_MAP, CONTINUOUS_MAX, FactorKeywordDetail } from './contextualAnalyzer';
 export type { InterviewContext };
 
-export function getEngineStatus(): { ollamaAvailable: boolean; activeEngine: 'llm' | 'rule-based' } {
-  return { ollamaAvailable, activeEngine: ollamaAvailable ? 'llm' : 'rule-based' };
+export function getEngineStatus(): { activeEngine: 'llm' | 'rule-based' } {
+  return { activeEngine: 'llm' };
 }
 
 function ruleBasedEvaluation(puesto: any, procCtx?: any): AIEvaluationResult {
@@ -119,6 +107,25 @@ Reporta a: ${sanitizeInput(puesto.reporta_a) || 'No especificado'}
 
 === DESCRIPCION DE FUNCIONES ===
 ${sanitizeInput(puesto.descripcion_funciones) || 'No especificadas'}
+
+=== CONTEXTO DE SERIE Y ACOTACIÓN JERÁRQUICA ===
+Este puesto pertenece a la serie laboral: ${puesto.estrato || 'No determinada'}
+La serie define el tope máximo de puntos que puede alcanzar el puesto.
+No asignes una clase o puntuación total que exceda el límite de su serie.
+${puesto.estrato ? (() => {
+  const limites: Record<string, string> = {
+    'Operativa': 'MÁXIMO 355 PUNTOS — Clase tope: Operativo Municipal 6',
+    'Administrativa': 'MÁXIMO 355 PUNTOS — Clase tope: Administrativo Municipal 4',
+    'Policia': 'MÁXIMO 345 PUNTOS — Clase tope: Policia Municipal 5',
+    'Tecnica': 'MÁXIMO 390 PUNTOS — Clase tope: Tecnico Municipal 3',
+    'Profesional': 'MÁXIMO 610 PUNTOS — Clase tope: Profesional Municipal 4',
+    'Jefatura': 'MÁXIMO 880 PUNTOS — Clase tope: Profesional Jefe 5'
+  };
+  for (const [serie, texto] of Object.entries(limites)) {
+    if (puesto.estrato.toLowerCase().includes(serie.toLowerCase())) return texto;
+  }
+  return '';
+})() : 'Límite por defecto: 1000 PUNTOS'}
 
 === REQUISITOS DEL PUESTO ===
 Educacion requerida: ${sanitizeInput(puesto.educacion_requerida) || 'No especificada'}
@@ -282,7 +289,7 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
   return JSON.parse(cleanJson);
 }
 
-async function callOllama(prompt: string): Promise<any> {
+async function callGeminiEnsemble(prompt: string): Promise<any> {
   const ENSEMBLE_CALLS = 3;
   const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
   const results: any[] = [];
@@ -343,26 +350,22 @@ export const aiAgentService = {
         const procCtx = await enrichProc(puesto).catch(() => null);
         const procText = procCtx ? procCtx.textoCompleto : undefined;
         let result: AIEvaluationResult;
-        if (ollamaAvailable) {
-          try {
-            let funcionesConProcedimientos = puesto.descripcion_funciones;
-            if (procText) {
-              funcionesConProcedimientos = `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}`;
-            }
-            const enrichedPuesto = { ...puesto, descripcion_funciones: funcionesConProcedimientos };
-            const prompt = buildPrompt(enrichedPuesto, interviewCtx);
-            const raw = await callOllama(prompt);
-            result = validateAndCalculate(raw, puesto.id, 'llm');
-            result.factorPoints = calculateFactorPoints(result.data);
-            if (procCtx) result.procedimientosCount = procCtx.totalProcedimientos;
-            result.buildVersion = BUILD_VERSION;
-            result.interviewContext = interviewCtx;
-          } catch (error: any) {
-            console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
-            result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Gemini fallu00F3, revisa tu API KEY en Vercel). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+        try {
+          let funcionesConProcedimientos = puesto.descripcion_funciones;
+          if (procText) {
+            funcionesConProcedimientos = `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}`;
           }
-        } else {
-          result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+          const enrichedPuesto = { ...puesto, descripcion_funciones: funcionesConProcedimientos };
+          const prompt = buildPrompt(enrichedPuesto, interviewCtx);
+          const raw = await callGeminiEnsemble(prompt);
+          result = validateAndCalculate(raw, puesto.id, 'llm');
+          result.factorPoints = calculateFactorPoints(result.data);
+          if (procCtx) result.procedimientosCount = procCtx.totalProcedimientos;
+          result.buildVersion = BUILD_VERSION;
+          result.interviewContext = interviewCtx;
+        } catch (error: any) {
+          console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
+          result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Gemini fallu00F3, revisa tu API KEY en Vercel). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
         }
         return result;
     },
@@ -370,21 +373,17 @@ export const aiAgentService = {
     async suggestEvaluation(puesto: any): Promise<EvaluationSuggestion | null> {
         const procCtx = await enrichProc(puesto).catch(() => null);
         const procText = procCtx ? procCtx.textoCompleto : undefined;
-        if (!ollamaAvailable) {
-          const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
-          return result.data;
-        }
 
         try {
             const enrichedPuesto = procText
               ? { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}` }
               : puesto;
             const prompt = buildPrompt(enrichedPuesto);
-            const raw = await callOllama(prompt);
+            const raw = await callGeminiEnsemble(prompt);
             return raw as EvaluationSuggestion;
         } catch (error: any) {
             console.warn('[AI Service] Error en suggestEvaluation, usando rule-based:', error.message);
-            const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+            const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Gemini fallu00F3, revisa tu API KEY en Vercel). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
             return result.data;
         }
     }

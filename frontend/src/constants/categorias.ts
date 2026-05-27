@@ -104,11 +104,21 @@ export function determinarSerie(nombre: string, educacion?: string, claseMsc?: s
 /**
  * Encuentra el estrato más cercano por puntaje sin excederlo y aplicando la acotación de serie.
  */
-export const getEstratoSugerido = (puntos: number, nombrePuesto?: string, claseMsc?: string, educacion?: string): ClaseMunicipal | null => {
+export const getEstratoSugerido = (puntos: number, nombrePuesto?: string, claseMsc?: string, educacion?: string, estratoDirecto?: string): ClaseMunicipal | null => {
   if (!puntos) return null;
 
   let seriePermitida: string | null = null;
-  if (nombrePuesto) {
+  // Si el estrato directo viene desde Supabase/CatalogoPuesto, usarlo como fuente de verdad
+  if (estratoDirecto) {
+    const estratoNormalizado = estratoDirecto.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    const series = ['Operativa', 'Administrativa', 'Policia', 'Tecnica', 'Profesional', 'Jefatura'];
+    const encontrada = series.find(s => estratoNormalizado.toLowerCase().includes(s.toLowerCase()));
+    if (encontrada) {
+      seriePermitida = encontrada;
+    }
+  }
+  // Fallback al regex tradicional si no hay estrato directo
+  if (!seriePermitida && nombrePuesto) {
     seriePermitida = determinarSerie(nombrePuesto, educacion, claseMsc);
   }
 
@@ -150,8 +160,8 @@ export type EstratoResult = {
   alternativaNoProhibida: ClaseMunicipal | null;
 };
 
-export function getEstratoCompleto(puntos: number, nombrePuesto?: string, claseMsc?: string, educacion?: string): EstratoResult | null {
-  const clase = getEstratoSugerido(puntos, nombrePuesto, claseMsc, educacion);
+export function getEstratoCompleto(puntos: number, nombrePuesto?: string, claseMsc?: string, educacion?: string, estratoDirecto?: string): EstratoResult | null {
+  const clase = getEstratoSugerido(puntos, nombrePuesto, claseMsc, educacion, estratoDirecto);
   if (!clase) return null;
   return {
     clase,

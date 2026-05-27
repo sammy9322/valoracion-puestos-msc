@@ -1,5 +1,8 @@
+import { POINTS_MAP } from '../config/factorTables';
 import dotenv from 'dotenv';
 dotenv.config();
+
+export { POINTS_MAP };
 
 export const FACTOR_NAMES: Record<string, string> = {
   dificultad: 'Dificultad de Funciones',
@@ -13,15 +16,6 @@ export const FACTOR_NAMES: Record<string, string> = {
 export const CONTINUOUS_MAX: Record<string, number> = {
   dificultad: 200, supervision: 150, responsabilidad: 200,
   condiciones: 100, error: 150, requisitos: 200
-};
-
-export const POINTS_MAP: Record<string, number[]> = {
-  dificultad: [0, 40, 80, 120, 160, 200],
-  supervision: [0, 30, 60, 90, 120, 150],
-  responsabilidad: [0, 40, 80, 120, 160, 200],
-  condiciones: [0, 20, 40, 60, 80, 100],
-  error: [0, 30, 60, 90, 120, 150],
-  requisitos: [0, 40, 80, 120, 160, 200]
 };
 
 const GRADE_DESCRIPTIONS: Record<string, string[]> = {
@@ -475,7 +469,15 @@ export function evalProcedimientos(procCtx:any):{ref:string[];acc:TaggedAccion[]
   return {ref, acc};
 }
 
-export function determinarSerie(nombre: string, educacion?: string, claseMsc?: string): string {
+export function determinarSerie(nombre: string, educacion?: string, claseMsc?: string, estratoDirecto?: string): string {
+  // Si el estrato directo está disponible (desde CatalogoPuesto), usarlo como fuente de verdad
+  if (estratoDirecto) {
+    const normalized = estratoDirecto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const series = ['Operativa', 'Administrativa', 'Policia', 'Tecnica', 'Profesional', 'Jefatura'];
+    const found = series.find(s => normalized.includes(s.toLowerCase()));
+    if (found) return found;
+  }
+
   const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const ed = (educacion || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const cl = (claseMsc || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -553,7 +555,7 @@ export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
   const pc:string[]=pr.ref.length?['dificultad','responsabilidad']:[];
 
   // Acotación de alerta global
-  const seriePuesto = determinarSerie(puesto.nombre || '', ed, puesto.codigo_clase_msc);
+  const seriePuesto = determinarSerie(puesto.nombre || '', ed, puesto.codigo_clase_msc, puesto.estrato);
   let maxPuntosPermitidos = 1000;
   if (seriePuesto === 'Operativa') maxPuntosPermitidos = 355;
   else if (seriePuesto === 'Administrativa') maxPuntosPermitidos = 355;

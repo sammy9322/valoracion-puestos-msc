@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import prisma from '../db';
 import { aiAgentService, POINTS_MAP, BUILD_VERSION } from '../services/aiAgentService';
+import { contextualEvaluate } from '../services/contextualAnalyzer';
 import { generateEvaluationReport } from '../services/reportGenerator';
 import { generateHtmlReport } from '../services/htmlReportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
 import { parseEntrevistaMD } from '../services/interviewParser';
+import { findPuestoWithEstrato } from '../services/puestoService';
 import multer from 'multer';
 
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
@@ -110,6 +112,37 @@ router.post('/', async (req, res) => {
     catch (error) {
         console.error('Error al registrar evaluación:', error);
         res.status(500).json({ error: 'Error al registrar la Evaluación' });
+    }
+});
+
+// POST Evaluación solo con reglas (sin IA — para pre-llenado automático)
+router.post('/rule-evaluate', async (req, res) => {
+    try {
+        const { puesto_id } = req.body;
+        if (!puesto_id) {
+            return res.status(400).json({ error: 'puesto_id es requerido' });
+        }
+
+        const puesto = await findPuestoWithEstrato(puesto_id);
+        if (!puesto) return res.status(404).json({ error: 'Puesto no encontrado' });
+
+        const result = contextualEvaluate(puesto);
+        if (!result.success) {
+            return res.status(422).json({ error: 'El motor de reglas no pudo evaluar el puesto' });
+        }
+
+        res.json({
+            success: true,
+            data: result.data,
+            totalPuntos: result.totalPuntos,
+            factorPoints: result.factorPoints,
+            procedimientosCount: result.procedimientosCount || 0,
+            procContribution: result.procContribution || [],
+            motor: 'rule-based'
+        });
+    } catch (error: any) {
+        console.error('Error en /rule-evaluate:', error);
+        res.status(500).json({ error: error.message || 'Error al evaluar con reglas' });
     }
 });
 

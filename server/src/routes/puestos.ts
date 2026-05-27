@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import prisma from '../db';
+import { findPuestoWithEstrato } from '../services/puestoService';
 
 const router = Router();
 
@@ -51,9 +52,7 @@ router.get('/clave', async (req, res) => {
 router.get('/:id', async (req, res) => {
     try {
         const { id } = req.params;
-        const puesto = await prisma.puesto.findUnique({
-            where: { id }
-        });
+        const puesto = await findPuestoWithEstrato(id);
         if (!puesto) return res.status(404).json({ error: 'Puesto no encontrado' });
         res.json(puesto);
     }

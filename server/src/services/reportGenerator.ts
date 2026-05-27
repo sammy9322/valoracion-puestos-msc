@@ -1,15 +1,7 @@
 import PDFDocument from 'pdfkit';
 import type { ProcedimientosContext } from './procedimientosService';
 import { extraerAcciones, evalProcedimientos, TaggedAccion } from './contextualAnalyzer';
-
-const POINTS_MAP: Record<string, number[]> = {
-  dificultad: [0, 40, 80, 120, 160, 200],
-  supervision: [0, 30, 60, 90, 120, 150],
-  responsabilidad: [0, 40, 80, 120, 160, 200],
-  condiciones: [0, 20, 40, 60, 80, 100],
-  error: [0, 30, 60, 90, 120, 150],
-  requisitos: [0, 40, 80, 120, 160, 200]
-};
+import { POINTS_MAP } from '../config/factorTables';
 
 const FACTOR_DISPLAY: Record<string, { label: string; max: number }> = {
   dificultad: { label: 'Dificultad de Funciones', max: 200 },
@@ -130,7 +122,15 @@ export const ESTRATOS_MUNICIPALES = [
   { nombre: 'Profesional Jefe 5 (Prohib.)', puntos: 880, serie: 'Jefatura' },
 ];
 
-export function determinarSerie(nombre: string, educacion?: string, claseMsc?: string): string {
+export function determinarSerie(nombre: string, educacion?: string, claseMsc?: string, estratoDirecto?: string): string {
+  // Si el estrato directo está disponible (desde CatalogoPuesto), usarlo como fuente de verdad
+  if (estratoDirecto) {
+    const normalized = estratoDirecto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+    const series = ['Operativa', 'Administrativa', 'Policia', 'Tecnica', 'Profesional', 'Jefatura'];
+    const found = series.find(s => normalized.includes(s.toLowerCase()));
+    if (found) return found;
+  }
+
   const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const ed = (educacion || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const cl = (claseMsc || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -180,10 +180,10 @@ export function determinarSerie(nombre: string, educacion?: string, claseMsc?: s
   return 'Operativa'; // Conservador por defecto
 }
 
-export function getClaseSugerida(puntos: number, nombrePuesto?: string, educacionPuesto?: string, claseMsc?: string): { nombre: string; serie: string } | null {
+export function getClaseSugerida(puntos: number, nombrePuesto?: string, educacionPuesto?: string, claseMsc?: string, estratoDirecto?: string): { nombre: string; serie: string } | null {
   let seriePermitida: string | null = null;
   if (nombrePuesto) {
-    seriePermitida = determinarSerie(nombrePuesto, educacionPuesto, claseMsc);
+    seriePermitida = determinarSerie(nombrePuesto, educacionPuesto, claseMsc, estratoDirecto);
   }
 
   let candidatos = [...ESTRATOS_MUNICIPALES];
@@ -836,7 +836,7 @@ class ReportGenerator {
     this.addSectionTitle('7. Conclusión y Dictamen Técnico');
     
     const pct = Math.round((totalPuntos / 1000) * 100);
-    const clase = getClaseSugerida(totalPuntos, evaluacion.puesto?.nombre, evaluacion.puesto?.educacion_requerida, evaluacion.puesto?.codigo_clase_msc);
+    const clase = getClaseSugerida(totalPuntos, evaluacion.puesto?.nombre, evaluacion.puesto?.educacion_requerida, evaluacion.puesto?.codigo_clase_msc, evaluacion.puesto?.estrato);
     
     let cat = '', desc = '';
     if (pct <= 20) {
