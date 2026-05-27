@@ -1,6 +1,6 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { enrich as enrichProc } from './procedimientosService';
 import { contextualEvaluate, POINTS_MAP, CONTINUOUS_MAX, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
 import type { InterviewContext } from './interviewParser';
@@ -31,7 +31,7 @@ function sanitizeInput(text: string): string {
     .trim();
 }
 
-function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
+function buildPrompt(puesto: any, interviewCtx?: InterviewContext, baseline?: any): string {
   const gradeTable = Object.entries({
     dificultad: [
       'Grado 1 (40 pts): Tareas simples y repetitivas, poca iniciativa.',
@@ -95,6 +95,26 @@ function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
     }
   }
 
+  let baselineSection = '';
+  if (baseline) {
+    baselineSection = `
+=== LÍNEA BASE DETERMINISTA ===
+El sistema experto basado en reglas ya ha evaluado la Ficha Oficial y asignó los siguientes grados base:
+- Dificultad: Grado ${baseline.dificultad}
+- Supervisión: Grado ${baseline.supervision}
+- Responsabilidad: Grado ${baseline.responsabilidad}
+- Condiciones: Grado ${baseline.condiciones}
+- Error: Grado ${baseline.error}
+- Requisitos: Grado ${baseline.requisitos}
+
+=== TU ÚNICA MISIÓN ===
+1. Eres un auditor de entrevistas.
+2. Compara la EVIDENCIA DE LA ENTREVISTA con la LÍNEA BASE.
+3. Si la entrevista NO aporta nada nuevo o no existe, DEBES devolver exactamente los mismos grados de la línea base.
+4. SOLO puedes elevar o modificar un grado si la entrevista demuestra responsabilidades operativas irrefutablemente mayores al documento base.
+`;
+  }
+
   return `
 Eres el EVALUADOR TECNICO OFICIAL del sistema de valoracion de puestos de la Municipalidad de San Carlos.
 Tu analisis es objetivo, vinculante y constituye un documento oficial con implicaciones administrativas y legales.
@@ -131,6 +151,7 @@ ${puesto.estrato ? (() => {
 Educacion requerida: ${sanitizeInput(puesto.educacion_requerida) || 'No especificada'}
 Experiencia requerida: ${sanitizeInput(puesto.experiencia_requerida) || 'No especificada'}
 ${interviewSection}
+${baselineSection}
 === ESCALA DE GRADOS POR FACTOR ===
 Cada factor se califica del 1 (minimo) al 5 (maximo).
 
@@ -278,9 +299,46 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
   const genAI = new GoogleGenerativeAI(apiKey);
+  const schema = {
+    type: SchemaType.OBJECT as const,
+    properties: {
+      dificultad: { type: SchemaType.INTEGER as const },
+      dificultad_just: { type: SchemaType.STRING as const },
+      dificultad_cita_documental: { type: SchemaType.STRING as const },
+      dificultad_fuente: { type: SchemaType.STRING as const },
+      dificultad_cita_entrevista: { type: SchemaType.STRING as const },
+      supervision: { type: SchemaType.INTEGER as const },
+      supervision_just: { type: SchemaType.STRING as const },
+      supervision_cita_documental: { type: SchemaType.STRING as const },
+      supervision_fuente: { type: SchemaType.STRING as const },
+      supervision_cita_entrevista: { type: SchemaType.STRING as const },
+      responsabilidad: { type: SchemaType.INTEGER as const },
+      responsabilidad_just: { type: SchemaType.STRING as const },
+      responsabilidad_cita_documental: { type: SchemaType.STRING as const },
+      responsabilidad_fuente: { type: SchemaType.STRING as const },
+      responsabilidad_cita_entrevista: { type: SchemaType.STRING as const },
+      condiciones: { type: SchemaType.INTEGER as const },
+      condiciones_just: { type: SchemaType.STRING as const },
+      condiciones_cita_documental: { type: SchemaType.STRING as const },
+      condiciones_fuente: { type: SchemaType.STRING as const },
+      condiciones_cita_entrevista: { type: SchemaType.STRING as const },
+      error: { type: SchemaType.INTEGER as const },
+      error_just: { type: SchemaType.STRING as const },
+      error_cita_documental: { type: SchemaType.STRING as const },
+      error_fuente: { type: SchemaType.STRING as const },
+      error_cita_entrevista: { type: SchemaType.STRING as const },
+      requisitos: { type: SchemaType.INTEGER as const },
+      requisitos_just: { type: SchemaType.STRING as const },
+      requisitos_cita_documental: { type: SchemaType.STRING as const },
+      requisitos_fuente: { type: SchemaType.STRING as const },
+      requisitos_cita_entrevista: { type: SchemaType.STRING as const },
+      alertas_contradiccion: { type: SchemaType.ARRAY as const, items: { type: SchemaType.STRING as const } }
+    },
+    required: ["dificultad", "supervision", "responsabilidad", "condiciones", "error", "requisitos"]
+  };
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
-    generationConfig: { responseMimeType: 'application/json', temperature }
+    generationConfig: { responseMimeType: 'application/json', temperature, responseSchema: schema }
   });
   const result = await model.generateContent(prompt);
   const jsonText = result.response.text();
@@ -349,6 +407,7 @@ export const aiAgentService = {
     async evaluate(puesto: any, interviewCtx?: InterviewContext): Promise<AIEvaluationResult> {
         const procCtx = await enrichProc(puesto).catch(() => null);
         const procText = procCtx ? procCtx.textoCompleto : undefined;
+        const baselineResult = ruleBasedEvaluation(puesto, procCtx, interviewCtx);
         let result: AIEvaluationResult;
         try {
           let funcionesConProcedimientos = puesto.descripcion_funciones;
@@ -356,7 +415,7 @@ export const aiAgentService = {
             funcionesConProcedimientos = `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}`;
           }
           const enrichedPuesto = { ...puesto, descripcion_funciones: funcionesConProcedimientos };
-          const prompt = buildPrompt(enrichedPuesto, interviewCtx);
+          const prompt = buildPrompt(enrichedPuesto, interviewCtx, baselineResult.data);
           const raw = await callGeminiEnsemble(prompt);
           result = validateAndCalculate(raw, puesto.id, 'llm');
           result.factorPoints = calculateFactorPoints(result.data);
@@ -365,7 +424,7 @@ export const aiAgentService = {
           result.interviewContext = interviewCtx;
         } catch (error: any) {
           console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
-          result = ruleBasedEvaluation(puesto, procCtx, interviewCtx);
+          result = baselineResult;
           result.alerta_global = "Servicio de IA no disponible temporalmente. Se aplicó evaluación basada en reglas." +
             (interviewCtx ? " NOTA: Hay una entrevista adjunta. Por favor asigne puntos extra manualmente si la entrevista demuestra mayor complejidad operativa." : "");
         }
@@ -375,19 +434,18 @@ export const aiAgentService = {
     async suggestEvaluation(puesto: any): Promise<EvaluationSuggestion | null> {
         const procCtx = await enrichProc(puesto).catch(() => null);
         const procText = procCtx ? procCtx.textoCompleto : undefined;
+        const baselineResult = ruleBasedEvaluation(puesto, procCtx, null);
 
         try {
             const enrichedPuesto = procText
               ? { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}` }
               : puesto;
-            const prompt = buildPrompt(enrichedPuesto);
+            const prompt = buildPrompt(enrichedPuesto, undefined, baselineResult.data);
             const raw = await callGeminiEnsemble(prompt);
             return raw as EvaluationSuggestion;
         } catch (error: any) {
             console.warn('[AI Service] Error en suggestEvaluation, usando rule-based:', error.message);
-            const result = ruleBasedEvaluation(puesto, procCtx, null);
-            result.alerta_global = "Servicio de IA no disponible temporalmente. Se aplicó evaluación basada en reglas.";
-            return result.data;
+            return baselineResult.data;
         }
     }
 };
