@@ -337,8 +337,8 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
     required: ["dificultad", "supervision", "responsabilidad", "condiciones", "error", "requisitos"]
   };
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: { responseMimeType: 'application/json', temperature, responseSchema: schema }
+    model: 'gemini-2.5-flash',
+    generationConfig: { responseMimeType: 'application/json', temperature }
   });
   const result = await model.generateContent(prompt);
   const jsonText = result.response.text();
