@@ -53,3 +53,4 @@ server/*.txt
 !server/README.md
 .vercel
 server/.env.prod
+.env*
