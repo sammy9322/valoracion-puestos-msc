@@ -527,7 +527,7 @@ export function determinarSerie(nombre: string, educacion?: string, claseMsc?: s
   return 'Operativa'; // Conservador por defecto
 }
 
-export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
+export function contextualEvaluate(puesto:any,procCtx?:any,interviewCtx?:any):AIEvaluationResult{
   const fx=puesto.descripcion_funciones||'',ed=puesto.educacion_requerida||'';
   const pf=analizarTituloCompuesto(puesto.nombre||'',puesto.area||'');
   const accFx = extraerAcciones(fx).map(a => ({...a, fuente: 'funciones' as const} as TaggedAccion));
@@ -566,6 +566,9 @@ export function contextualEvaluate(puesto:any,procCtx?:any):AIEvaluationResult{
   let alerta_global = undefined;
   if (total > maxPuntosPermitidos) {
     alerta_global = `Advertencia de Acotación Jerárquica: Los puntos calculados (${total}) exceden la escala natural de la serie ${seriePuesto} (${maxPuntosPermitidos} pts). La clase se ha acotado en la visualización para mantener la coherencia organizativa.`;
+  }
+  if (interviewCtx && interviewCtx.factores && interviewCtx.factores.length > 0) {
+    alerta_global = (alerta_global || '') + "⚠️ Entrevista no analizada por IA. Por favor, revise la transcripción y ajuste los grados manualmente si aplica. ";
   }
   return{success:true,data,totalPuntos:total,puesto_id:puesto.id,analisis_completo:true,motor:'rule-based',procedimientosCount:procCtx?.totalProcedimientos||0,factorPoints:fp,buildVersion:'v12-contextual',procContribution:pc,alerta_global};
 }

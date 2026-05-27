@@ -14,8 +14,8 @@ export function getEngineStatus(): { activeEngine: 'llm' | 'rule-based' } {
   return { activeEngine: 'llm' };
 }
 
-function ruleBasedEvaluation(puesto: any, procCtx?: any): AIEvaluationResult {
-  const result = contextualEvaluate(puesto, procCtx);
+function ruleBasedEvaluation(puesto: any, procCtx?: any, interviewCtx?: any): AIEvaluationResult {
+  const result = contextualEvaluate(puesto, procCtx, interviewCtx);
   result.buildVersion = result.buildVersion || BUILD_VERSION;
   return result;
 }
@@ -290,7 +290,7 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
 }
 
 async function callGeminiEnsemble(prompt: string): Promise<any> {
-  const ENSEMBLE_CALLS = 3;
+  const ENSEMBLE_CALLS = 1;
   const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
   const results: any[] = [];
 
@@ -365,7 +365,9 @@ export const aiAgentService = {
           result.interviewContext = interviewCtx;
         } catch (error: any) {
           console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
-          result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Gemini fallu00F3, revisa tu API KEY en Vercel). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+          result = ruleBasedEvaluation(puesto, procCtx, interviewCtx);
+          result.alerta_global = "Servicio de IA no disponible temporalmente. Se aplicó evaluación basada en reglas." +
+            (interviewCtx ? " NOTA: Hay una entrevista adjunta. Por favor asigne puntos extra manualmente si la entrevista demuestra mayor complejidad operativa." : "");
         }
         return result;
     },
@@ -383,7 +385,8 @@ export const aiAgentService = {
             return raw as EvaluationSuggestion;
         } catch (error: any) {
             console.warn('[AI Service] Error en suggestEvaluation, usando rule-based:', error.message);
-            const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Gemini fallu00F3, revisa tu API KEY en Vercel). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+            const result = ruleBasedEvaluation(puesto, procCtx, null);
+            result.alerta_global = "Servicio de IA no disponible temporalmente. Se aplicó evaluación basada en reglas.";
             return result.data;
         }
     }
