@@ -337,7 +337,7 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
     required: ["dificultad", "supervision", "responsabilidad", "condiciones", "error", "requisitos"]
   };
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-1.5-flash',
     generationConfig: { responseMimeType: 'application/json', temperature, responseSchema: schema }
   });
   const result = await model.generateContent(prompt);
@@ -360,7 +360,8 @@ async function callGeminiEnsemble(prompt: string): Promise<any> {
         if (!raw[f] || raw[f] < 1 || raw[f] > 5) raw[f] = 1;
       }
       results.push(raw);
-    } catch {
+    } catch (e) {
+      console.error("[AI Service] Error in callGemini:", e);
       continue;
     }
   }
