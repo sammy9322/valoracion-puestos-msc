@@ -1,4 +1,4 @@
-import { POINTS_MAP } from '../config/factorTables';
+import { FACTOR_CONFIG, getFactorPoints, POINTS_MAP } from '../config/factorTables';
 import dotenv from 'dotenv';
 dotenv.config();
 
@@ -14,53 +14,8 @@ export const FACTOR_NAMES: Record<string, string> = {
 };
 
 export const CONTINUOUS_MAX: Record<string, number> = {
-  dificultad: 200, supervision: 150, responsabilidad: 200,
-  condiciones: 100, error: 150, requisitos: 200
-};
-
-const GRADE_DESCRIPTIONS: Record<string, string[]> = {
-  dificultad: [
-    'Tareas simples y repetitivas, poca iniciativa',
-    'Tareas variadas pero estandarizadas',
-    'Requiere análisis y juicio para resolver problemas técnicos',
-    'Alta complejidad, planificación y coordinación institucional',
-    'Dirección estratégica y toma de decisiones críticas'
-  ],
-  supervision: [
-    'No ejerce supervisión',
-    'Supervisión ocasional de tareas simples',
-    'Supervisión de grupo de trabajo operativo',
-    'Jefatura de una unidad o departamento',
-    'Dirección de área técnica o administrativa mayor'
-  ],
-  responsabilidad: [
-    'Baja responsabilidad por valores o equipo',
-    'Responsabilidad moderada por materiales y herramientas',
-    'Custodia de información sensible o fondos fijos',
-    'Responsabilidad por presupuestos o activos de alto valor',
-    'Responsabilidad total por gestión de proceso clave'
-  ],
-  condiciones: [
-    'Ambiente de oficina normal, riesgos mínimos',
-    'Esfuerzo físico moderado o ambiente algo incómodo',
-    'Exposición a condiciones climáticas o ruido constante',
-    'Riesgo de accidentes laborales o manejo de químicos',
-    'Condiciones de alta peligrosidad o insalubridad constante'
-  ],
-  error: [
-    'Error fácil de detectar y corregir',
-    'Error causa retrasos menores en el flujo de trabajo',
-    'Error afecta a otros departamentos o al servicio al ciudadano',
-    'Error causa pérdidas económicas o legales significativas',
-    'Error compromete la estabilidad institucional o seguridad pública'
-  ],
-  requisitos: [
-    'Educación básica o primaria',
-    'Bachillerato en Educación Media o Técnico básico',
-    'Diplomado o Técnico superior especializado',
-    'Bachillerato Universitario o Licenciatura profesional',
-    'Grado de Maestría o especialización avanzada requerida'
-  ]
+  dificultad: 150, supervision: 150, responsabilidad: 200,
+  condiciones: 150, error: 150, requisitos: 150
 };
 
 type VerbCat = 'operativo'|'ejecucion'|'analisis'|'planificacion'|'direccion';
@@ -77,12 +32,12 @@ interface RolProfile { nombre: string; baseDificultad: number; baseSupervision: 
 interface FactorResult { grado: number; puntos: number; justificacion: string }
 
 export interface EvaluationSuggestion {
-  dificultad: number; dificultad_just: string;
-  supervision: number; supervision_just: string;
-  responsabilidad: number; responsabilidad_just: string;
-  condiciones: number; condiciones_just: string;
-  error: number; error_just: string;
-  requisitos: number; requisitos_just: string;
+  dificultad: number; dificultad_just: string; dificultad_intensidad?: string;
+  supervision: number; supervision_just: string; supervision_intensidad?: string;
+  responsabilidad: number; responsabilidad_just: string; responsabilidad_intensidad?: string;
+  condiciones: number; condiciones_just: string; condiciones_intensidad?: string;
+  error: number; error_just: string; error_intensidad?: string;
+  requisitos: number; requisitos_just: string; requisitos_intensidad?: string;
 }
 
 export interface FactorKeywordDetail {
@@ -251,7 +206,7 @@ function tieneInfoSensible(fx:string,area:string):boolean{
   return false;
 }
 
-function clamp(g:number):number{return Math.max(1,Math.min(5,Math.round(g)));}
+function clamp(g:number, maxG:number = 6):number{return Math.max(1,Math.min(maxG,Math.round(g)));}
 
 function evalDificultad(acc:TaggedAccion[],pf:RolProfile):FactorResult{
   const b=pf.baseDificultad||1;
@@ -262,7 +217,7 @@ function evalDificultad(acc:TaggedAccion[],pf:RolProfile):FactorResult{
   if(!acc.length){
     g = Math.max(1,b);
     hallazgos = 'No se identificaron acciones sustantivas en la descripcion de funciones ni en los procedimientos asociados.';
-    analisis = `Ante la falta de evidencia detallada, se asume el perfil base del puesto "${pf.nombre}" que establece un minimo de Grado ${b}. Segun la rubrica MSC, el Grado ${g} se define como "${GRADE_DESCRIPTIONS.dificultad[g-1]}". No existe base documental para asignar un grado superior.`;
+    analisis = `Ante la falta de evidencia detallada, se asume el perfil base del puesto "${pf.nombre}" que establece un minimo de Grado ${b}. Segun la rubrica MSC, el Grado ${g} se define como "${FACTOR_CONFIG.dificultad.grades[g-1]}". No existe base documental para asignar un grado superior.`;
   } else {
     let tot=0;
     for(const a of acc){const vc=clasifVerbo(a.verboNorm),oc=clasifObj(a.objeto);tot+=clamp(vc.base+oc.boost);}
@@ -289,11 +244,11 @@ function evalDificultad(acc:TaggedAccion[],pf:RolProfile):FactorResult{
     const hProc = Array.from(procsMap.entries()).slice(0, 2).map(([cod, data]) => `En el procedimiento ${cod} (${data.nombre}), se establece que el puesto: "${data.acciones[0]}".`).join(' ');
     hallazgos = [hFunc, hProc].filter(Boolean).join(' ') || 'Se analizaron las funciones sin identificar citas literales destacables.';
 
-    analisis = `Las acciones identificadas corresponden a funciones que promedian un nivel G${avgR} en complejidad.${pfText} Segun la rubrica MSC, el Grado ${g} de Dificultad de Funciones se define como "${GRADE_DESCRIPTIONS.dificultad[g-1]}", lo cual es consistente con la naturaleza y alcance de las tareas descritas. No se evidencian elementos suficientes que justifiquen una clasificacion distinta.`;
+    analisis = `Las acciones identificadas corresponden a funciones que promedian un nivel G${avgR} en complejidad.${pfText} Segun la rubrica MSC, el Grado ${g} de Dificultad de Funciones se define como "${FACTOR_CONFIG.dificultad.grades[g-1]}", lo cual es consistente con la naturaleza y alcance de las tareas descritas. No se evidencian elementos suficientes que justifiquen una clasificacion distinta.`;
   }
 
-  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.dificultad[g]} puntos de ${CONTINUOUS_MAX.dificultad} posibles) para el factor de Dificultad de Funciones.`;
-  return { grado:g, puntos:POINTS_MAP.dificultad[g], justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}` };
+  const resolucion = `Se asigna Grado ${g} (${getFactorPoints('dificultad', g, 'medio')} puntos de ${FACTOR_CONFIG.dificultad.maxPts} posibles) para el factor de Dificultad de Funciones.`;
+  return { grado:g, puntos:getFactorPoints('dificultad', g, 'medio'), justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}` };
 }
 
 function evalSupervision(acc:TaggedAccion[],pf:RolProfile,t:string):FactorResult{
@@ -323,10 +278,10 @@ function evalSupervision(acc:TaggedAccion[],pf:RolProfile,t:string):FactorResult
     hallazgos += ` En el procedimiento ${procAcc[0].procCodigo || 'PR-GEN'}, se indica: "${procAcc[0].oracion}".`;
   }
 
-  const analisis = `El analisis identifica ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Supervision Ejercida se define como "${GRADE_DESCRIPTIONS.supervision[g-1]}". Esto resulta acorde con la naturaleza de la autoridad delegada al puesto. No existe justificacion suficiente para asignar un grado distinto.`;
-  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.supervision[g]} puntos de ${CONTINUOUS_MAX.supervision} posibles) para el factor de Supervision Ejercida.`;
+  const analisis = `El analisis identifica ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Supervision Ejercida se define como "${FACTOR_CONFIG.supervision.grades[g-1]}". Esto resulta acorde con la naturaleza de la autoridad delegada al puesto. No existe justificacion suficiente para asignar un grado distinto.`;
+  const resolucion = `Se asigna Grado ${g} (${getFactorPoints('supervision', g, 'medio')} puntos de ${FACTOR_CONFIG.supervision.maxPts} posibles) para el factor de Supervision Ejercida.`;
 
-  return{grado:g,puntos:POINTS_MAP.supervision[g],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
+  return{grado:g,puntos:getFactorPoints('supervision', g, 'medio'),justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
 function evalResponsabilidad(acc:TaggedAccion[],pf:RolProfile,t:string):FactorResult{
@@ -355,10 +310,10 @@ function evalResponsabilidad(acc:TaggedAccion[],pf:RolProfile,t:string):FactorRe
     hallazgos += ` En el procedimiento ${procAcc[0].procCodigo || 'PR-GEN'}, se observa: "${procAcc[0].oracion}".`;
   }
 
-  const analisis = `El alcance funcional refleja ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Responsabilidad se define como "${GRADE_DESCRIPTIONS.responsabilidad[g-1]}", ajustandose fielmente al grado de riesgo y autonomia exigido. Un nivel superior requeriria autoridad sobre activos de mayor criticidad institucional.`;
-  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.responsabilidad[g]} puntos de ${CONTINUOUS_MAX.responsabilidad} posibles) para el factor de Responsabilidad.`;
+  const analisis = `El alcance funcional refleja ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Responsabilidad se define como "${FACTOR_CONFIG.responsabilidad.grades[g-1]}", ajustandose fielmente al grado de riesgo y autonomia exigido. Un nivel superior requeriria autoridad sobre activos de mayor criticidad institucional.`;
+  const resolucion = `Se asigna Grado ${g} (${getFactorPoints('responsabilidad', g, 'medio')} puntos de ${FACTOR_CONFIG.responsabilidad.maxPts} posibles) para el factor de Responsabilidad.`;
 
-  return{grado:g,puntos:POINTS_MAP.responsabilidad[g],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
+  return{grado:g,puntos:getFactorPoints('responsabilidad', g, 'medio'),justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
 function evalCondiciones(acc:TaggedAccion[],t:string,pf:RolProfile):FactorResult{
@@ -384,10 +339,10 @@ function evalCondiciones(acc:TaggedAccion[],t:string,pf:RolProfile):FactorResult
     hallazgos += ` En el procedimiento ${procAcc[0].procCodigo || 'PR-GEN'}, se describe un contexto afín: "${procAcc[0].oracion}".`;
   }
 
-  const analisis = `Se evidencia ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Condiciones de Trabajo se define como "${GRADE_DESCRIPTIONS.condiciones[g-1]}", que refleja adecuadamente el entorno fisico y ergonomico. No se justifica modificar este grado por falta de mayor exposicion comprobada.`;
-  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.condiciones[g]} puntos de ${CONTINUOUS_MAX.condiciones} posibles) para el factor de Condiciones de Trabajo.`;
+  const analisis = `Se evidencia ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Condiciones de Trabajo se define como "${FACTOR_CONFIG.condiciones.grades[g-1]}", que refleja adecuadamente el entorno fisico y ergonomico. No se justifica modificar este grado por falta de mayor exposicion comprobada.`;
+  const resolucion = `Se asigna Grado ${g} (${getFactorPoints('condiciones', g, 'medio')} puntos de ${FACTOR_CONFIG.condiciones.maxPts} posibles) para el factor de Condiciones de Trabajo.`;
 
-  return{grado:g,puntos:POINTS_MAP.condiciones[g],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
+  return{grado:g,puntos:getFactorPoints('condiciones', g, 'medio'),justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
 function evalError(acc:TaggedAccion[],t:string,pf:RolProfile):FactorResult{
@@ -415,10 +370,10 @@ function evalError(acc:TaggedAccion[],t:string,pf:RolProfile):FactorResult{
     hallazgos += ` En el procedimiento ${procAcc[0].procCodigo || 'PR-GEN'}, se requiere precaucion por: "${procAcc[0].oracion}".`;
   }
 
-  const analisis = `El analisis identifica ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Consecuencia del Error se define como "${GRADE_DESCRIPTIONS.error[g-1]}", que se corresponde con la magnitud de los perjuicios posibles. Un nivel superior estaria reservado a riesgos de mayor afectacion comprobada.`;
-  const resolucion = `Se asigna Grado ${g} (${POINTS_MAP.error[g]} puntos de ${CONTINUOUS_MAX.error} posibles) para el factor de Consecuencia del Error.`;
+  const analisis = `El analisis identifica ${razon}.${pfText} Segun la rubrica MSC, el Grado ${g} de Consecuencia del Error se define como "${FACTOR_CONFIG.error.grades[g-1]}", que se corresponde con la magnitud de los perjuicios posibles. Un nivel superior estaria reservado a riesgos de mayor afectacion comprobada.`;
+  const resolucion = `Se asigna Grado ${g} (${getFactorPoints('error', g, 'medio')} puntos de ${FACTOR_CONFIG.error.maxPts} posibles) para el factor de Consecuencia del Error.`;
 
-  return{grado:g,puntos:POINTS_MAP.error[g],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
+  return{grado:g,puntos:getFactorPoints('error', g, 'medio'),justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
 const EDUC:[RegExp,number,string][]=[
@@ -433,18 +388,18 @@ function evalRequisitos(educacion:string):FactorResult{
   const tn=norm(educacion);
   if(/no\s+(?:requiere|necesita|exige|se\s+requiere|se\s+exige)/i.test(tn)) {
     const hallazgos = `Se especifica formalmente que el puesto no requiere educacion academica ("${educacion}").`;
-    const analisis = `Al no solicitar estudios especificos, el puesto se ubica en el escalafon inicial. Segun la rubrica MSC, el Grado 1 se define como "${GRADE_DESCRIPTIONS.requisitos[0]}".`;
-    const resolucion = `Se asigna Grado 1 (${POINTS_MAP.requisitos[1]} puntos de ${CONTINUOUS_MAX.requisitos} posibles) para el factor de Requisitos.`;
-    return{grado:1,puntos:POINTS_MAP.requisitos[1],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
+    const analisis = `Al no solicitar estudios especificos, el puesto se ubica en el escalafon inicial. Segun la rubrica MSC, el Grado 1 se define como "${FACTOR_CONFIG.requisitos.grades[0]}".`;
+    const resolucion = `Se asigna Grado 1 (${getFactorPoints('requisitos', 1, 'medio')} puntos de ${FACTOR_CONFIG.requisitos.maxPts} posibles) para el factor de Requisitos.`;
+    return{grado:1,puntos:getFactorPoints('requisitos', 1, 'medio'),justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
   }
   let mg=1,lb='educacion basica';
   for(const[re,g,lbl]of EDUC)if(re.test(tn)&&g>mg){mg=g;lb=lbl;}
   
   const hallazgos = educacion ? `El requerimiento formal del perfil documenta: "${educacion.trim()}".` : `No se dispone de texto formal sobre requisitos de educacion, infiriendose la educacion basica.`;
-  const analisis = `Los estudios exigidos corresponden a la clasificacion de ${lb}. Segun la rubrica MSC, el Grado ${mg} de Requisitos se define como "${GRADE_DESCRIPTIONS.requisitos[mg-1]}". Este grado refleja fielmente el nivel de preparacion academica obligatoria para el adecuado cumplimiento de las funciones descritas.`;
-  const resolucion = `Se asigna Grado ${mg} (${POINTS_MAP.requisitos[mg]} puntos de ${CONTINUOUS_MAX.requisitos} posibles) para el factor de Requisitos.`;
+  const analisis = `Los estudios exigidos corresponden a la clasificacion de ${lb}. Segun la rubrica MSC, el Grado ${mg} de Requisitos se define como "${FACTOR_CONFIG.requisitos.grades[mg-1]}". Este grado refleja fielmente el nivel de preparacion academica obligatoria para el adecuado cumplimiento de las funciones descritas.`;
+  const resolucion = `Se asigna Grado ${mg} (${getFactorPoints('requisitos', mg, 'medio')} puntos de ${FACTOR_CONFIG.requisitos.maxPts} posibles) para el factor de Requisitos.`;
 
-  return{grado:mg,puntos:POINTS_MAP.requisitos[mg],justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
+  return{grado:mg,puntos:getFactorPoints('requisitos', mg, 'medio'),justificacion:`HALLAZGOS:\n${hallazgos}\n\nANÁLISIS:\n${analisis}\n\nRESOLUCIÓN:\n${resolucion}`};
 }
 
 export function evalProcedimientos(procCtx:any):{ref:string[];acc:TaggedAccion[]}{
@@ -543,15 +498,15 @@ export function contextualEvaluate(puesto:any,procCtx?:any,interviewCtx?:any):AI
     requisitos:evalRequisitos(ed),
   };
   const data:EvaluationSuggestion={
-    dificultad:res.dificultad.grado,dificultad_just:res.dificultad.justificacion,
-    supervision:res.supervision.grado,supervision_just:res.supervision.justificacion,
-    responsabilidad:res.responsabilidad.grado,responsabilidad_just:res.responsabilidad.justificacion,
-    condiciones:res.condiciones.grado,condiciones_just:res.condiciones.justificacion,
-    error:res.error.grado,error_just:res.error.justificacion,
-    requisitos:res.requisitos.grado,requisitos_just:res.requisitos.justificacion,
+    dificultad:res.dificultad.grado,dificultad_just:res.dificultad.justificacion,dificultad_intensidad:'medio',
+    supervision:res.supervision.grado,supervision_just:res.supervision.justificacion,supervision_intensidad:'medio',
+    responsabilidad:res.responsabilidad.grado,responsabilidad_just:res.responsabilidad.justificacion,responsabilidad_intensidad:'medio',
+    condiciones:res.condiciones.grado,condiciones_just:res.condiciones.justificacion,condiciones_intensidad:'medio',
+    error:res.error.grado,error_just:res.error.justificacion,error_intensidad:'medio',
+    requisitos:res.requisitos.grado,requisitos_just:res.requisitos.justificacion,requisitos_intensidad:'medio',
   };
   let total=0;const fp:Record<string,number>={};
-  for(const f of['dificultad','supervision','responsabilidad','condiciones','error','requisitos']){const g=res[f].grado;const pts=POINTS_MAP[f][g];total+=pts;fp[f]=pts;}
+  for(const f of['dificultad','supervision','responsabilidad','condiciones','error','requisitos']){const g=res[f].grado;const pts=getFactorPoints(f as any, g, 'medio');total+=pts;fp[f]=pts;}
   const pc:string[]=pr.ref.length?['dificultad','responsabilidad']:[];
 
   // Acotación de alerta global

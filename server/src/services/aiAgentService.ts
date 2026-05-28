@@ -2,12 +2,14 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
 import { enrich as enrichProc } from './procedimientosService';
-import { contextualEvaluate, POINTS_MAP, CONTINUOUS_MAX, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
+import { contextualEvaluate, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
+import { FACTOR_CONFIG, getFactorPoints, POINTS_MAP, type Intensidad } from '../config/factorTables';
 import type { InterviewContext } from './interviewParser';
 
 export const BUILD_VERSION = 'v13-ensemble-temp0';
 
-export { POINTS_MAP, CONTINUOUS_MAX, FactorKeywordDetail } from './contextualAnalyzer';
+export { POINTS_MAP } from '../config/factorTables';
+export { FactorKeywordDetail } from './contextualAnalyzer';
 export type { InterviewContext };
 
 export function getEngineStatus(): { activeEngine: 'llm' | 'rule-based' } {
@@ -32,50 +34,15 @@ function sanitizeInput(text: string): string {
 }
 
 function buildPrompt(puesto: any, interviewCtx?: InterviewContext, baseline?: any): string {
-  const gradeTable = Object.entries({
-    dificultad: [
-      'Grado 1 (40 pts): Tareas simples y repetitivas, poca iniciativa.',
-      'Grado 2 (80 pts): Tareas variadas pero estandarizadas.',
-      'Grado 3 (120 pts): Requiere analisis y juicio para resolver problemas tecnicos.',
-      'Grado 4 (160 pts): Alta complejidad, planeacion y coordinacion institucional.',
-      'Grado 5 (200 pts): Direccion estrategica y toma de decisiones criticas.'
-    ],
-    supervision: [
-      'Grado 1 (30 pts): No ejerce supervision.',
-      'Grado 2 (60 pts): Supervision ocasional de tareas simples.',
-      'Grado 3 (90 pts): Supervision de un grupo de trabajo operativo.',
-      'Grado 4 (120 pts): Jefatura de una unidad o departamento.',
-      'Grado 5 (150 pts): Direccion de un area tecnica o administrativa mayor.'
-    ],
-    responsabilidad: [
-      'Grado 1 (40 pts): Baja responsabilidad por valores o equipo.',
-      'Grado 2 (80 pts): Responsabilidad moderada por materiales y herramientas.',
-      'Grado 3 (120 pts): Custodia de informacion sensible o fondos fijos.',
-      'Grado 4 (160 pts): Responsabilidad por presupuestos o activos de alto valor.',
-      'Grado 5 (200 pts): Responsabilidad total por la gestion de un proceso clave.'
-    ],
-    condiciones: [
-      'Grado 1 (20 pts): Ambiente de oficina normal, riesgos minimos.',
-      'Grado 2 (40 pts): Esfuerzo fisico moderado o ambiente algo incomodo.',
-      'Grado 3 (60 pts): Exposicion a condiciones climaticas o ruido constante.',
-      'Grado 4 (80 pts): Riesgo de accidentes laborales o manejo de quimicos.',
-      'Grado 5 (100 pts): Condiciones de alta peligrosidad o insalubridad constante.'
-    ],
-    error: [
-      'Grado 1 (30 pts): Error facil de detectar y corregir.',
-      'Grado 2 (60 pts): Error causa retrasos menores en el flujo de trabajo.',
-      'Grado 3 (90 pts): Error afecta a otros departamentos o al servicio al cliente.',
-      'Grado 4 (120 pts): Error causa perdidas economicas o legales significativas.',
-      'Grado 5 (150 pts): Error compromete la estabilidad institucional o seguridad publica.'
-    ],
-    requisitos: [
-      'Grado 1 (40 pts): Educacion basica o primaria.',
-      'Grado 2 (80 pts): Bachillerato en Educacion Media o Tecnico basico.',
-      'Grado 3 (120 pts): Diplomado o Tecnico superior especializado.',
-      'Grado 4 (160 pts): Bachillerato Universitario o Licenciatura profesional.',
-      'Grado 5 (200 pts): Grado de Maestria o especializacion avanzada requerida.'
-    ]
-  }).map(([factor, grades]) => `${FACTOR_NAMES[factor] || factor}:\n${grades.map(g => `  ${g}`).join('\n')}`).join('\n\n');
+  const gradeTable = Object.entries(FACTOR_CONFIG).map(([factor, cfg]) => {
+    const label = FACTOR_NAMES[factor] || cfg.label;
+    const lines = cfg.grades.map((g, i) => {
+      if (i === 0) return '';
+      const [min, max] = cfg.ranges[i];
+      return `  Grado ${i} (${min}-${max} pts): ${g}`;
+    }).filter(Boolean);
+    return `${label} (${cfg.maxPts} pts max):\n${lines.join('\n')}`;
+  }).join('\n\n');
 
   let interviewSection = '';
   if (interviewCtx && interviewCtx.factores) {
@@ -153,7 +120,8 @@ Experiencia requerida: ${sanitizeInput(puesto.experiencia_requerida) || 'No espe
 ${interviewSection}
 ${baselineSection}
 === ESCALA DE GRADOS POR FACTOR ===
-Cada factor se califica del 1 (minimo) al 5 (maximo).
+Cada factor se califica del 1 (minimo) al 6 (maximo) segun la rubrica oficial, excepto Condiciones de Trabajo que va del 1 al 5.
+Ademas, para cada factor debes evaluar la INTENSIDAD (bajo, medio o alto) basandote en que tan profundo calzan las funciones dentro del grado asignado.
 
 ${gradeTable}
 
@@ -182,41 +150,47 @@ Para CADA factor, realiza un analisis multidimensional cruzando nuestras 3 fuent
 
 === FORMATO JSON REQUERIDO ===
 {
-  "dificultad": <1-5>,
+  "dificultad": <1-6>,
   "dificultad_just": "<justificacion tecnica>",
   "dificultad_cita_documental": "<cita textual de las funciones>",
   "dificultad_fuente": "documental|entrevista|mixta",
   "dificultad_cita_entrevista": "<cita textual de la entrevista si aplica o ''>",
+  "dificultad_intensidad": "bajo|medio|alto",
 
-  "supervision": <1-5>,
+  "supervision": <1-6>,
   "supervision_just": "<justificacion tecnica>",
   "supervision_cita_documental": "<cita textual>",
   "supervision_fuente": "documental|entrevista|mixta",
   "supervision_cita_entrevista": "<cita o ''>",
+  "supervision_intensidad": "bajo|medio|alto",
 
-  "responsabilidad": <1-5>,
+  "responsabilidad": <1-6>,
   "responsabilidad_just": "<justificacion tecnica>",
   "responsabilidad_cita_documental": "<cita textual>",
   "responsabilidad_fuente": "documental|entrevista|mixta",
   "responsabilidad_cita_entrevista": "<cita o ''>",
+  "responsabilidad_intensidad": "bajo|medio|alto",
 
   "condiciones": <1-5>,
   "condiciones_just": "<justificacion tecnica>",
   "condiciones_cita_documental": "<cita textual>",
   "condiciones_fuente": "documental|entrevista|mixta",
   "condiciones_cita_entrevista": "<cita o ''>",
+  "condiciones_intensidad": "bajo|medio|alto",
 
-  "error": <1-5>,
+  "error": <1-6>,
   "error_just": "<justificacion tecnica>",
   "error_cita_documental": "<cita textual>",
   "error_fuente": "documental|entrevista|mixta",
   "error_cita_entrevista": "<cita o ''>",
+  "error_intensidad": "bajo|medio|alto",
 
-  "requisitos": <1-5>,
+  "requisitos": <1-6>,
   "requisitos_just": "<justificacion tecnica>",
   "requisitos_cita_documental": "<cita textual>",
   "requisitos_fuente": "documental|entrevista|mixta",
   "requisitos_cita_entrevista": "<cita o ''>",
+  "requisitos_intensidad": "bajo|medio|alto",
 
   "alertas_contradiccion": ["<alerta si hay contradiccion entre fuentes>"]
 }
@@ -230,8 +204,9 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
 
   for (const factor of FACTORS) {
     const grado = Number(suggestion[factor]);
-    if (!Number.isInteger(grado) || grado < 1 || grado > 5) {
-      errors.push(`${factor}: debe ser entero entre 1 y 5, recibio ${suggestion[factor]}`);
+    const maxGrado = factor === 'condiciones' ? 5 : 6;
+    if (!Number.isInteger(grado) || grado < 1 || grado > maxGrado) {
+      errors.push(`${factor}: debe ser entero entre 1 y ${maxGrado}, recibio ${suggestion[factor]}`);
       suggestion[factor] = 1;
     }
     const justKey = `${factor}_just`;
@@ -239,6 +214,13 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
       errors.push(`${justKey}: justificacion muy corta o vacia`);
       suggestion[justKey] = suggestion[justKey] || 'Analisis basado en la descripcion de funciones del puesto.';
     }
+
+    // Extraer intensidad (default 'medio')
+    const intensidadKey = `${factor}_intensidad`;
+    const intensidad: Intensidad = ['bajo', 'medio', 'alto'].includes(suggestion[intensidadKey])
+      ? suggestion[intensidadKey]
+      : 'medio';
+    suggestion[intensidadKey] = intensidad;
 
     // Extraer campos multifuente
     const citaDocKey = `${factor}_cita_documental`;
@@ -257,10 +239,12 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
       suggestion[`${factor}_contradiccion`] === 'true'
     ));
 
+    const puntos = getFactorPoints(factor, Number(suggestion[factor]), intensidad);
+
     analisis_multifuente.push({
       factor,
       grado: Number(suggestion[factor]),
-      puntos: POINTS_MAP[factor][Number(suggestion[factor])] || 0,
+      puntos,
       justificacion_documental: suggestion[justKey] || '',
       cita_documental: citaDocumental,
       justificacion_entrevista: undefined,
@@ -275,7 +259,10 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
 
   let totalPuntos = 0;
   for (const factor of FACTORS) {
-    totalPuntos += POINTS_MAP[factor][suggestion[factor]];
+    const intensidad: Intensidad = ['bajo', 'medio', 'alto'].includes(suggestion[`${factor}_intensidad`])
+      ? suggestion[`${factor}_intensidad`]
+      : 'medio';
+    totalPuntos += getFactorPoints(factor, suggestion[factor], intensidad);
   }
 
   const alertasContradiccion: string[] = suggestion.alertas_contradiccion || [];
@@ -307,34 +294,40 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
       dificultad_cita_documental: { type: SchemaType.STRING as const },
       dificultad_fuente: { type: SchemaType.STRING as const },
       dificultad_cita_entrevista: { type: SchemaType.STRING as const },
+      dificultad_intensidad: { type: SchemaType.STRING as const },
       supervision: { type: SchemaType.INTEGER as const },
       supervision_just: { type: SchemaType.STRING as const },
       supervision_cita_documental: { type: SchemaType.STRING as const },
       supervision_fuente: { type: SchemaType.STRING as const },
       supervision_cita_entrevista: { type: SchemaType.STRING as const },
+      supervision_intensidad: { type: SchemaType.STRING as const },
       responsabilidad: { type: SchemaType.INTEGER as const },
       responsabilidad_just: { type: SchemaType.STRING as const },
       responsabilidad_cita_documental: { type: SchemaType.STRING as const },
       responsabilidad_fuente: { type: SchemaType.STRING as const },
       responsabilidad_cita_entrevista: { type: SchemaType.STRING as const },
+      responsabilidad_intensidad: { type: SchemaType.STRING as const },
       condiciones: { type: SchemaType.INTEGER as const },
       condiciones_just: { type: SchemaType.STRING as const },
       condiciones_cita_documental: { type: SchemaType.STRING as const },
       condiciones_fuente: { type: SchemaType.STRING as const },
       condiciones_cita_entrevista: { type: SchemaType.STRING as const },
+      condiciones_intensidad: { type: SchemaType.STRING as const },
       error: { type: SchemaType.INTEGER as const },
       error_just: { type: SchemaType.STRING as const },
       error_cita_documental: { type: SchemaType.STRING as const },
       error_fuente: { type: SchemaType.STRING as const },
       error_cita_entrevista: { type: SchemaType.STRING as const },
+      error_intensidad: { type: SchemaType.STRING as const },
       requisitos: { type: SchemaType.INTEGER as const },
       requisitos_just: { type: SchemaType.STRING as const },
       requisitos_cita_documental: { type: SchemaType.STRING as const },
       requisitos_fuente: { type: SchemaType.STRING as const },
       requisitos_cita_entrevista: { type: SchemaType.STRING as const },
+      requisitos_intensidad: { type: SchemaType.STRING as const },
       alertas_contradiccion: { type: SchemaType.ARRAY as const, items: { type: SchemaType.STRING as const } }
     },
-    required: ["dificultad", "supervision", "responsabilidad", "condiciones", "error", "requisitos"]
+    required: ["dificultad", "supervision", "responsabilidad", "condiciones", "error", "requisitos", "dificultad_intensidad", "supervision_intensidad", "responsabilidad_intensidad", "condiciones_intensidad", "error_intensidad", "requisitos_intensidad"]
   };
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
@@ -357,7 +350,8 @@ async function callGeminiEnsemble(prompt: string): Promise<any> {
       if (i > 0) await new Promise(r => setTimeout(r, 500));
       const raw = await callGemini(prompt);
       for (const f of FACTORS) {
-        if (!raw[f] || raw[f] < 1 || raw[f] > 5) raw[f] = 1;
+        const maxG = f === 'condiciones' ? 5 : 6;
+        if (!raw[f] || raw[f] < 1 || raw[f] > maxG) raw[f] = 1;
       }
       results.push(raw);
     } catch (e) {
@@ -391,14 +385,14 @@ async function callGeminiEnsemble(prompt: string): Promise<any> {
   return modeResult;
 }
 
-function calculateFactorPoints(data: EvaluationSuggestion): Record<string, number> {
+function calculateFactorPoints(data: any): Record<string, number> {
   return {
-    dificultad: POINTS_MAP.dificultad[data.dificultad],
-    supervision: POINTS_MAP.supervision[data.supervision],
-    responsabilidad: POINTS_MAP.responsabilidad[data.responsabilidad],
-    condiciones: POINTS_MAP.condiciones[data.condiciones],
-    error: POINTS_MAP.error[data.error],
-    requisitos: POINTS_MAP.requisitos[data.requisitos],
+    dificultad: getFactorPoints('dificultad', data.dificultad, data.dificultad_intensidad || 'medio'),
+    supervision: getFactorPoints('supervision', data.supervision, data.supervision_intensidad || 'medio'),
+    responsabilidad: getFactorPoints('responsabilidad', data.responsabilidad, data.responsabilidad_intensidad || 'medio'),
+    condiciones: getFactorPoints('condiciones', data.condiciones, data.condiciones_intensidad || 'medio'),
+    error: getFactorPoints('error', data.error, data.error_intensidad || 'medio'),
+    requisitos: getFactorPoints('requisitos', data.requisitos, data.requisitos_intensidad || 'medio'),
   };
 }
 
