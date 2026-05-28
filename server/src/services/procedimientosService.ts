@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { buildAliasSet, JOB_ALIASES } from '../config/jobAliases';
 
 const supabaseUrl = process.env.VITE_SUPABASE_URL || '';
 const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY || '';
@@ -35,6 +36,14 @@ export async function enrich(puesto: any): Promise<ProcedimientosContext | null>
 
     const nombreSim = cargoData?.nombre_sim || puesto.nombre;
     console.log(`[Procedimientos] Resolviendo puesto "${puesto.nombre}" con alias SIM: "${nombreSim}"`);
+
+    // Construir el set consolidado de aliases para este puesto
+    const aliases = buildAliasSet(puesto.nombre, nombreSim);
+    const dictAliases = JOB_ALIASES[puesto.nombre];
+    if (dictAliases && dictAliases.length > 0) {
+      console.log(`[Procedimientos] 📋 Alias del diccionario activados para "${puesto.nombre}": [${dictAliases.join(', ')}]`);
+    }
+    console.log(`[Procedimientos] Set de búsqueda consolidado: [${Array.from(aliases).join(', ')}]`);
 
     // 2. Mapear de forma dinámica el nombre del departamento/área con su código de Supabase (ej: "Control Interno" -> "DCI")
     const areaTarget = puesto.area || '';
@@ -94,15 +103,18 @@ export async function enrich(puesto: any): Promise<ProcedimientosContext | null>
     for (const proc of procedimientos) {
       const pasosProc = pasos.filter((p: any) => p.procedimiento_codigo === proc.codigo && p.descripcion);
       
-      // Filtrar procedimientos: solo nos interesan donde el puesto tenga alguna intervención (evaluando nombre o alias)
-      const isPositionInvolved = pasosProc.some((p: any) => 
-        p.responsable && (
-          p.responsable.toLowerCase().includes(puesto.nombre.toLowerCase()) ||
-          p.responsable.toLowerCase().includes(nombreSim.toLowerCase()) ||
-          puesto.nombre.toLowerCase().includes(p.responsable.toLowerCase()) ||
-          nombreSim.toLowerCase().includes(p.responsable.toLowerCase())
-        )
-      );
+      // Filtrar procedimientos: solo nos interesan donde el puesto tenga alguna intervención
+      // Se evalúa contra el set consolidado de aliases (nombre + SIM + diccionario)
+      const isPositionInvolved = pasosProc.some((p: any) => {
+        if (!p.responsable) return false;
+        const respLower = p.responsable.toLowerCase();
+        for (const alias of aliases) {
+          if (respLower.includes(alias) || alias.includes(respLower)) {
+            return true;
+          }
+        }
+        return false;
+      });
 
       // Si el puesto no tiene pasos asignados en este procedimiento, lo ignoramos para no saturar el contexto de la IA
       if (!isPositionInvolved) continue;
@@ -114,12 +126,22 @@ export async function enrich(puesto: any): Promise<ProcedimientosContext | null>
 
       for (const paso of pasosProc) {
         // Verificar si el puesto actual es responsable de este paso específico
-        const isResponsible = paso.responsable && (
-          paso.responsable.toLowerCase().includes(puesto.nombre.toLowerCase()) ||
-          paso.responsable.toLowerCase().includes(nombreSim.toLowerCase()) ||
-          puesto.nombre.toLowerCase().includes(paso.responsable.toLowerCase()) ||
-          nombreSim.toLowerCase().includes(paso.responsable.toLowerCase())
-        );
+        // Se evalúa contra el set consolidado de aliases
+        let isResponsible = false;
+        let matchedAlias = '';
+        if (paso.responsable) {
+          const respLower = paso.responsable.toLowerCase();
+          for (const alias of aliases) {
+            if (respLower.includes(alias) || alias.includes(respLower)) {
+              isResponsible = true;
+              // Log de auditoría: registrar qué alias produjo el match
+              if (alias !== puesto.nombre.toLowerCase() && alias !== nombreSim.toLowerCase()) {
+                matchedAlias = alias;
+              }
+              break;
+            }
+          }
+        }
 
         const responsableTag = paso.responsable ? ` [Responsable: ${paso.responsable}]` : '';
         const actionTag = isResponsible ? ' (¡EL PUESTO EVALUADO REALIZA ESTA TAREA!)' : '';
@@ -137,7 +159,9 @@ export async function enrich(puesto: any): Promise<ProcedimientosContext | null>
       return null;
     }
 
-    console.log(`[Procedimientos] Inyectados ${procsFiltrados.length} procedimientos con participación activa en el prompt.`);
+    // Log de auditoría: resumen de la vinculación
+    const usedDictAlias = dictAliases && dictAliases.length > 0;
+    console.log(`[Procedimientos] ✅ Inyectados ${procsFiltrados.length} procedimientos con participación activa.${usedDictAlias ? ' (Match vía diccionario de alias)' : ''}`);
 
     return {
       procedimientos: procsFiltrados,
