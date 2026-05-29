@@ -332,7 +332,11 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
   };
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
-    generationConfig: { responseMimeType: 'application/json', temperature }
+    generationConfig: { 
+      responseMimeType: 'application/json', 
+      responseSchema: schema, 
+      temperature 
+    }
   });
   const result = await model.generateContent(prompt);
   const jsonText = result.response.text();
@@ -349,14 +353,22 @@ async function callGeminiEnsemble(prompt: string): Promise<any> {
   for (let i = 0; i < ENSEMBLE_CALLS; i++) {
     try {
       if (i > 0) await new Promise(r => setTimeout(r, 500));
-      const raw = await callGemini(prompt);
+      
+      let raw = null;
+      try {
+        raw = await callGemini(prompt);
+      } catch (apiError) {
+        console.warn("[AI Service] Fallo en primer intento, reintentando en 1s...");
+        await new Promise(r => setTimeout(r, 1000));
+        raw = await callGemini(prompt); // Segundo intento
+      }
       for (const f of FACTORS) {
         const maxG = f === 'condiciones' ? 5 : 6;
         if (!raw[f] || raw[f] < 1 || raw[f] > maxG) raw[f] = 1;
       }
       results.push(raw);
     } catch (e) {
-      console.error("[AI Service] Error in callGemini:", e);
+      console.error("[AI Service] Error definitivo en callGemini:", e);
       continue;
     }
   }
