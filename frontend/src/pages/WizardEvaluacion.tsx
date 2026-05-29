@@ -7,19 +7,21 @@ import EvidenceReport from '../components/evaluation/EvidenceReport';
 import AdjustmentPanel from '../components/evaluation/AdjustmentPanel';
 
 const FACTORS_CONFIG = [
-  { key: 'dificultad', label: 'Dificultad de Funciones', icon: Target, points: [0, 40, 80, 120, 160, 200], maxPts: 200, desc: 'Complejidad de las tareas, iniciativa y juicio requerido.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica y decisiones críticas.'] },
-  { key: 'supervision', label: 'Supervisión Ejercida', icon: Briefcase, points: [0, 30, 60, 90, 120, 150], maxPts: 150, desc: 'Cantidad y nivel de personal bajo su cargo.', grades: ['', 'No ejerce supervisión.', 'Supervisión ocasional.', 'Supervisión de grupo operativo.', 'Jefatura de unidad.', 'Dirección de área mayor.'] },
-  { key: 'responsabilidad', label: 'Responsabilidad', icon: ShieldAlert, points: [0, 40, 80, 120, 160, 200], maxPts: 200, desc: 'Responsabilidad por valores, equipo o información.', grades: ['', 'Baja responsabilidad.', 'Responsabilidad moderada.', 'Custodia de información sensible.', 'Responsabilidad por presupuestos.', 'Gestión de proceso clave.'] },
-  { key: 'condiciones', label: 'Condiciones de Trabajo', icon: Thermometer, points: [0, 20, 40, 60, 80, 100], maxPts: 100, desc: 'Exposición a riesgos y esfuerzo físico.', grades: ['', 'Oficina normal.', 'Esfuerzo moderado.', 'Exposición climática o ruido.', 'Riesgo de accidentes.', 'Alta peligrosidad.'] },
-  { key: 'error', label: 'Consecuencia del Error', icon: AlertTriangle, points: [0, 30, 60, 90, 120, 150], maxPts: 150, desc: 'Gravedad del daño institucional por error.', grades: ['', 'Error fácil de corregir.', 'Retrasos menores.', 'Afecta otros departamentos.', 'Pérdidas económicas/legales.', 'Compromete estabilidad.'] },
-  { key: 'requisitos', label: 'Requisitos', icon: GraduationCap, points: [0, 40, 80, 120, 160, 200], maxPts: 200, desc: 'Nivel académico y experiencia requerida.', grades: ['', 'Educación básica.', 'Bachillerato / Técnico.', 'Diplomado / Técnico superior.', 'Bachillerato / Licenciatura.', 'Maestría / Especialización.'] }
+  { key: 'dificultad', label: 'Dificultad de Funciones', icon: Target, points: [0, 13, 40, 65, 90, 118, 143], maxPts: 150, desc: 'Complejidad de las tareas, iniciativa y juicio requerido.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica.', 'Análisis sin precedentes.'] },
+  { key: 'supervision', label: 'Supervisión Ejercida', icon: Briefcase, points: [0, 15, 40, 65, 90, 115, 140], maxPts: 150, desc: 'Cantidad y nivel de personal bajo su cargo.', grades: ['', 'No ejerce supervisión.', 'Supervisión ocasional.', 'Supervisión de grupo operativo.', 'Jefatura de unidad.', 'Dirección de área mayor.', 'Coordina programas.'] },
+  { key: 'responsabilidad', label: 'Responsabilidad', icon: ShieldAlert, points: [0, 13, 40, 65, 90, 128, 180], maxPts: 200, desc: 'Responsabilidad por valores, equipo o información.', grades: ['', 'Baja responsabilidad.', 'Responsabilidad moderada.', 'Custodia de información sensible.', 'Responsabilidad por presupuestos.', 'Gestión de proceso clave.', 'Responsabilidad completa.'] },
+  { key: 'condiciones', label: 'Condiciones de Trabajo', icon: Thermometer, points: [0, 18, 48, 78, 108, 138], maxPts: 150, desc: 'Exposición a riesgos y esfuerzo físico.', grades: ['', 'Oficina normal.', 'Esfuerzo moderado.', 'Exposición climática o ruido.', 'Riesgo de accidentes.', 'Alta peligrosidad.'] },
+  { key: 'error', label: 'Consecuencia del Error', icon: AlertTriangle, points: [0, 13, 40, 65, 90, 115, 140], maxPts: 150, desc: 'Gravedad del daño institucional por error.', grades: ['', 'Error fácil de corregir.', 'Retrasos menores.', 'Afecta otros departamentos.', 'Pérdidas económicas/legales.', 'Compromete estabilidad.', 'Daños irreversibles.'] },
+  { key: 'requisitos', label: 'Requisitos', icon: GraduationCap, points: [0, 13, 35, 63, 90, 115, 140], maxPts: 150, desc: 'Nivel académico y experiencia requerida.', grades: ['', 'Educación básica.', 'Bachillerato / Técnico.', 'Diplomado / Técnico superior.', 'Bachillerato / Licenciatura.', 'Maestría / Especialización.', 'Postgrado avanzado.'] }
 ];
 
-// SOURCE OF TRUTH: server/src/config/factorTables.ts — keep values in sync
 const POINTS_MAP: Record<string, number[]> = Object.fromEntries(FACTORS_CONFIG.map(f => [f.key, f.points]));
 
-function linearPts(grado: number, maxPts: number): number {
-  return Math.round(maxPts * (Math.max(1, Math.min(5, grado)) - 1) / 4);
+function linearPts(grado: number, factorKey: string): number {
+  const factor = FACTORS_CONFIG.find(f => f.key === factorKey);
+  if (!factor) return 0;
+  const safeGrade = Math.max(0, Math.min(grado, factor.points.length - 1));
+  return factor.points[safeGrade];
 }
 
 interface FactorState {
@@ -254,10 +256,10 @@ const WizardEvaluacion: React.FC = () => {
     if (Object.keys(base).length === 0) {
       for (const f of FACTORS_CONFIG) {
         const a = analisis[f.key];
-        if (a) base[f.key] = linearPts(a.grado, f.maxPts);
+        if (a) base[f.key] = linearPts(a.grado, f.key);
       }
     }
-    base[factorKey] = linearPts(grado, factor.maxPts);
+    base[factorKey] = linearPts(grado, factor.key);
     setFactorPoints(base);
     setTotalPuntos(Object.values(base).reduce((s, v) => s + v, 0));
 
@@ -283,7 +285,7 @@ const WizardEvaluacion: React.FC = () => {
     }
   };
 
-  const totalMax = FACTORS_CONFIG.reduce((sum, f) => sum + f.points[5], 0);
+  const totalMax = FACTORS_CONFIG.reduce((sum, f) => sum + f.maxPts, 0);
   const porcentaje = totalMax > 0 ? Math.round((totalPuntos / totalMax) * 100) : 0;
   const estrato = useMemo<EstratoResult | null>(() => getEstratoCompleto(totalPuntos, puestoDetails?.nombre, puestoDetails?.codigo_clase_msc, puestoDetails?.educacion_requerida, puestoDetails?.estrato), [totalPuntos, puestoDetails?.nombre, puestoDetails?.codigo_clase_msc, puestoDetails?.educacion_requerida, puestoDetails?.estrato]);
 
