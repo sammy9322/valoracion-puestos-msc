@@ -1,7 +1,7 @@
 export const FACTOR_CONFIG = {
   dificultad: {
-    label: 'Dificultad de Funciones', maxPts: 150,
-    ranges: [[0,0], [0,25], [30,50], [55,75], [80,100], [105,130], [135,150]],
+    label: 'Dificultad de Funciones', maxPts: 200,
+    ranges: [[0,0], [0,35], [40,65], [70,100], [105,135], [140,175], [180,200]],
     grades: ['', 'Tareas simples y repetitivas, poca iniciativa.', 'Tareas variadas pero estandarizadas.', 'Requiere análisis y juicio para resolver problemas técnicos.', 'Alta complejidad, planeación y coordinación institucional.', 'Dirección estratégica y toma de decisiones críticas.', 'Análisis y solución de problemas sin precedentes.']
   },
   supervision: {
@@ -15,8 +15,8 @@ export const FACTOR_CONFIG = {
     grades: ['', 'Baja responsabilidad por valores o equipo.', 'Responsabilidad moderada por materiales y herramientas.', 'Custodia de información sensible o fondos fijos.', 'Responsabilidad por presupuestos o activos de alto valor.', 'Responsabilidad total por la gestión de un proceso clave.', 'Responsabilidad completa de unidad y decisiones trascendentales.']
   },
   condiciones: {
-    label: 'Condiciones de Trabajo', maxPts: 150,
-    ranges: [[0,0], [5,30], [35,60], [65,90], [95,120], [125,150]],
+    label: 'Condiciones de Trabajo', maxPts: 100,
+    ranges: [[0,0], [5,20], [25,40], [45,60], [65,80], [85,100]],
     grades: ['', 'Ambiente de oficina normal, riesgos mínimos.', 'Esfuerzo físico moderado o ambiente algo incómodo.', 'Exposición a condiciones climáticas o ruido constante.', 'Riesgo de accidentes laborales o manejo de químicos.', 'Condiciones de alta peligrosidad o insalubridad constante.']
   },
   error: {
@@ -25,8 +25,8 @@ export const FACTOR_CONFIG = {
     grades: ['', 'Error fácil de detectar y corregir.', 'Error causa retrasos menores en el flujo de trabajo.', 'Error afecta a otros departamentos o al servicio al cliente.', 'Error causa pérdidas económicas o legales significativas.', 'Error compromete la estabilidad institucional o seguridad pública.', 'Decisiones críticas; el error causa daños irreversibles institucionales.']
   },
   requisitos: {
-    label: 'Requisitos', maxPts: 150,
-    ranges: [[0,0], [5,20], [25,45], [50,75], [80,100], [105,125], [130,150]],
+    label: 'Requisitos', maxPts: 200,
+    ranges: [[0,0], [5,25], [35,60], [65,100], [105,135], [140,165], [170,200]],
     grades: ['', 'Educación básica o primaria.', 'Bachillerato en Educación Media o Técnico básico.', 'Diplomado o Técnico superior especializado.', 'Bachillerato Universitario o Licenciatura profesional.', 'Grado de Maestría o especialización avanzada requerida.', 'Postgrado avanzado y madurez profesional crítica.']
   }
 };
