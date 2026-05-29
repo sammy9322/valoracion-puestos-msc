@@ -115,25 +115,14 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
 
       <!-- Alerta Global -->
       ${(() => {
-        if (!evaluacion.alerta_global) return '';
-        const contradicciones = (evaluacion.analisis_multifuente || []).filter((m: any) => m.contradiccion);
-        const count = contradicciones.length;
-        const textoAlerta = count === 1 ? 'Se detectó 1 alerta de contradicción entre fuentes. Consulte la sección 3 para valorarla.' : `Se detectaron ${count} alertas de contradicción entre fuentes. Consulte la sección 3 para valorarlas.`;
-        
+        const alertas = evaluacion.alerta_global ? evaluacion.alerta_global.split('\n').filter((l: string) => l.trim().startsWith('•')) : [];
+        const count = alertas.length;
+        if (count === 0) return '';
         return `
-        <div class="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-xl mb-8 avoid-break">
-          <div class="flex items-start">
-            <svg class="h-6 w-6 text-amber-500 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
-            <div>
-              <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide">Alerta de Contradicción</h3>
-              <p class="mt-1 text-sm text-amber-900 leading-relaxed">${evaluacion.alerta_global.replace(/\\n/g, '<br>')}</p>
-              ${count > 0 ? `<p class="mt-2 text-sm text-amber-800 font-semibold"><a href="#seccion-contradicciones" class="underline decoration-amber-500 hover:text-amber-600">${textoAlerta}</a></p>` : ''}
-            </div>
-          </div>
-        </div>
-        `;
+        <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-xl mb-6">
+          <h3 class="font-bold text-amber-800 text-sm mb-1">⚠️ Alerta de Contradicción</h3>
+          <p class="text-sm text-amber-700">${count === 1 ? 'Se detectó 1 discrepancia entre fuentes.' : `Se detectaron ${count} discrepancias entre fuentes.`} Cada contradicción se detalla en la sección del factor correspondiente.</p>
+        </div>`;
       })()}
 
       <!-- Resultado Principal -->
@@ -241,6 +230,19 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
                 </h4>
                 <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line text-justify">${fJustificacion}</p>
               </div>
+              ${(() => {
+                if (!evaluacion.alerta_global) return '';
+                const alertas = evaluacion.alerta_global.split('\n').filter((l: string) => l.trim().startsWith('•'));
+                const factorLabel = (FACTOR_DISPLAY as any)[factorKey]?.label || factorKey;
+                const match = alertas.find((a: string) => a.toLowerCase().includes(factorKey.toLowerCase()) || a.includes(factorLabel));
+                if (!match) return '';
+                const textoLimpio = match.replace(/^•\s*/, '').replace(new RegExp('^' + factorLabel + '\\s*', 'i'), '').trim();
+                return `
+                <div class="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p class="text-xs font-semibold text-amber-800 mb-1">⚠️ Discrepancia Detectada</p>
+                  <p class="text-xs text-amber-700 leading-relaxed">${textoLimpio}</p>
+                </div>`;
+              })()}
             </div>
           </div>
           `;
