@@ -104,7 +104,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
           </div>
           <div>
             <p class="text-xs text-gray-500 uppercase">Superior Inmediato</p>
-            <p class="font-medium text-gray-800">${puesto.jefatura || 'N/A'}</p>
+            <p class="font-medium text-gray-800">${puesto.reporta_a || 'N/A'}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500 uppercase">Motor de Evaluación</p>

@@ -373,6 +373,27 @@ router.get('/:id/report', async (req, res) => {
         (evaluacion as any).motor = motor;
         (evaluacion as any).buildVersion = buildVersion;
 
+        try {
+            const auditoria = await prisma.auditoria.findFirst({
+                where: {
+                    registro_id: id,
+                    accion: 'EVALUACION_IA'
+                },
+                orderBy: { timestamp: 'desc' }
+            });
+            if (auditoria && auditoria.datos_despues) {
+                const datos = typeof auditoria.datos_despues === 'string' ? JSON.parse(auditoria.datos_despues) : auditoria.datos_despues;
+                if (!(evaluacion as any).analisis_multifuente && datos.analisis_multifuente) {
+                    (evaluacion as any).analisis_multifuente = datos.analisis_multifuente;
+                }
+                if (!(evaluacion as any).alerta_global && datos.alerta_global) {
+                    (evaluacion as any).alerta_global = datos.alerta_global;
+                }
+            }
+        } catch (e) {
+            console.warn('[Evaluacion] Could not read auditoria for multifuente data:', e);
+        }
+
         const procCtx = await enrichProc(evaluacion.puesto).catch(() => undefined);
 
         const puestoNombre = evaluacion.puesto.nombre.replace(/\s+/g, '-').toLowerCase();
