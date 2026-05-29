@@ -256,7 +256,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
             Tecnica: 390, Profesional: 610, Jefatura: 880
           };
           const maxPuntos = limites[serie] || 1000;
-          if (totalPuntos > maxPuntos) return '';
+          if (totalPuntos <= maxPuntos) return '';
           return `
           <div class="mt-6 bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r-xl">
             <h3 class="text-xs font-bold text-indigo-800 uppercase tracking-widest mb-1">Acotaci\u00f3n Jer\u00e1rquica Activa</h3>
