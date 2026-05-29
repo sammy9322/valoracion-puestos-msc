@@ -1,16 +1,11 @@
 import PDFDocument from 'pdfkit';
 import type { ProcedimientosContext } from './procedimientosService';
 import { extraerAcciones, evalProcedimientos, TaggedAccion } from './contextualAnalyzer';
-import { POINTS_MAP } from '../config/factorTables';
+import { FACTOR_CONFIG } from '../config/factorTables';
 
-const FACTOR_DISPLAY: Record<string, { label: string; max: number }> = {
-  dificultad: { label: 'Dificultad de Funciones', max: 200 },
-  supervision: { label: 'Supervision Ejercida', max: 150 },
-  responsabilidad: { label: 'Responsabilidad', max: 200 },
-  condiciones: { label: 'Condiciones de Trabajo', max: 100 },
-  error: { label: 'Consecuencia del Error', max: 150 },
-  requisitos: { label: 'Requisitos', max: 200 },
-};
+const FACTOR_DISPLAY = Object.fromEntries(
+  Object.entries(FACTOR_CONFIG).map(([k, v]) => [k, { label: v.label, max: v.maxPts }])
+);
 
 const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
 
@@ -20,21 +15,24 @@ const GRADES_DESC: Record<string, string[]> = {
     'Tareas variadas estandarizadas',
     'Analisis y juicio tecnico',
     'Alta complejidad y planeacion',
-    'Direccion estrategica'
+    'Direccion estrategica',
+    'Analisis y solucion de problemas sin precedentes'
   ],
   supervision: [
     'No ejerce supervision',
     'Supervision ocasional',
     'Supervision de grupo operativo',
     'Jefatura de unidad',
-    'Direccion de area mayor'
+    'Direccion de area mayor',
+    'Coordina programas de alto nivel, autonomia completa'
   ],
   responsabilidad: [
     'Baja responsabilidad',
     'Responsabilidad moderada',
     'Custodia de info sensible',
     'Responsabilidad por presupuestos',
-    'Gestion de proceso clave'
+    'Gestion de proceso clave',
+    'Responsabilidad completa de unidad'
   ],
   condiciones: [
     'Oficina normal',
@@ -48,14 +46,16 @@ const GRADES_DESC: Record<string, string[]> = {
     'Retrasos menores',
     'Afecta otros deptos',
     'Perdidas economicas/legales',
-    'Compromete estabilidad'
+    'Compromete estabilidad',
+    'Decisiones criticas; daños irreversibles'
   ],
   requisitos: [
     'Educacion basica',
     'Bachillerato / Tecnico',
     'Diplomado / Tecnico sup.',
     'Licenciatura',
-    'Maestria / Doctorado'
+    'Maestria / Doctorado',
+    'Postgrado avanzado y madurez profesional'
   ],
 };
 
@@ -78,14 +78,15 @@ const C = {
   g5: '#8b5cf6'  // Purple
 };
 
-function g(gv: number): number { return Math.max(1, Math.min(5, gv)); }
+function g(gv: number): number { return Math.max(1, Math.min(6, gv)); }
 
 function getGradeColor(gr: number): string {
   if (gr === 1) return '#10b981'; // Emerald
   if (gr === 2) return '#06b6d4'; // Teal/Cyan
   if (gr === 3) return '#3b82f6'; // Royal Blue
   if (gr === 4) return '#1e3a5f'; // Navy Institutional
-  return '#8b5cf6'; // Purple / Directivo
+  if (gr === 5) return '#8b5cf6'; // Purple / Directivo
+  return '#dc2626'; // G6 — Red / Maximo critico
 }
 
 export const ESTRATOS_MUNICIPALES = [

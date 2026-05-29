@@ -138,7 +138,7 @@ Para CADA factor, realiza un analisis multidimensional cruzando nuestras 3 fuent
 
 === INSTRUCCIONES CRITICAS ===
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
-- Cada grado debe ser un numero entero entre 1 y 5.
+- Cada grado debe ser un numero entero entre 1 y 6 (Condiciones de Trabajo: 1-5).
 - Cada justificacion debe tener entre 2 y 4 oraciones. Es OBLIGATORIO incluir al menos una cita textual exacta usando comillas dobles ("cita") de cualquiera de las 3 fuentes de verdad.
 - OBLIGATORIO MULTIFUENTE: Si existe EVIDENCIA DE ENTREVISTA para el factor, ESTAS OBLIGADO a cambiar el campo "_fuente" a "mixta" o "entrevista". ¡NUNCA uses "documental" si la entrevista aporto contexto!
 - OBLIGATORIO CITAS MIXTAS: Si usas "mixta", ESTAS OBLIGADO a llenar el campo "_cita_entrevista" con la cita textual de la entrevista y explicar en tu justificacion si la entrevista refuerza o contradice el documento.

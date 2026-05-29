@@ -14,8 +14,8 @@ export const FACTOR_NAMES: Record<string, string> = {
 };
 
 export const CONTINUOUS_MAX: Record<string, number> = {
-  dificultad: 150, supervision: 150, responsabilidad: 200,
-  condiciones: 150, error: 150, requisitos: 150
+  dificultad: 200, supervision: 150, responsabilidad: 200,
+  condiciones: 100, error: 150, requisitos: 200
 };
 
 type VerbCat = 'operativo'|'ejecucion'|'analisis'|'planificacion'|'direccion';
