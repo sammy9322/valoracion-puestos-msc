@@ -267,7 +267,7 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
 
   const alertasContradiccion: string[] = suggestion.alertas_contradiccion || [];
   const alertaGlobal = alertasContradiccion.length > 0
-    ? `Se detectaron ${alertasContradiccion.length} alertas de contradiccion entre fuentes.`
+    ? alertasContradiccion.map(alerta => `• ${alerta}`).join('\n')
     : undefined;
 
   return {
