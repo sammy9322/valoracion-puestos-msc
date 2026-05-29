@@ -25,12 +25,12 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
   const allAcc: TaggedAccion[] = [...accFx, ...pr.acc];
 
   const FACTOR_DISPLAY: Record<string, { label: string; desc: string; grades: string[] }> = {
-    dificultad: { label: 'Dificultad de Funciones', desc: 'Evalúa la complejidad, variedad y nivel de análisis.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica.', 'Análisis sin precedentes.'] },
-    supervision: { label: 'Supervisión Ejercida', desc: 'Evalúa la responsabilidad por dirigir o revisar el trabajo de otros.', grades: ['', 'No ejerce supervisión.', 'Supervisión ocasional.', 'Supervisión de grupo operativo.', 'Jefatura de unidad.', 'Dirección de área mayor.', 'Coordina programas.'] },
-    responsabilidad: { label: 'Responsabilidad', desc: 'Evalúa el impacto de custodiar bienes, información o manejar fondos.', grades: ['', 'Baja responsabilidad.', 'Responsabilidad moderada.', 'Custodia de información sensible.', 'Responsabilidad por presupuestos.', 'Gestión de proceso clave.', 'Responsabilidad completa.'] },
-    condiciones: { label: 'Condiciones de Trabajo', desc: 'Evalúa el esfuerzo físico y exposición a riesgos.', grades: ['', 'Oficina normal.', 'Esfuerzo moderado.', 'Exposición climática o ruido.', 'Riesgo de accidentes.', 'Alta peligrosidad.'] },
-    error: { label: 'Consecuencia del Error', desc: 'Evalúa el impacto económico, legal o de servicio.', grades: ['', 'Error fácil de corregir.', 'Retrasos menores.', 'Afecta otros departamentos.', 'Pérdidas económicas/legales.', 'Compromete estabilidad.', 'Daños irreversibles.'] },
-    requisitos: { label: 'Requisitos', desc: 'Evalúa el nivel educativo y experiencia.', grades: ['', 'Educación básica.', 'Bachillerato / Técnico.', 'Diplomado / Técnico superior.', 'Bachillerato / Licenciatura.', 'Maestría / Especialización.', 'Postgrado avanzado.'] }
+    dificultad: { label: 'Dificultad de Funciones', desc: 'Evalúa la complejidad, variedad y nivel de análisis.', grades: ['', 'Tareas simples y repetitivas, poca iniciativa.', 'Tareas variadas pero estandarizadas.', 'Requiere análisis y juicio para resolver problemas técnicos.', 'Alta complejidad, planeación y coordinación institucional.', 'Dirección estratégica y toma de decisiones críticas.', 'Análisis y solución de problemas sin precedentes.'] },
+    supervision: { label: 'Supervisión Ejercida', desc: 'Evalúa la responsabilidad por dirigir o revisar el trabajo de otros.', grades: ['', 'No ejerce supervisión.', 'Supervisión ocasional de tareas simples.', 'Supervisión de un grupo de trabajo operativo.', 'Jefatura de una unidad o departamento.', 'Dirección de un área técnica o administrativa mayor.', 'Coordina programas de alto nivel, autonomía completa.'] },
+    responsabilidad: { label: 'Responsabilidad', desc: 'Evalúa el impacto de custodiar bienes, información o manejar fondos.', grades: ['', 'Baja responsabilidad por valores o equipo.', 'Responsabilidad moderada por materiales y herramientas.', 'Custodia de información sensible o fondos fijos.', 'Responsabilidad por presupuestos o activos de alto valor.', 'Responsabilidad total por la gestión de un proceso clave.', 'Responsabilidad completa de unidad y decisiones trascendentales.'] },
+    condiciones: { label: 'Condiciones de Trabajo', desc: 'Evalúa el esfuerzo físico y exposición a riesgos.', grades: ['', 'Ambiente de oficina normal, riesgos mínimos.', 'Esfuerzo físico moderado o ambiente algo incómodo.', 'Exposición a condiciones climáticas o ruido constante.', 'Riesgo de accidentes laborales o manejo de químicos.', 'Condiciones de alta peligrosidad o insalubridad constante.'] },
+    error: { label: 'Consecuencia del Error', desc: 'Evalúa el impacto económico, legal o de servicio.', grades: ['', 'Error fácil de detectar y corregir.', 'Error causa retrasos menores en el flujo de trabajo.', 'Error afecta a otros departamentos o al servicio al cliente.', 'Error causa pérdidas económicas o legales significativas.', 'Error compromete la estabilidad institucional o seguridad pública.', 'Decisiones críticas; el error causa daños irreversibles institucionales.'] },
+    requisitos: { label: 'Requisitos', desc: 'Evalúa el nivel educativo y experiencia.', grades: ['', 'Educación básica o primaria.', 'Bachillerato en Educación Media o Técnico básico.', 'Diplomado o Técnico superior especializado.', 'Bachillerato Universitario o Licenciatura profesional.', 'Grado de Maestría o especialización avanzada requerida.', 'Postgrado avanzado y madurez profesional crítica.'] }
   };
   const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
   const FACTOR_DB_FIELD: Record<string, string> = {
@@ -117,7 +117,9 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
       ${(() => {
         if (!evaluacion.alerta_global) return '';
         const contradicciones = (evaluacion.analisis_multifuente || []).filter((m: any) => m.contradiccion);
-        const hasContradictions = contradicciones.length > 0;
+        const count = contradicciones.length;
+        const textoAlerta = count === 1 ? 'Se detectó 1 alerta de contradicción entre fuentes. Consulte la sección 3 para valorarla.' : `Se detectaron ${count} alertas de contradicción entre fuentes. Consulte la sección 3 para valorarlas.`;
+        
         return `
         <div class="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-xl mb-8 avoid-break">
           <div class="flex items-start">
@@ -127,7 +129,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
             <div>
               <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide">Alerta de Contradicción</h3>
               <p class="mt-1 text-sm text-amber-900 leading-relaxed">${evaluacion.alerta_global.replace(/\\n/g, '<br>')}</p>
-              ${hasContradictions ? `<p class="mt-2 text-sm text-amber-800 font-semibold"><a href="#seccion-contradicciones" class="underline decoration-amber-500 hover:text-amber-600">Se detectaron ${contradicciones.length} alertas de contradicción entre fuentes. Consulte la sección 3 para valorarlas.</a></p>` : ''}
+              ${count > 0 ? `<p class="mt-2 text-sm text-amber-800 font-semibold"><a href="#seccion-contradicciones" class="underline decoration-amber-500 hover:text-amber-600">${textoAlerta}</a></p>` : ''}
             </div>
           </div>
         </div>
