@@ -142,6 +142,7 @@ Para CADA factor, realiza un analisis multidimensional cruzando nuestras 3 fuent
 - Cada justificacion debe tener entre 2 y 4 oraciones. Es OBLIGATORIO incluir al menos una cita textual exacta usando comillas dobles ("cita") de cualquiera de las 3 fuentes de verdad.
 - OBLIGATORIO MULTIFUENTE: Si existe EVIDENCIA DE ENTREVISTA para el factor, ESTAS OBLIGADO a cambiar el campo "_fuente" a "mixta" o "entrevista". ¡NUNCA uses "documental" si la entrevista aporto contexto!
 - OBLIGATORIO CITAS MIXTAS: Si usas "mixta", ESTAS OBLIGADO a llenar el campo "_cita_entrevista" con la cita textual de la entrevista y explicar en tu justificacion si la entrevista refuerza o contradice el documento.
+- ALERTAS DE CONTRADICCION: Redacta las alertas de forma clara, directa y estructurada. Usa este formato: "[Nombre del Factor] Discrepancia: La Ficha Oficial indica 'X', pero la Entrevista evidencia 'Y'. Impacto: Se elevo el nivel por mayor complejidad real." No uses redacciones confusas ni redundantes.
 - Si no hay evidencia clara, asigna el grado mas conservador (1).
 - Devuelve UNICAMENTE el objeto JSON, sin texto adicional ni codigo.
 
