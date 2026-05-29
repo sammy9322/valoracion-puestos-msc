@@ -1,155 +1,51 @@
-# CHECKPOINT — Acotación Jerárquica por Serie
+# CHECKPOINT — Evaluación de Puestos MSC
 
-**Fecha:** 26/05/2026
+**Fecha:** 29/05/2026
 **Proyecto:** Valoración de Puestos MSC — Municipalidad de San Carlos
 **Contexto completo para retomar el trabajo al día siguiente**
 
 ---
 
-## 1. ¿QUÉ ES ESTE PROYECTO?
+## 1. ESTADO ACTUAL DEL PROYECTO
 
-Sistema de valoración de puestos de la **Municipalidad de San Carlos (MSC)**. Evalúa puestos usando 6 factores:
+El sistema de valoración de puestos es un modelo híbrido dual (Motor LLM Gemini 2.5 Flash + Fallback basado en reglas). Hemos logrado la consistencia técnica y matemática de toda la infraestructura bajo la metodología oficial de 1000 puntos. 
 
-| Factor | Pts máx |
-|--------|---------|
-| Dificultad de Funciones | 200 |
-| Supervisión Ejercida | 150 |
-| Responsabilidad | 200 |
-| Condiciones de Trabajo | 100 |
-| Consecuencia del Error | 150 |
-| Requisitos | 200 |
-| **Total** | **1000** |
-
-Clasifica los puestos en una **Clase Municipal** (ej. `Operativo Municipal 6`, `Profesional Jefe 5`) dentro de 6 **Series Laborales** con jerarquía definida.
-
-**Problema que resuelve la acotación jerárquica:** Evitar que un puesto de serie inferior (ej. *Peón* → Operativa) sea clasificado erróneamente en una categoría superior (Profesional o Jefatura) aunque los puntos calculados superen los umbrales de su serie.
+**Logros de la última sesión:**
+1. **Calibración a 1000 Puntos:** Sincronizados todos los `maxPts`, matrices y frontend para que los factores sumen exactamente 1000 puntos (Dificultad 200, Supervisión 150, Responsabilidad 200, Condiciones 100, Error 150, Requisitos 200).
+2. **Alertas de Contradicción Inline:** El reporte ahora muestra recuadros ámbar específicos debajo de cada factor afectado cuando existe discrepancia entre la Ficha Oficial y la Entrevista.
+3. **Resiliencia API Gemini:** Se inyectó el `responseSchema` para forzar JSON estructural y se construyó un bloque de _retry_ (reintento a 1s) para mitigar fallos transitorios de red. Sin embargo, persisten bloqueos si se excede la cuota estricta (429) de Gemini Flash Free Tier (15 RPM).
 
 ---
 
-## 2. SERIES LABORALES Y TOPES
+## 2. ARQUITECTURA DE EVALUACIÓN
 
-| Serie | Máx puntos | Clase tope |
-|-------|-----------|------------|
-| Operativa | 355 | Operativo Municipal 6 |
-| Administrativa | 355 | Administrativo Municipal 4 |
-| Policia | 345 | Policia Municipal 5 |
-| Tecnica | 390 | Tecnico Municipal 3 |
-| Profesional | 610 | Profesional Municipal 4 |
-| Jefatura | 880 | Profesional Jefe 5 |
-
-Jerarquía (menor→mayor): `Operativa → Administrativa → Policia → Tecnica → Profesional → Jefatura`
+El pipeline (`aiAgentService.ts`) procesa el puesto así:
+1. **enrichProc:** Inyecta tareas operativas desde la base de datos (Supabase).
+2. **ruleBasedEvaluation:** Extrae verbos y genera una evaluación determinista de contingencia.
+3. **buildPrompt:** Ensambla un macro-prompt usando 3 pilares: Ficha Oficial + Procedimientos (Operativo) + Entrevista (Testimonial).
+4. **callGeminiEnsemble:** Invoca al LLM (ahora con `responseSchema` validado) y bloque de reintento en caso de error.
+5. **validateAndCalculate:** Calcula puntos cruzando el Grado [1-6] con la Intensidad [Bajo/Medio/Alto], extrayendo los puntos medios si aplica.
+6. **Reportes:** Genera visualizaciones en `WizardEvaluacion.tsx`, PDF (`reportGenerator.ts`) e HTML (`htmlReportGenerator.ts`).
 
 ---
 
-## 3. ARCHIVOS DEL PROYECTO
+## 3. PUNTOS PENDIENTES PARA LA PRÓXIMA SESIÓN
 
-| Ruta | Rol |
-|------|-----|
-| `frontend/src/constants/categorias.ts` | Frontend: clases, series, lógica de capping |
-| `frontend/src/pages/WizardEvaluacion.tsx` | Frontend: wizard de evaluación con alerta visual |
-| `server/src/services/reportGenerator.ts` | Backend: genera PDF con misma lógica de capping |
-| `server/src/services/aiAgentService.ts` | Backend: llama a Gemini API con prompt enriquecido |
-| `server/src/services/contextualAnalyzer.ts` | Backend: evaluador por reglas de respaldo + alertas |
-| `server/.env` | Contiene `GEMINI_API_KEY` |
+**Prioridad Alta (Motor de IA y Cuotas)**
+1. **Gestión de Errores de Cuota (429):** Actualmente si se recibe un error 429 de Gemini, el reintento a 1 segundo no es suficiente (la cuota tarda 1 min en reiniciar). Hay que implementar un _Backoff_ exponencial más largo o avisar explícitamente en el UI "Límite de cuota alcanzado, espere 1 minuto".
+2. **Depuración del Schema:** Confirmar con exactitud mediante los logs de la terminal (o PM2) cuál es la cadena de error cuando falla Gemini, para asegurar que el SDK `@google/generative-ai` no esté rechazando propiedades tipo `items: { type: SchemaType.STRING }` si la versión del paquete está desfasada.
 
----
-
-## 4. LO QUE YA SE IMPLEMENTÓ
-
-### 4.1 `categorias.ts` — Clasificador determinista por nombre
-
-**`determinarSeriePorNombre(nombre: string): string`** — Detecta la serie natural del puesto mediante palabras clave en orden de prioridad:
-
-1. `director|gerente|subdirector|jefe|jefatura|coordinador|encargado` → **Jefatura**
-2. `profesional|ingeniero|abogado|arquitecto|medico|psicologo|trabajador social|auditor|licenciado|analista` → **Profesional**
-3. `tecnico|técnico|dibujante|soporte|inspector` → **Tecnica**
-4. `policia|policía|seguridad|vigilante|guardia|transito|tránsito` → **Policia**
-5. `auxiliar|asistente|secretaria|recepcionista|archivista|oficinista|cajero|administrativo` → **Administrativa**
-6. `operario|peon|peón|conserje|chofer|mensajero|limpieza|mantenimiento|jardinero|cocinero|miscelaneo|miscelánea` → **Operativa**
-7. Default → `Operativa` (conservador)
-
-**`getEstratoSugerido(puntos, nombrePuesto?)`** — Filtra clases candidatas por jerarquía de serie:
-```typescript
-const ordenSeries = ['Operativa', 'Administrativa', 'Policia', 'Tecnica', 'Profesional', 'Jefatura'];
-```
-
-### 4.2 `WizardEvaluacion.tsx` — Alerta visual de acotación
-
-- Llamada a `getEstratoCompleto` ahora pasa `puestoDetails?.nombre`
-- Nuevo bloque de alerta azul cuando `totalPuntos > estrato.clase.puntos`:
-  > "Acotación Jerárquica Activa: Por la naturaleza organizativa del puesto ({serie}), la clase de valoración se ha acotado automáticamente al estrato máximo permitido..."
-
-### 4.3 `reportGenerator.ts` — PDF alineado
-
-- Misma función `determinarSeriePorNombre`
-- `getClaseSugerida(puntos, nombrePuesto?)` con filtro por jerarquía
-- Llamada en `addConclusionHero` actualizada para pasar `evaluacion.puesto?.nombre`
-
-### 4.4 `aiAgentService.ts` — Prompt de Gemini enriquecido
-
-- `determinarSeriePorNombre` para identificar la serie del puesto
-- `limitePuntosText` calculado según la serie (ej. Operativa → "MÁXIMO 355 PUNTOS")
-- Bloque `=== CONTEXTO DE SERIE Y ACOTACIÓN JERÁRQUICA ===` en el prompt
-- Tabla de `gradeTable` con puntajes físicos reales (Grado 1 ya no es 0 pts)
-  - Ej: Dificultad G1=40pts, G2=80pts, G3=120pts, G4=160pts, G5=200pts
-
-### 4.5 `contextualAnalyzer.ts` — Evaluador por reglas con alerta
-
-- Misma `determinarSeriePorNombre`
-- `contextualEvaluate` genera `alerta_global` si `total > maxPuntosPermitidos`
-- Verbos añadidos: `colaborar`, `prestar`, `participar`
-- `extraerAcciones` reconstruida con regex simplificado
+**Prioridad Media (UX y Datos)**
+1. **Revisión de Textos Justificativos:** Asegurarse de que el prompt genere justificaciones que engloben orgánicamente las citas documentales sin romper el formato JSON.
+2. **Ensemble Real:** Mover `ENSEMBLE_CALLS` a 3 para promediar las calificaciones (moda estadística) de Gemini y evitar fluctuaciones en puestos límite, pero esto dependerá de no reventar la cuota gratuita.
 
 ---
 
-## 5. LO QUE QUEDA PENDIENTE
+## 4. ARCHIVOS CRÍTICOS MODIFICADOS RECIENTEMENTE
 
-### Diagnóstico de no-determinismo de Gemini
-
-**Problema detectado:** En dos ejecuciones con el mismo puesto, el factor **Responsabilidad** varió entre Grado 5 (200 pts) y Grado 4 (160 pts), cambiando el total de 720 → 680 pts.
-
-**Causa raíz:** `temperature > 0` en Gemini hace que cada llamada pueda elegir entre grados limítrofes con probabilidad similar.
-
-### 3 scripts de prueba en `/tmp/`
-
-| Script | Propósito | Llamadas |
-|--------|-----------|----------|
-| `test-determinismo-base.ts` | Línea base: 5 llamadas con config actual | 5 |
-| `test-determinismo-temp0.ts` | 5 llamadas con `temperature: 0` | 5 |
-| `test-determinismo-ensemble.ts` | 3 rondas de 3 llamadas + moda | 9 |
-
-**Cómo ejecutar (desde `server/`):**
-```bash
-# 1. Línea base
-cp /tmp/test-determinismo-base.ts .
-npx tsx test-determinismo-base.ts <ID_DEL_PUESTO>
-rm test-determinismo-base.ts
-
-# 2. Temperature = 0
-cp /tmp/test-determinismo-temp0.ts .
-npx tsx test-determinismo-temp0.ts <ID_DEL_PUESTO>
-rm test-determinismo-temp0.ts
-
-# 3. Ensemble
-cp /tmp/test-determinismo-ensemble.ts .
-npx tsx test-determinismo-ensemble.ts <ID_DEL_PUESTO>
-rm test-determinismo-ensemble.ts
-```
-
-**Criterio de decisión:**
-- Si `temperature: 0` da 100% consistencia → implementar esa solución (mínimo cambio)
-- Si no, evaluar ensemble o combinación temp=0 + reglas post-fix
-
----
-
-## 6. NOTAS CLAVE
-
-1. **No se modificó ningún archivo de producción** más allá de los 5 listados.
-2. **Los scripts de prueba** no tocan el proyecto — se crean en `/tmp`, se copian temporalmente, se borran.
-3. **Comando de desarrollo:** `npm run dev` en `server/` (nodemon + ts-node).
-4. **Archivo .env** en `server/.env` — contiene `GEMINI_API_KEY`, `DATABASE_URL`.
-5. **Plan original del Orquestador:** en `brain/` (fuera del repo).
-6. **Últimos commits relevantes:**
-   - `89da0e9` — Enhance PDF/HTML reports
-   - `1542522` — Implementar acotación jerárquica por serie
-   - `9d3a163` — Alinear escala del prompt Gemini y reconstruir extraerAcciones
+- `server/src/config/factorTables.ts` (Core matemático de 1000 pts)
+- `server/src/services/aiAgentService.ts` (Resiliencia, Prompt y Schema)
+- `server/src/services/htmlReportGenerator.ts` (Alertas inline y narrativa)
+- `server/src/services/contextualAnalyzer.ts` (Línea base y topes)
+- `server/src/services/reportGenerator.ts` (PDF: Color G6, grados actualizados)
+- `frontend/src/pages/WizardEvaluacion.tsx` (Frontend factors_config sync)
