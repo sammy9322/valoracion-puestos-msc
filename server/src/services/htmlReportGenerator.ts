@@ -24,13 +24,13 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
   const pr = evalProcedimientos(proc);
   const allAcc: TaggedAccion[] = [...accFx, ...pr.acc];
 
-  const FACTOR_DISPLAY: Record<string, { label: string; desc: string }> = {
-    dificultad: { label: 'Dificultad de Funciones', desc: 'Evalúa la complejidad, variedad y nivel de análisis.' },
-    supervision: { label: 'Supervisión Ejercida', desc: 'Evalúa la responsabilidad por dirigir o revisar el trabajo de otros.' },
-    responsabilidad: { label: 'Responsabilidad', desc: 'Evalúa el impacto de custodiar bienes, información o manejar fondos.' },
-    condiciones: { label: 'Condiciones de Trabajo', desc: 'Evalúa el esfuerzo físico y exposición a riesgos.' },
-    error: { label: 'Consecuencia del Error', desc: 'Evalúa el impacto económico, legal o de servicio.' },
-    requisitos: { label: 'Requisitos', desc: 'Evalúa el nivel educativo y experiencia.' }
+  const FACTOR_DISPLAY: Record<string, { label: string; desc: string; grades: string[] }> = {
+    dificultad: { label: 'Dificultad de Funciones', desc: 'Evalúa la complejidad, variedad y nivel de análisis.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica.', 'Análisis sin precedentes.'] },
+    supervision: { label: 'Supervisión Ejercida', desc: 'Evalúa la responsabilidad por dirigir o revisar el trabajo de otros.', grades: ['', 'No ejerce supervisión.', 'Supervisión ocasional.', 'Supervisión de grupo operativo.', 'Jefatura de unidad.', 'Dirección de área mayor.', 'Coordina programas.'] },
+    responsabilidad: { label: 'Responsabilidad', desc: 'Evalúa el impacto de custodiar bienes, información o manejar fondos.', grades: ['', 'Baja responsabilidad.', 'Responsabilidad moderada.', 'Custodia de información sensible.', 'Responsabilidad por presupuestos.', 'Gestión de proceso clave.', 'Responsabilidad completa.'] },
+    condiciones: { label: 'Condiciones de Trabajo', desc: 'Evalúa el esfuerzo físico y exposición a riesgos.', grades: ['', 'Oficina normal.', 'Esfuerzo moderado.', 'Exposición climática o ruido.', 'Riesgo de accidentes.', 'Alta peligrosidad.'] },
+    error: { label: 'Consecuencia del Error', desc: 'Evalúa el impacto económico, legal o de servicio.', grades: ['', 'Error fácil de corregir.', 'Retrasos menores.', 'Afecta otros departamentos.', 'Pérdidas económicas/legales.', 'Compromete estabilidad.', 'Daños irreversibles.'] },
+    requisitos: { label: 'Requisitos', desc: 'Evalúa el nivel educativo y experiencia.', grades: ['', 'Educación básica.', 'Bachillerato / Técnico.', 'Diplomado / Técnico superior.', 'Bachillerato / Licenciatura.', 'Maestría / Especialización.', 'Postgrado avanzado.'] }
   };
   const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
   const FACTOR_DB_FIELD: Record<string, string> = {
@@ -114,19 +114,25 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
       </div>
 
       <!-- Alerta Global -->
-      ${evaluacion.alerta_global ? `
-      <div class="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-xl mb-8 avoid-break">
-        <div class="flex items-start">
-          <svg class="h-6 w-6 text-amber-500 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
-          <div>
-            <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide">Alerta de Contradicción</h3>
-            <p class="mt-1 text-sm text-amber-900 leading-relaxed">${evaluacion.alerta_global.replace(/\\n/g, '<br>')}</p>
+      ${(() => {
+        if (!evaluacion.alerta_global) return '';
+        const contradicciones = (evaluacion.analisis_multifuente || []).filter((m: any) => m.contradiccion);
+        const hasContradictions = contradicciones.length > 0;
+        return `
+        <div class="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-xl mb-8 avoid-break">
+          <div class="flex items-start">
+            <svg class="h-6 w-6 text-amber-500 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <div>
+              <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide">Alerta de Contradicción</h3>
+              <p class="mt-1 text-sm text-amber-900 leading-relaxed">${evaluacion.alerta_global.replace(/\\n/g, '<br>')}</p>
+              ${hasContradictions ? `<p class="mt-2 text-sm text-amber-800 font-semibold"><a href="#seccion-contradicciones" class="underline decoration-amber-500 hover:text-amber-600">Se detectaron ${contradicciones.length} alertas de contradicción entre fuentes. Consulte la sección 3 para valorarlas.</a></p>` : ''}
+            </div>
           </div>
         </div>
-      </div>
-      ` : ''}
+        `;
+      })()}
 
       <!-- Resultado Principal -->
       <div class="bg-blue-900 text-white rounded-2xl p-8 mb-10 shadow-lg flex items-center justify-between avoid-break">
@@ -163,7 +169,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
         const contradicciones = (evaluacion.analisis_multifuente || []).filter((m: any) => m.contradiccion);
         if (contradicciones.length === 0) return '';
         return `
-        <div class="mb-8 avoid-break border-l-4 border-amber-500 bg-amber-50/50 p-6 rounded-r-xl border border-gray-200 shadow-sm">
+        <div id="seccion-contradicciones" class="mb-8 avoid-break border-l-4 border-amber-500 bg-amber-50/50 p-6 rounded-r-xl border border-gray-200 shadow-sm">
           <h2 class="text-xs uppercase tracking-widest text-amber-800 font-bold mb-3">3. Análisis de Discrepancias y Contradicciones de Fuentes</h2>
           <p class="text-sm text-gray-700 leading-relaxed mb-4 text-justify">
             Se identificaron ${contradicciones.length} discrepancias sustantivas entre la Ficha Oficial del Puesto y la realidad operativa capturada en la entrevista o en los flujos procedimentales. A continuación, se detalla la resolución técnica adoptada para cada factor:
@@ -206,6 +212,8 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
           const fPuntos = evaluacion[`puntos_${dbField}`] || 0;
           const fJustificacion = evaluacion[`justif_${dbField}`] || '';
 
+          const safeGrade = Math.max(0, Math.min(fGrado, FACTOR_DISPLAY[factorKey].grades.length - 1));
+          const gradeText = FACTOR_DISPLAY[factorKey].grades[safeGrade];
           return `
           <div class="border border-gray-200 rounded-xl overflow-hidden avoid-break shadow-sm">
             <!-- Cabecera del Factor -->
@@ -217,11 +225,20 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
             </div>
             
             <div class="p-5">
-              <p class="text-xs text-gray-400 mb-3">${fDesc}</p>
-              <div class="bg-blue-50 border-l-4 border-blue-600 p-3 rounded-r mb-4">
-                <p class="text-xs font-bold text-blue-800 uppercase">Nivel Asignado: G${fGrado} (${fPuntos} pts)</p>
+              <p class="text-xs text-gray-400 mb-4">${fDesc}</p>
+              <div class="bg-blue-50 border-l-4 border-blue-600 p-3 rounded-r mb-5">
+                <p class="text-sm font-bold text-blue-800 uppercase">Nivel Asignado: Grado ${fGrado} (${fPuntos} pts)</p>
+                ${gradeText ? `<p class="text-xs font-medium text-blue-700 mt-1">${gradeText}</p>` : ''}
               </div>
-              <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line">${fJustificacion}</p>
+              <div class="mt-2 border-t border-gray-100 pt-3">
+                <h4 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-2 flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Fundamento Técnico y Evidencias
+                </h4>
+                <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line text-justify">${fJustificacion}</p>
+              </div>
             </div>
           </div>
           `;
