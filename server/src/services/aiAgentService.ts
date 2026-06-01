@@ -153,9 +153,9 @@ El sistema experto basado en reglas ya ha evaluado la Ficha Oficial y asignó lo
 1. Eres un auditor de entrevistas.
 2. Compara la EVIDENCIA DE LA ENTREVISTA con la LÍNEA BASE.
 3. Si la entrevista NO aporta nada nuevo o no existe, DEBES devolver exactamente los mismos grados de la línea base.
-4. SOLO puedes elevar o modificar un grado si la entrevista demuestra responsabilidades operativas irrefutablemente mayores al documento base.
-5. MAXIMO DE DESVIACION: No puedes alejarte mas de 2 grados de la linea base en NINGUN factor. Si la linea base dice G3, tu rango permitido es G1 a G5.
-6. REGLA DE EMPATE: Si dudas entre dos grados adyacentes, SIEMPRE elige el grado inferior y compensa con intensidad='alto'.
+4. SOLO puedes elevar la nota 1 grado como MÁXIMO si la entrevista demuestra responsabilidades operativas irrefutablemente mayores al documento base.
+5. MAXIMO DE DESVIACION: NUNCA puedes asignar un grado inferior a la línea base. Tu rango permitido es [Grado Base] hasta [Grado Base + 1]. Si dudas, mantén el grado base.
+6. REGLA DE EMPATE: Si dudas entre mantener el grado base o elevarlo, SIEMPRE mantén el grado base y compensa con intensidad='alto'.
 
 === INSTRUCCIONES CRITICAS ===
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
@@ -376,15 +376,14 @@ export const aiAgentService = {
             const prompt = buildPrompt(enrichedPuesto, interviewCtx, baselineResult.data);
             const raw = await callOllama(prompt);
 
-            // === CLAMPEO POR LÍNEA BASE (Anti-Variabilidad) ===
+            // === CLAMPEO ESTRICTO POR LÍNEA BASE (Anti-Variabilidad Máxima) ===
             const FACTORES_CLAMP = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
-            const MAX_DELTA = 2; // máximo ±2 grados de desviación de la línea base
             for (const factor of FACTORES_CLAMP) {
               const baseGrado = (baselineResult.data as any)[factor];
               const llmGrado = raw[factor];
               if (typeof baseGrado === 'number' && typeof llmGrado === 'number') {
-                const minAllowed = Math.max(1, baseGrado - MAX_DELTA);
-                const maxAllowed = Math.min(factor === 'condiciones' ? 5 : 6, baseGrado + MAX_DELTA);
+                const minAllowed = baseGrado; // Nunca puede ser menor a la línea base
+                const maxAllowed = Math.min(factor === 'condiciones' ? 5 : 6, baseGrado + 1); // Máximo puede subir 1 punto
                 if (llmGrado < minAllowed || llmGrado > maxAllowed) {
                   console.warn(`[AI Service] Clampeo: ${factor} LLM=${llmGrado}, Base=${baseGrado}, Rango=[${minAllowed},${maxAllowed}] → Clampeado a ${Math.max(minAllowed, Math.min(maxAllowed, llmGrado))}`);
                   raw[factor] = Math.max(minAllowed, Math.min(maxAllowed, llmGrado));

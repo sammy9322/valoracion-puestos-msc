@@ -1,11 +1,16 @@
 import PDFDocument from 'pdfkit';
 import type { ProcedimientosContext } from './procedimientosService';
 import { extraerAcciones, evalProcedimientos, TaggedAccion } from './contextualAnalyzer';
-import { FACTOR_CONFIG } from '../config/factorTables';
+import { FACTOR_CONFIG, POINTS_MAP } from '../config/factorTables';
 
-const FACTOR_DISPLAY = Object.fromEntries(
-  Object.entries(FACTOR_CONFIG).map(([k, v]) => [k, { label: v.label, max: v.maxPts }])
-);
+const FACTOR_DISPLAY: Record<string, { label: string; max: number }> = {
+  dificultad: { label: 'Dificultad de Funciones', max: 200 },
+  supervision: { label: 'Supervision Ejercida', max: 150 },
+  responsabilidad: { label: 'Responsabilidad', max: 200 },
+  condiciones: { label: 'Condiciones de Trabajo', max: 100 },
+  error: { label: 'Consecuencia del Error', max: 150 },
+  requisitos: { label: 'Requisitos', max: 200 },
+};
 
 const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
 
@@ -15,24 +20,21 @@ const GRADES_DESC: Record<string, string[]> = {
     'Tareas variadas estandarizadas',
     'Analisis y juicio tecnico',
     'Alta complejidad y planeacion',
-    'Direccion estrategica',
-    'Analisis y solucion de problemas sin precedentes'
+    'Direccion estrategica'
   ],
   supervision: [
     'No ejerce supervision',
     'Supervision ocasional',
     'Supervision de grupo operativo',
     'Jefatura de unidad',
-    'Direccion de area mayor',
-    'Coordina programas de alto nivel, autonomia completa'
+    'Direccion de area mayor'
   ],
   responsabilidad: [
     'Baja responsabilidad',
     'Responsabilidad moderada',
     'Custodia de info sensible',
     'Responsabilidad por presupuestos',
-    'Gestion de proceso clave',
-    'Responsabilidad completa de unidad'
+    'Gestion de proceso clave'
   ],
   condiciones: [
     'Oficina normal',
@@ -46,16 +48,14 @@ const GRADES_DESC: Record<string, string[]> = {
     'Retrasos menores',
     'Afecta otros deptos',
     'Perdidas economicas/legales',
-    'Compromete estabilidad',
-    'Decisiones criticas; daños irreversibles'
+    'Compromete estabilidad'
   ],
   requisitos: [
     'Educacion basica',
     'Bachillerato / Tecnico',
     'Diplomado / Tecnico sup.',
     'Licenciatura',
-    'Maestria / Doctorado',
-    'Postgrado avanzado y madurez profesional'
+    'Maestria / Doctorado'
   ],
 };
 
@@ -78,15 +78,14 @@ const C = {
   g5: '#8b5cf6'  // Purple
 };
 
-function g(gv: number): number { return Math.max(1, Math.min(6, gv)); }
+function g(gv: number): number { return Math.max(1, Math.min(5, gv)); }
 
 function getGradeColor(gr: number): string {
   if (gr === 1) return '#10b981'; // Emerald
   if (gr === 2) return '#06b6d4'; // Teal/Cyan
   if (gr === 3) return '#3b82f6'; // Royal Blue
   if (gr === 4) return '#1e3a5f'; // Navy Institutional
-  if (gr === 5) return '#8b5cf6'; // Purple / Directivo
-  return '#dc2626'; // G6 — Red / Maximo critico
+  return '#8b5cf6'; // Purple / Directivo
 }
 
 export const ESTRATOS_MUNICIPALES = [
@@ -123,15 +122,7 @@ export const ESTRATOS_MUNICIPALES = [
   { nombre: 'Profesional Jefe 5 (Prohib.)', puntos: 880, serie: 'Jefatura' },
 ];
 
-export function determinarSerie(nombre: string, educacion?: string, claseMsc?: string, estratoDirecto?: string): string {
-  // Si el estrato directo está disponible (desde CatalogoPuesto), usarlo como fuente de verdad
-  if (estratoDirecto) {
-    const normalized = estratoDirecto.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    const series = ['Operativa', 'Administrativa', 'Policia', 'Tecnica', 'Profesional', 'Jefatura'];
-    const found = series.find(s => normalized.includes(s.toLowerCase()));
-    if (found) return found;
-  }
-
+export function determinarSerie(nombre: string, educacion?: string, claseMsc?: string): string {
   const n = nombre.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const ed = (educacion || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
   const cl = (claseMsc || '').toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
@@ -181,10 +172,10 @@ export function determinarSerie(nombre: string, educacion?: string, claseMsc?: s
   return 'Operativa'; // Conservador por defecto
 }
 
-export function getClaseSugerida(puntos: number, nombrePuesto?: string, educacionPuesto?: string, claseMsc?: string, estratoDirecto?: string): { nombre: string; serie: string } | null {
+export function getClaseSugerida(puntos: number, nombrePuesto?: string, educacionPuesto?: string, claseMsc?: string): { nombre: string; serie: string } | null {
   let seriePermitida: string | null = null;
   if (nombrePuesto) {
-    seriePermitida = determinarSerie(nombrePuesto, educacionPuesto, claseMsc, estratoDirecto);
+    seriePermitida = determinarSerie(nombrePuesto, educacionPuesto, claseMsc);
   }
 
   let candidatos = [...ESTRATOS_MUNICIPALES];
@@ -837,7 +828,7 @@ class ReportGenerator {
     this.addSectionTitle('7. Conclusión y Dictamen Técnico');
     
     const pct = Math.round((totalPuntos / 1000) * 100);
-    const clase = getClaseSugerida(totalPuntos, evaluacion.puesto?.nombre, evaluacion.puesto?.educacion_requerida, evaluacion.puesto?.codigo_clase_msc, evaluacion.puesto?.estrato);
+    const clase = getClaseSugerida(totalPuntos, evaluacion.puesto?.nombre, evaluacion.puesto?.educacion_requerida, evaluacion.puesto?.codigo_clase_msc);
     
     let cat = '', desc = '';
     if (pct <= 20) {

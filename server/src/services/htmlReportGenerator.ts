@@ -2,6 +2,15 @@ import type { ProcedimientosContext } from './procedimientosService';
 import { extraerAcciones, evalProcedimientos, TaggedAccion } from './contextualAnalyzer';
 import { getClaseSugerida } from './reportGenerator';
 
+const FACTOR_DISPLAY: Record<string, { desc: string, grades: string[] }> = {
+  dificultad: { desc: 'Complejidad de las tareas, iniciativa y juicio requerido.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica y decisiones críticas.'] },
+  supervision: { desc: 'Cantidad y nivel de personal bajo su cargo.', grades: ['', 'No ejerce supervisión.', 'Supervisión ocasional.', 'Supervisión de grupo operativo.', 'Jefatura de unidad.', 'Dirección de área mayor.'] },
+  responsabilidad: { desc: 'Responsabilidad por valores, equipo o información.', grades: ['', 'Baja responsabilidad.', 'Responsabilidad moderada.', 'Custodia de información sensible.', 'Responsabilidad por presupuestos.', 'Gestión de proceso clave.'] },
+  condiciones: { desc: 'Exposición a riesgos y esfuerzo físico.', grades: ['', 'Oficina normal.', 'Esfuerzo moderado.', 'Exposición climática o ruido.', 'Riesgo de accidentes.', 'Alta peligrosidad.'] },
+  error: { desc: 'Gravedad del daño institucional por error.', grades: ['', 'Error fácil de corregir.', 'Retrasos menores.', 'Afecta otros departamentos.', 'Pérdidas económicas/legales.', 'Compromete estabilidad.'] },
+  requisitos: { desc: 'Nivel académico y experiencia requerida.', grades: ['', 'Educación básica.', 'Bachillerato / Técnico.', 'Diplomado / Técnico superior.', 'Bachillerato / Licenciatura.', 'Maestría / Especialización.'] }
+};
+
 export function generateHtmlReport(evaluacion: any, procedimientos?: ProcedimientosContext): string {
   const puesto = evaluacion.puesto || {};
   const totalPuntos = evaluacion.puntos_totales || 0;
@@ -182,22 +191,37 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
       <div class="space-y-10">
         ${evaluacion.factores?.map((f: any) => {
           const m = evaluacion.analisis_multifuente?.find((mf: any) => mf.factor === f.factor);
+          const fDesc = FACTOR_DISPLAY[f.dbField]?.desc || '';
+          const safeGrade = Math.max(0, Math.min(f.grado, (FACTOR_DISPLAY[f.dbField]?.grades.length || 1) - 1));
+          const gradeText = FACTOR_DISPLAY[f.dbField]?.grades[safeGrade] || '';
+          const intensidadCap = (evaluacion[`intensidad_${f.dbField}`] || 'medio').charAt(0).toUpperCase() + (evaluacion[`intensidad_${f.dbField}`] || 'medio').slice(1);
           
           return `
           <div class="border border-gray-200 rounded-xl overflow-hidden avoid-break shadow-sm">
             <!-- Cabecera del Factor -->
             <div class="bg-gray-50 border-b border-gray-200 p-4 flex justify-between items-center">
-              <div>
-                <h3 class="font-bold text-gray-800 uppercase text-sm">${f.factor}</h3>
-                <p class="text-sm font-bold text-blue-800 uppercase">Nivel Asignado: Grado ${f.grado} (${f.puntos} pts) — Intensidad: ${(evaluacion[`intensidad_${f.dbField}`] || 'medio').charAt(0).toUpperCase() + (evaluacion[`intensidad_${f.dbField}`] || 'medio').slice(1)}</p>
-              </div>
+              <h3 class="font-bold text-gray-800 uppercase text-sm">${f.factor}</h3>
               <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-black">
                 ${f.puntos} pts
               </div>
             </div>
             
             <div class="p-5">
-              <p class="text-sm text-gray-600 mb-4 leading-relaxed">${f.justificacion}</p>
+              <p class="text-xs text-gray-400 mb-4">${fDesc}</p>
+              <div class="bg-blue-50 border-l-4 border-blue-600 p-3 rounded-r mb-5">
+                <p class="text-sm font-bold text-blue-800 uppercase">Nivel Asignado: Grado ${f.grado} (${f.puntos} pts) — Intensidad: ${intensidadCap}</p>
+                ${gradeText ? `<p class="text-xs font-medium text-blue-700 mt-1">${gradeText}</p>` : ''}
+              </div>
+              
+              <div class="mt-2 border-t border-gray-100 pt-3">
+                <h4 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-2 flex items-center gap-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Fundamento Técnico y Evidencias
+                </h4>
+                <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line text-justify">${f.justificacion}</p>
+              </div>
               
               <!-- Evidencia Multifuente -->
               ${(m && (m.cita_documental || m.cita_entrevista)) ? `
