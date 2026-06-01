@@ -155,9 +155,9 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
         if (contradicciones.length === 0) return '';
         return `
         <div class="mb-8 avoid-break border-l-4 border-amber-500 bg-amber-50/50 p-6 rounded-r-xl border border-gray-200 shadow-sm">
-          <h2 class="text-xs uppercase tracking-widest text-amber-800 font-bold mb-3">3. Análisis de Discrepancias y Contradicciones de Fuentes</h2>
+          <h2 class="text-xs uppercase tracking-widest text-amber-800 font-bold mb-3">3. Análisis de Discrepancias y Aportes de la Entrevista</h2>
           <p class="text-sm text-gray-700 leading-relaxed mb-4 text-justify">
-            Se identificaron ${contradicciones.length} discrepancias sustantivas entre la Ficha Oficial del Puesto y la realidad operativa capturada en la entrevista o en los flujos procedimentales. A continuación, se detalla la resolución técnica adoptada para cada factor:
+            Se identificaron ${contradicciones.length} factores donde la realidad operativa capturada en la entrevista enriqueció o discrepó de la Ficha Oficial del Puesto. A continuación, se detalla la resolución técnica adoptada:
           </p>
           <div class="space-y-4">
             ${contradicciones.map((c: any) => `

@@ -250,11 +250,8 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
         ? suggestion[fuenteKey]
         : (citaEntrevista ? 'mixta' : 'documental');
 
-    // Detectar contradiccion: si hay cita de entrevista que contradice lo documental
-    const contradiccion = !!(citaEntrevista && citaDocumental && (
-      suggestion[`${factor}_contradiccion`] === true ||
-      suggestion[`${factor}_contradiccion`] === 'true'
-    ));
+    // Detectar aporte o contradiccion: Si hay cita de entrevista, lo visibilizamos en el reporte de discrepancias.
+    const contradiccion = !!(citaEntrevista && citaDocumental);
 
     analisis_multifuente.push({
       factor,
