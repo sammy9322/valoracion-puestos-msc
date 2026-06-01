@@ -8,7 +8,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
   const proc = procedimientos || evaluacion._procedimientos;
   
   // Resolver la clase exacta según el Manual de Clases y Metodología MSC
-  const sugerida = getClaseSugerida(totalPuntos, puesto.nombre, puesto.educacion_requerida, puesto.codigo_clase_msc, puesto.estrato);
+  const sugerida = getClaseSugerida(totalPuntos, puesto.nombre, puesto.educacion_requerida, puesto.codigo_clase_msc);
   const clase = {
     nombre: sugerida ? sugerida.nombre : 'No determinada',
     serie: sugerida ? sugerida.serie : 'General'
@@ -23,24 +23,6 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
   const accFx = extraerAcciones(fx).map(a => ({...a, fuente: 'funciones'} as TaggedAccion));
   const pr = evalProcedimientos(proc);
   const allAcc: TaggedAccion[] = [...accFx, ...pr.acc];
-
-  const FACTOR_DISPLAY: Record<string, { label: string; desc: string; grades: string[] }> = {
-    dificultad: { label: 'Dificultad de Funciones', desc: 'Evalúa la complejidad, variedad y nivel de análisis.', grades: ['', 'Tareas simples y repetitivas, poca iniciativa.', 'Tareas variadas pero estandarizadas.', 'Requiere análisis y juicio para resolver problemas técnicos.', 'Alta complejidad, planeación y coordinación institucional.', 'Dirección estratégica y toma de decisiones críticas.', 'Análisis y solución de problemas sin precedentes.'] },
-    supervision: { label: 'Supervisión Ejercida', desc: 'Evalúa la responsabilidad por dirigir o revisar el trabajo de otros.', grades: ['', 'No ejerce supervisión.', 'Supervisión ocasional de tareas simples.', 'Supervisión de un grupo de trabajo operativo.', 'Jefatura de una unidad o departamento.', 'Dirección de un área técnica o administrativa mayor.', 'Coordina programas de alto nivel, autonomía completa.'] },
-    responsabilidad: { label: 'Responsabilidad', desc: 'Evalúa el impacto de custodiar bienes, información o manejar fondos.', grades: ['', 'Baja responsabilidad por valores o equipo.', 'Responsabilidad moderada por materiales y herramientas.', 'Custodia de información sensible o fondos fijos.', 'Responsabilidad por presupuestos o activos de alto valor.', 'Responsabilidad total por la gestión de un proceso clave.', 'Responsabilidad completa de unidad y decisiones trascendentales.'] },
-    condiciones: { label: 'Condiciones de Trabajo', desc: 'Evalúa el esfuerzo físico y exposición a riesgos.', grades: ['', 'Ambiente de oficina normal, riesgos mínimos.', 'Esfuerzo físico moderado o ambiente algo incómodo.', 'Exposición a condiciones climáticas o ruido constante.', 'Riesgo de accidentes laborales o manejo de químicos.', 'Condiciones de alta peligrosidad o insalubridad constante.'] },
-    error: { label: 'Consecuencia del Error', desc: 'Evalúa el impacto económico, legal o de servicio.', grades: ['', 'Error fácil de detectar y corregir.', 'Error causa retrasos menores en el flujo de trabajo.', 'Error afecta a otros departamentos o al servicio al cliente.', 'Error causa pérdidas económicas o legales significativas.', 'Error compromete la estabilidad institucional o seguridad pública.', 'Decisiones críticas; el error causa daños irreversibles institucionales.'] },
-    requisitos: { label: 'Requisitos', desc: 'Evalúa el nivel educativo y experiencia.', grades: ['', 'Educación básica o primaria.', 'Bachillerato en Educación Media o Técnico básico.', 'Diplomado o Técnico superior especializado.', 'Bachillerato Universitario o Licenciatura profesional.', 'Grado de Maestría o especialización avanzada requerida.', 'Postgrado avanzado y madurez profesional crítica.'] }
-  };
-  const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
-  const FACTOR_DB_FIELD: Record<string, string> = {
-    dificultad: 'dificultad',
-    supervision: 'supervision',
-    responsabilidad: 'responsabilidad',
-    condiciones: 'condiciones',
-    error: 'consecuencia_error',
-    requisitos: 'requisitos',
-  };
 
   const html = `
 <!DOCTYPE html>
@@ -104,26 +86,29 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
           </div>
           <div>
             <p class="text-xs text-gray-500 uppercase">Superior Inmediato</p>
-            <p class="font-medium text-gray-800">${puesto.reporta_a || 'N/A'}</p>
+            <p class="font-medium text-gray-800">${puesto.jefatura || 'N/A'}</p>
           </div>
           <div>
             <p class="text-xs text-gray-500 uppercase">Motor de Evaluación</p>
-            <p class="font-medium text-gray-800">${(!evaluacion.motor || evaluacion.motor === 'rule-based' ? 'Motor de Reglas Contextuales (MSC)' : 'Sistema Experto de Valoración Metodológica (IA)') + (evaluacion.buildVersion ? ` (${evaluacion.buildVersion})` : '')}</p>
+            <p class="font-medium text-gray-800">${!evaluacion.motor || evaluacion.motor === 'rule-based' ? 'Motor de Reglas Contextuales MSC' : 'Agente de IA (Google Gemini API)'}</p>
           </div>
         </div>
       </div>
 
       <!-- Alerta Global -->
-      ${(() => {
-        const alertas = evaluacion.alerta_global ? evaluacion.alerta_global.split('\n').filter((l: string) => l.trim().startsWith('•')) : [];
-        const count = alertas.length;
-        if (count === 0) return '';
-        return `
-        <div class="bg-amber-50 border-l-4 border-amber-400 p-4 rounded-r-xl mb-6">
-          <h3 class="font-bold text-amber-800 text-sm mb-1">⚠️ Alerta de Contradicción</h3>
-          <p class="text-sm text-amber-700">${count === 1 ? 'Se detectó 1 discrepancia entre fuentes.' : `Se detectaron ${count} discrepancias entre fuentes.`} Cada contradicción se detalla en la sección del factor correspondiente.</p>
-        </div>`;
-      })()}
+      ${evaluacion.alerta_global ? `
+      <div class="bg-amber-50 border-l-4 border-amber-500 p-5 rounded-r-xl mb-8 avoid-break">
+        <div class="flex items-start">
+          <svg class="h-6 w-6 text-amber-500 mr-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div>
+            <h3 class="text-sm font-bold text-amber-800 uppercase tracking-wide">Alerta de Contradicción</h3>
+            <p class="mt-1 text-sm text-amber-900 leading-relaxed">${evaluacion.alerta_global.replace(/\\n/g, '<br>')}</p>
+          </div>
+        </div>
+      </div>
+      ` : ''}
 
       <!-- Resultado Principal -->
       <div class="bg-blue-900 text-white rounded-2xl p-8 mb-10 shadow-lg flex items-center justify-between avoid-break">
@@ -160,7 +145,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
         const contradicciones = (evaluacion.analisis_multifuente || []).filter((m: any) => m.contradiccion);
         if (contradicciones.length === 0) return '';
         return `
-        <div id="seccion-contradicciones" class="mb-8 avoid-break border-l-4 border-amber-500 bg-amber-50/50 p-6 rounded-r-xl border border-gray-200 shadow-sm">
+        <div class="mb-8 avoid-break border-l-4 border-amber-500 bg-amber-50/50 p-6 rounded-r-xl border border-gray-200 shadow-sm">
           <h2 class="text-xs uppercase tracking-widest text-amber-800 font-bold mb-3">3. Análisis de Discrepancias y Contradicciones de Fuentes</h2>
           <p class="text-sm text-gray-700 leading-relaxed mb-4 text-justify">
             Se identificaron ${contradicciones.length} discrepancias sustantivas entre la Ficha Oficial del Puesto y la realidad operativa capturada en la entrevista o en los flujos procedimentales. A continuación, se detalla la resolución técnica adoptada para cada factor:
@@ -192,57 +177,48 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
 
     <!-- SALTO DE PÁGINA PARA EL DETALLE -->
     <div class="page-break p-12">
-      <h2 class="text-xl font-black text-gray-900 uppercase mb-6">Desglose de Evaluación por Factores</h2>
+      <h2 class="text-xl font-black text-gray-900 uppercase mb-6">4. Desglose de Evaluación por Factores</h2>
       
       <div class="space-y-10">
-        ${FACTORS.map((factorKey) => {
-          const dbField = FACTOR_DB_FIELD[factorKey];
-          const fLabel = FACTOR_DISPLAY[factorKey].label;
-          const fDesc = FACTOR_DISPLAY[factorKey].desc;
-          const fGrado = evaluacion[`grado_${dbField}`] || 0;
-          const fPuntos = evaluacion[`puntos_${dbField}`] || 0;
-          const fJustificacion = evaluacion[`justif_${dbField}`] || '';
-
-          const safeGrade = Math.max(0, Math.min(fGrado, FACTOR_DISPLAY[factorKey].grades.length - 1));
-          const gradeText = FACTOR_DISPLAY[factorKey].grades[safeGrade];
+        ${evaluacion.factores?.map((f: any) => {
+          const m = evaluacion.analisis_multifuente?.find((mf: any) => mf.factor === f.factor);
+          
           return `
           <div class="border border-gray-200 rounded-xl overflow-hidden avoid-break shadow-sm">
             <!-- Cabecera del Factor -->
             <div class="bg-gray-50 border-b border-gray-200 p-4 flex justify-between items-center">
-              <h3 class="font-bold text-gray-800 uppercase text-sm">${fLabel}</h3>
+              <div>
+                <h3 class="font-bold text-gray-800 uppercase text-sm">${f.factor}</h3>
+                <p class="text-xs text-blue-600 mt-0.5">Nivel Asignado: Grado ${f.grado} (${f.puntos} pts) &mdash; Intensidad: ${(evaluacion[`intensidad_${f.dbField}`] || 'medio').replace(/^./, (c: string) => c.toUpperCase())}</p>
+              </div>
               <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-black">
-                ${fPuntos} pts
+                ${f.puntos} pts
               </div>
             </div>
             
             <div class="p-5">
-              <p class="text-xs text-gray-400 mb-4">${fDesc}</p>
-              <div class="bg-blue-50 border-l-4 border-blue-600 p-3 rounded-r mb-5">
-                <p class="text-sm font-bold text-blue-800 uppercase">Nivel Asignado: Grado ${fGrado} (${fPuntos} pts)</p>
-                ${gradeText ? `<p class="text-xs font-medium text-blue-700 mt-1">${gradeText}</p>` : ''}
-              </div>
-              <div class="mt-2 border-t border-gray-100 pt-3">
-                <h4 class="text-xs font-bold text-gray-800 uppercase tracking-widest mb-2 flex items-center gap-1">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Fundamento Técnico y Evidencias
-                </h4>
-                <p class="text-sm text-gray-600 leading-relaxed whitespace-pre-line text-justify">${fJustificacion}</p>
-              </div>
-              ${(() => {
-                if (!evaluacion.alerta_global) return '';
-                const alertas = evaluacion.alerta_global.split('\n').filter((l: string) => l.trim().startsWith('•'));
-                const factorLabel = (FACTOR_DISPLAY as any)[factorKey]?.label || factorKey;
-                const match = alertas.find((a: string) => a.toLowerCase().includes(factorKey.toLowerCase()) || a.includes(factorLabel));
-                if (!match) return '';
-                const textoLimpio = match.replace(/^•\s*/, '').replace(new RegExp('^' + factorLabel + '\\s*', 'i'), '').trim();
-                return `
-                <div class="mt-3 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <p class="text-xs font-semibold text-amber-800 mb-1">⚠️ Discrepancia Detectada</p>
-                  <p class="text-xs text-amber-700 leading-relaxed">${textoLimpio}</p>
-                </div>`;
-              })()}
+              <p class="text-sm text-gray-600 mb-4 leading-relaxed">${f.justificacion}</p>
+              
+              <!-- Evidencia Multifuente -->
+              ${(m && (m.cita_documental || m.cita_entrevista)) ? `
+                <div class="mt-4 pt-4 border-t border-gray-100">
+                  <h4 class="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Evidencia Multifuente Comparada</h4>
+                  <div class="grid grid-cols-2 gap-4">
+                    ${m.cita_documental ? `
+                      <div class="bg-blue-50/50 border border-blue-100 rounded-lg p-3 border-l-4 border-l-blue-500">
+                        <p class="text-[10px] font-bold text-blue-800 uppercase mb-2">Evidencia Documental (Manual)</p>
+                        <p class="text-xs text-blue-900 italic leading-relaxed">"\${m.cita_documental}"</p>
+                      </div>
+                    ` : ''}
+                    ${m.cita_entrevista ? `
+                      <div class="bg-purple-50/50 border border-purple-100 rounded-lg p-3 border-l-4 border-l-purple-500">
+                        <p class="text-[10px] font-bold text-purple-800 uppercase mb-2">Evidencia Testimonial (Entrevista)</p>
+                        <p class="text-xs text-purple-900 italic leading-relaxed">"\${m.cita_entrevista}"</p>
+                      </div>
+                    ` : ''}
+                  </div>
+                </div>
+              ` : ''}
             </div>
           </div>
           `;
@@ -253,12 +229,11 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
     <!-- SALTO DE PÁGINA PARA FIRMAS -->
     <div class="page-break p-12 flex flex-col justify-between h-full">
       <div>
-        <h2 class="text-xl font-black text-gray-900 uppercase mb-6">Dictamen Técnico y Recomendaciones</h2>
-        <p class="text-sm text-gray-700 leading-relaxed text-justify mb-4">
-          Conforme al análisis técnico integral de las funciones descritas y la aplicación estricta de la metodología oficial de Puntos por Factores, el puesto evaluado obtiene una puntuación final de <strong>${totalPuntos} puntos</strong>. Este resultado técnico, cruzado con el Manual de Clases institucional, dictamina su clasificación formal en la clase <strong>${clase.nombre}</strong> (Serie ${clase.serie}).
-        </p>
+        <h2 class="text-xl font-black text-gray-900 uppercase mb-6">5. Dictamen Técnico y Recomendaciones</h2>
         <p class="text-sm text-gray-700 leading-relaxed text-justify mb-6">
-          La presente valoración ha sido ejecutada de forma sistemática, multifuente y auditable, utilizando ponderación cruzada entre la ficha oficial, las evidencias operativas y los procedimientos departamentales. Se garantiza así la total objetividad, equidad interna, trazabilidad y cumplimiento normativo en la asignación de la categoría salarial.
+          Conforme al análisis técnico de las funciones descritas y la metodología oficial de Puntos por Factores, 
+          el puesto obtiene una valoración de <strong>${totalPuntos} puntos</strong>, dictaminando su clasificación en la clase <strong>${clase.nombre}</strong>. 
+          La valoración fue ejecutada de forma sistemática y auditable, garantizando total objetividad, trazabilidad y cumplimiento normativo.
         </p>
         
         <div class="bg-gray-50 rounded-xl p-5 border border-gray-200">
@@ -269,34 +244,25 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
             <li>Programar auditorías de puesto anuales para corroborar la vigencia del perfil.</li>
           </ul>
         </div>
-
-        ${(() => {
-          const serie = clase.serie;
-          const limites: Record<string, number> = {
-            Operativa: 355, Administrativa: 355, Policia: 345,
-            Tecnica: 390, Profesional: 610, Jefatura: 880
-          };
-          const maxPuntos = limites[serie] || 1000;
-          if (totalPuntos <= maxPuntos) return '';
-          return `
-          <div class="mt-6 bg-indigo-50 border-l-4 border-indigo-500 p-4 rounded-r-xl">
-            <h3 class="text-xs font-bold text-indigo-800 uppercase tracking-widest mb-1">Acotaci\u00f3n Jer\u00e1rquica Activa</h3>
-            <p class="text-xs text-indigo-900 leading-relaxed text-justify">
-              Por la naturaleza organizativa del puesto (${serie}), la clase de valoraci\u00f3n se ha acotado autom\u00e1ticamente al estrato m\u00e1ximo permitido (<strong>${clase.nombre}</strong> con ${maxPuntos} pts) para resguardar la coherencia jer\u00e1rquica municipal, previniendo ascensos indebidos a escalas superiores.
-            </p>
-          </div>
-          `;
-        })()}
       </div>
 
       <!-- Bloque de Firmas -->
-      <div class="mt-20 pt-10 border-t border-gray-200 flex justify-center">
-        <div class="border border-gray-200 rounded-lg p-4 flex items-center bg-gray-50 max-w-lg">
-          <div class="w-1 h-12 bg-blue-600 rounded mr-4"></div>
-          <div>
-            <p class="text-[9px] font-bold text-blue-800 uppercase mb-1">Certificado Digital de Seguridad</p>
-            <p class="text-[8px] text-gray-600 font-mono">HASH: sha256-${hash}</p>
-            <p class="text-[8px] text-gray-600 font-mono">VERSION: ${buildVersion}</p>
+      <div class="mt-20 pt-10 border-t border-gray-200 flex justify-between items-end">
+        <div class="w-1/2 pr-10 text-center">
+          <div class="border-b border-gray-400 w-full mb-2"></div>
+          <p class="text-xs font-bold text-gray-800 uppercase">Firma Responsable RRHH</p>
+          <p class="text-[10px] text-gray-500">Gestor(a) de Talento Humano</p>
+        </div>
+        
+        <div class="w-1/2 pl-10">
+          <div class="border border-gray-200 rounded-lg p-4 flex items-center bg-gray-50">
+            <div class="w-1 h-12 bg-blue-600 rounded mr-4"></div>
+            <div>
+              <p class="text-[9px] font-bold text-blue-800 uppercase mb-1">Certificado Digital de Seguridad</p>
+              <p class="text-[8px] text-gray-600 font-mono">HASH: sha256-${hash}</p>
+              <p class="text-[8px] text-gray-600 font-mono">VERSION: ${buildVersion}</p>
+              <p class="text-[8px] font-bold text-gray-400 uppercase mt-1">Validado por RRHH MSC</p>
+            </div>
           </div>
         </div>
       </div>

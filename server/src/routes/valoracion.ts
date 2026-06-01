@@ -5,7 +5,6 @@ import { generateHtmlReport } from '../services/htmlReportGenerator';
 import { generateEvaluationReport } from '../services/reportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
 import { parseEntrevistaMD } from '../services/interviewParser';
-import { findPuestoWithEstrato } from '../services/puestoService';
 import prisma from '../db';
 import multer from 'multer';
 
@@ -17,7 +16,7 @@ router.post('/pipeline', upload.single('plaudTranscript'), async (req, res) => {
     const { puesto_id } = req.body;
     if (!puesto_id) return res.status(400).json({ error: 'puesto_id es requerido' });
 
-    const puesto = await findPuestoWithEstrato(puesto_id);
+    const puesto = await prisma.puesto.findUnique({ where: { id: puesto_id } });
     if (!puesto) return res.status(404).json({ error: 'Puesto no encontrado' });
 
     let interviewCtx = undefined;
@@ -187,14 +186,22 @@ router.post('/pipeline/report', async (req, res) => {
       fecha_evaluacion: new Date()
     };
 
+    // Inyectar intensidades desde el objeto evaluado
+    evaluacionPdf.intensidad_dificultad = ev.dificultad_intensidad || 'medio';
+    evaluacionPdf.intensidad_supervision = ev.supervision_intensidad || 'medio';
+    evaluacionPdf.intensidad_responsabilidad = ev.responsabilidad_intensidad || 'medio';
+    evaluacionPdf.intensidad_condiciones = ev.condiciones_intensidad || 'medio';
+    evaluacionPdf.intensidad_error = ev.error_intensidad || 'medio';
+    evaluacionPdf.intensidad_requisitos = ev.requisitos_intensidad || 'medio';
+
     // Formatear para que el iterador del HTML funcione
     evaluacionPdf.factores = [
-      { factor: 'Dificultad de las Funciones', puntos: evaluacionPdf.puntos_dificultad, justificacion: evaluacionPdf.justif_dificultad },
-      { factor: 'Supervisión Ejercida', puntos: evaluacionPdf.puntos_supervision, justificacion: evaluacionPdf.justif_supervision },
-      { factor: 'Responsabilidad', puntos: evaluacionPdf.puntos_responsabilidad, justificacion: evaluacionPdf.justif_responsabilidad },
-      { factor: 'Condiciones de Trabajo', puntos: evaluacionPdf.puntos_condiciones, justificacion: evaluacionPdf.justif_condiciones },
-      { factor: 'Consecuencia de Errores', puntos: evaluacionPdf.puntos_consecuencia_error, justificacion: evaluacionPdf.justif_consecuencia_error },
-      { factor: 'Requisitos', puntos: evaluacionPdf.puntos_requisitos, justificacion: evaluacionPdf.justif_requisitos },
+      { factor: 'Dificultad de las Funciones', dbField: 'dificultad', grado: evaluacionPdf.grado_dificultad, puntos: evaluacionPdf.puntos_dificultad, justificacion: evaluacionPdf.justif_dificultad },
+      { factor: 'Supervisión Ejercida', dbField: 'supervision', grado: evaluacionPdf.grado_supervision, puntos: evaluacionPdf.puntos_supervision, justificacion: evaluacionPdf.justif_supervision },
+      { factor: 'Responsabilidad', dbField: 'responsabilidad', grado: evaluacionPdf.grado_responsabilidad, puntos: evaluacionPdf.puntos_responsabilidad, justificacion: evaluacionPdf.justif_responsabilidad },
+      { factor: 'Condiciones de Trabajo', dbField: 'condiciones', grado: evaluacionPdf.grado_condiciones, puntos: evaluacionPdf.puntos_condiciones, justificacion: evaluacionPdf.justif_condiciones },
+      { factor: 'Consecuencia de Errores', dbField: 'error', grado: evaluacionPdf.grado_consecuencia_error, puntos: evaluacionPdf.puntos_consecuencia_error, justificacion: evaluacionPdf.justif_consecuencia_error },
+      { factor: 'Requisitos', dbField: 'requisitos', grado: evaluacionPdf.grado_requisitos, puntos: evaluacionPdf.puntos_requisitos, justificacion: evaluacionPdf.justif_requisitos },
     ];
 
     const format = req.query.format;

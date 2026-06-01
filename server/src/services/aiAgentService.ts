@@ -1,23 +1,33 @@
 import dotenv from 'dotenv';
 dotenv.config();
-import { GoogleGenerativeAI, SchemaType } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import { enrich as enrichProc } from './procedimientosService';
-import { contextualEvaluate, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
-import { FACTOR_CONFIG, getFactorPoints, POINTS_MAP, type Intensidad } from '../config/factorTables';
+import { contextualEvaluate, POINTS_MAP, CONTINUOUS_MAX, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
 import type { InterviewContext } from './interviewParser';
 
-export const BUILD_VERSION = 'v13-ensemble-temp0';
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
+export const BUILD_VERSION = 'v14-conservatism-clamp';
 
-export { POINTS_MAP } from '../config/factorTables';
-export { FactorKeywordDetail } from './contextualAnalyzer';
-export type { InterviewContext };
+let ollamaAvailable = true;
 
-export function getEngineStatus(): { activeEngine: 'llm' | 'rule-based' } {
-  return { activeEngine: 'llm' };
+async function checkOllama(): Promise<boolean> {
+  return true;
 }
 
-function ruleBasedEvaluation(puesto: any, procCtx?: any, interviewCtx?: any): AIEvaluationResult {
-  const result = contextualEvaluate(puesto, procCtx, interviewCtx);
+checkOllama().then(() => {
+  console.log('[AI Service] Conectado a Google Gemini API — usando motor LLM en la nube');
+});
+
+export { POINTS_MAP, CONTINUOUS_MAX, FactorKeywordDetail } from './contextualAnalyzer';
+export type { InterviewContext };
+
+export function getEngineStatus(): { ollamaAvailable: boolean; activeEngine: 'llm' | 'rule-based' } {
+  return { ollamaAvailable, activeEngine: ollamaAvailable ? 'llm' : 'rule-based' };
+}
+
+function ruleBasedEvaluation(puesto: any, procCtx?: any): AIEvaluationResult {
+  const result = contextualEvaluate(puesto, procCtx);
   result.buildVersion = result.buildVersion || BUILD_VERSION;
   return result;
 }
@@ -33,16 +43,51 @@ function sanitizeInput(text: string): string {
     .trim();
 }
 
-function buildPrompt(puesto: any, interviewCtx?: InterviewContext, baseline?: any): string {
-  const gradeTable = Object.entries(FACTOR_CONFIG).map(([factor, cfg]) => {
-    const label = FACTOR_NAMES[factor] || cfg.label;
-    const lines = cfg.grades.map((g, i) => {
-      if (i === 0) return '';
-      const [min, max] = cfg.ranges[i];
-      return `  Grado ${i} (${min}-${max} pts): ${g}`;
-    }).filter(Boolean);
-    return `${label} (${cfg.maxPts} pts max):\n${lines.join('\n')}`;
-  }).join('\n\n');
+function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
+  const gradeTable = Object.entries({
+    dificultad: [
+      'Grado 1 (40 pts): Tareas simples y repetitivas, poca iniciativa.',
+      'Grado 2 (80 pts): Tareas variadas pero estandarizadas.',
+      'Grado 3 (120 pts): Requiere analisis y juicio para resolver problemas tecnicos.',
+      'Grado 4 (160 pts): Alta complejidad, planeacion y coordinacion institucional.',
+      'Grado 5 (200 pts): Direccion estrategica y toma de decisiones criticas.'
+    ],
+    supervision: [
+      'Grado 1 (30 pts): No ejerce supervision.',
+      'Grado 2 (60 pts): Supervision ocasional de tareas simples.',
+      'Grado 3 (90 pts): Supervision de un grupo de trabajo operativo.',
+      'Grado 4 (120 pts): Jefatura de una unidad o departamento.',
+      'Grado 5 (150 pts): Direccion de un area tecnica o administrativa mayor.'
+    ],
+    responsabilidad: [
+      'Grado 1 (40 pts): Baja responsabilidad por valores o equipo.',
+      'Grado 2 (80 pts): Responsabilidad moderada por materiales y herramientas.',
+      'Grado 3 (120 pts): Custodia de informacion sensible o fondos fijos.',
+      'Grado 4 (160 pts): Responsabilidad por presupuestos o activos de alto valor.',
+      'Grado 5 (200 pts): Responsabilidad total por la gestion de un proceso clave.'
+    ],
+    condiciones: [
+      'Grado 1 (20 pts): Ambiente de oficina normal, riesgos minimos.',
+      'Grado 2 (40 pts): Esfuerzo fisico moderado o ambiente algo incomodo.',
+      'Grado 3 (60 pts): Exposicion a condiciones climaticas o ruido constante.',
+      'Grado 4 (80 pts): Riesgo de accidentes laborales o manejo de quimicos.',
+      'Grado 5 (100 pts): Condiciones de alta peligrosidad o insalubridad constante.'
+    ],
+    error: [
+      'Grado 1 (30 pts): Error facil de detectar y corregir.',
+      'Grado 2 (60 pts): Error causa retrasos menores en el flujo de trabajo.',
+      'Grado 3 (90 pts): Error afecta a otros departamentos o al servicio al cliente.',
+      'Grado 4 (120 pts): Error causa perdidas economicas o legales significativas.',
+      'Grado 5 (150 pts): Error compromete la estabilidad institucional o seguridad publica.'
+    ],
+    requisitos: [
+      'Grado 1 (40 pts): Educacion basica o primaria.',
+      'Grado 2 (80 pts): Bachillerato en Educacion Media o Tecnico basico.',
+      'Grado 3 (120 pts): Diplomado o Tecnico superior especializado.',
+      'Grado 4 (160 pts): Bachillerato Universitario o Licenciatura profesional.',
+      'Grado 5 (200 pts): Grado de Maestria o especializacion avanzada requerida.'
+    ]
+  }).map(([factor, grades]) => `${FACTOR_NAMES[factor] || factor}:\n${grades.map(g => `  ${g}`).join('\n')}`).join('\n\n');
 
   let interviewSection = '';
   if (interviewCtx && interviewCtx.factores) {
@@ -62,26 +107,6 @@ function buildPrompt(puesto: any, interviewCtx?: InterviewContext, baseline?: an
     }
   }
 
-  let baselineSection = '';
-  if (baseline) {
-    baselineSection = `
-=== LÍNEA BASE DETERMINISTA ===
-El sistema experto basado en reglas ya ha evaluado la Ficha Oficial y asignó los siguientes grados base:
-- Dificultad: Grado ${baseline.dificultad}
-- Supervisión: Grado ${baseline.supervision}
-- Responsabilidad: Grado ${baseline.responsabilidad}
-- Condiciones: Grado ${baseline.condiciones}
-- Error: Grado ${baseline.error}
-- Requisitos: Grado ${baseline.requisitos}
-
-=== TU ÚNICA MISIÓN ===
-1. Eres un auditor de entrevistas.
-2. Compara la EVIDENCIA DE LA ENTREVISTA con la LÍNEA BASE.
-3. Si la entrevista NO aporta nada nuevo o no existe, DEBES devolver exactamente los mismos grados de la línea base.
-4. SOLO puedes elevar o modificar un grado si la entrevista demuestra responsabilidades operativas irrefutablemente mayores al documento base.
-`;
-  }
-
   return `
 Eres el EVALUADOR TECNICO OFICIAL del sistema de valoracion de puestos de la Municipalidad de San Carlos.
 Tu analisis es objetivo, vinculante y constituye un documento oficial con implicaciones administrativas y legales.
@@ -95,33 +120,12 @@ Reporta a: ${sanitizeInput(puesto.reporta_a) || 'No especificado'}
 === DESCRIPCION DE FUNCIONES ===
 ${sanitizeInput(puesto.descripcion_funciones) || 'No especificadas'}
 
-=== CONTEXTO DE SERIE Y ACOTACIÓN JERÁRQUICA ===
-Este puesto pertenece a la serie laboral: ${puesto.estrato || 'No determinada'}
-La serie define el tope máximo de puntos que puede alcanzar el puesto.
-No asignes una clase o puntuación total que exceda el límite de su serie.
-${puesto.estrato ? (() => {
-  const limites: Record<string, string> = {
-    'Operativa': 'MÁXIMO 355 PUNTOS — Clase tope: Operativo Municipal 6',
-    'Administrativa': 'MÁXIMO 355 PUNTOS — Clase tope: Administrativo Municipal 4',
-    'Policia': 'MÁXIMO 345 PUNTOS — Clase tope: Policia Municipal 5',
-    'Tecnica': 'MÁXIMO 390 PUNTOS — Clase tope: Tecnico Municipal 3',
-    'Profesional': 'MÁXIMO 610 PUNTOS — Clase tope: Profesional Municipal 4',
-    'Jefatura': 'MÁXIMO 880 PUNTOS — Clase tope: Profesional Jefe 5'
-  };
-  for (const [serie, texto] of Object.entries(limites)) {
-    if (puesto.estrato.toLowerCase().includes(serie.toLowerCase())) return texto;
-  }
-  return '';
-})() : 'Límite por defecto: 1000 PUNTOS'}
-
 === REQUISITOS DEL PUESTO ===
 Educacion requerida: ${sanitizeInput(puesto.educacion_requerida) || 'No especificada'}
 Experiencia requerida: ${sanitizeInput(puesto.experiencia_requerida) || 'No especificada'}
 ${interviewSection}
-${baselineSection}
 === ESCALA DE GRADOS POR FACTOR ===
-Cada factor se califica del 1 (minimo) al 6 (maximo) segun la rubrica oficial, excepto Condiciones de Trabajo que va del 1 al 5.
-Ademas, para cada factor debes evaluar la INTENSIDAD (bajo, medio o alto) basandote en que tan profundo calzan las funciones dentro del grado asignado.
+Cada factor se califica del 1 (minimo) al 5 (maximo).
 
 ${gradeTable}
 
@@ -136,14 +140,18 @@ Para CADA factor, realiza un analisis multidimensional cruzando nuestras 3 fuent
 
 4. **Asignacion de Grado y Puntos**: Selecciona el grado que MEJOR refleje la totalidad de la evidencia cruzada. Si la entrevista y la participacion en procedimientos elevan la responsabilidad real del puesto por encima de lo documentado, prioriza la realidad operativa. Cada grado debe estar plenamente justificado.
 
+=== TU UNICA MISION ===
+5. **MAXIMO DE DESVIACION**: No puedes alejarte mas de 2 grados de la linea base en NINGUN factor. Si la linea base dice G3, tu rango permitido es G1 a G5.
+6. **REGLA DE EMPATE**: Si dudas entre dos grados adyacentes, SIEMPRE elige el grado inferior y compensa con intensidad='alto'.
+
 === INSTRUCCIONES CRITICAS ===
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
-- Cada grado debe ser un numero entero entre 1 y 6 (Condiciones de Trabajo: 1-5).
+- Cada grado debe ser un numero entero entre 1 y 5.
 - Cada justificacion debe tener entre 2 y 4 oraciones. Es OBLIGATORIO incluir al menos una cita textual exacta usando comillas dobles ("cita") de cualquiera de las 3 fuentes de verdad.
 - OBLIGATORIO MULTIFUENTE: Si existe EVIDENCIA DE ENTREVISTA para el factor, ESTAS OBLIGADO a cambiar el campo "_fuente" a "mixta" o "entrevista". ¡NUNCA uses "documental" si la entrevista aporto contexto!
 - OBLIGATORIO CITAS MIXTAS: Si usas "mixta", ESTAS OBLIGADO a llenar el campo "_cita_entrevista" con la cita textual de la entrevista y explicar en tu justificacion si la entrevista refuerza o contradice el documento.
-- ALERTAS DE CONTRADICCION: Redacta las alertas de forma clara, directa y estructurada. Usa este formato: "[Nombre del Factor] Discrepancia: La Ficha Oficial indica 'X', pero la Entrevista evidencia 'Y'. Impacto: Se elevo el nivel por mayor complejidad real." No uses redacciones confusas ni redundantes.
 - Si no hay evidencia clara, asigna el grado mas conservador (1).
+- REGLA DE CONSERVADURISMO OBLIGATORIA: Cuando la evidencia sea ambigua entre dos grados adyacentes, SIEMPRE debes asignar el grado INFERIOR y usar intensidad='alto' para reflejar la fuerza de la evidencia. Solo asigna el grado superior si la evidencia es ABSOLUTAMENTE IRREFUTABLE.
 - Devuelve UNICAMENTE el objeto JSON, sin texto adicional ni codigo.
 
 === EJEMPLO DE JUSTIFICACION TECNICA ADECUADA ===
@@ -151,47 +159,41 @@ Para CADA factor, realiza un analisis multidimensional cruzando nuestras 3 fuent
 
 === FORMATO JSON REQUERIDO ===
 {
-  "dificultad": <1-6>,
+  "dificultad": <1-5>,
   "dificultad_just": "<justificacion tecnica>",
   "dificultad_cita_documental": "<cita textual de las funciones>",
   "dificultad_fuente": "documental|entrevista|mixta",
   "dificultad_cita_entrevista": "<cita textual de la entrevista si aplica o ''>",
-  "dificultad_intensidad": "bajo|medio|alto",
 
-  "supervision": <1-6>,
+  "supervision": <1-5>,
   "supervision_just": "<justificacion tecnica>",
   "supervision_cita_documental": "<cita textual>",
   "supervision_fuente": "documental|entrevista|mixta",
   "supervision_cita_entrevista": "<cita o ''>",
-  "supervision_intensidad": "bajo|medio|alto",
 
-  "responsabilidad": <1-6>,
+  "responsabilidad": <1-5>,
   "responsabilidad_just": "<justificacion tecnica>",
   "responsabilidad_cita_documental": "<cita textual>",
   "responsabilidad_fuente": "documental|entrevista|mixta",
   "responsabilidad_cita_entrevista": "<cita o ''>",
-  "responsabilidad_intensidad": "bajo|medio|alto",
 
   "condiciones": <1-5>,
   "condiciones_just": "<justificacion tecnica>",
   "condiciones_cita_documental": "<cita textual>",
   "condiciones_fuente": "documental|entrevista|mixta",
   "condiciones_cita_entrevista": "<cita o ''>",
-  "condiciones_intensidad": "bajo|medio|alto",
 
-  "error": <1-6>,
+  "error": <1-5>,
   "error_just": "<justificacion tecnica>",
   "error_cita_documental": "<cita textual>",
   "error_fuente": "documental|entrevista|mixta",
   "error_cita_entrevista": "<cita o ''>",
-  "error_intensidad": "bajo|medio|alto",
 
-  "requisitos": <1-6>,
+  "requisitos": <1-5>,
   "requisitos_just": "<justificacion tecnica>",
   "requisitos_cita_documental": "<cita textual>",
   "requisitos_fuente": "documental|entrevista|mixta",
   "requisitos_cita_entrevista": "<cita o ''>",
-  "requisitos_intensidad": "bajo|medio|alto",
 
   "alertas_contradiccion": ["<alerta si hay contradiccion entre fuentes>"]
 }
@@ -205,9 +207,8 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
 
   for (const factor of FACTORS) {
     const grado = Number(suggestion[factor]);
-    const maxGrado = factor === 'condiciones' ? 5 : 6;
-    if (!Number.isInteger(grado) || grado < 1 || grado > maxGrado) {
-      errors.push(`${factor}: debe ser entero entre 1 y ${maxGrado}, recibio ${suggestion[factor]}`);
+    if (!Number.isInteger(grado) || grado < 1 || grado > 5) {
+      errors.push(`${factor}: debe ser entero entre 1 y 5, recibio ${suggestion[factor]}`);
       suggestion[factor] = 1;
     }
     const justKey = `${factor}_just`;
@@ -215,13 +216,6 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
       errors.push(`${justKey}: justificacion muy corta o vacia`);
       suggestion[justKey] = suggestion[justKey] || 'Analisis basado en la descripcion de funciones del puesto.';
     }
-
-    // Extraer intensidad (default 'medio')
-    const intensidadKey = `${factor}_intensidad`;
-    const intensidad: Intensidad = ['bajo', 'medio', 'alto'].includes(suggestion[intensidadKey])
-      ? suggestion[intensidadKey]
-      : 'medio';
-    suggestion[intensidadKey] = intensidad;
 
     // Extraer campos multifuente
     const citaDocKey = `${factor}_cita_documental`;
@@ -240,12 +234,10 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
       suggestion[`${factor}_contradiccion`] === 'true'
     ));
 
-    const puntos = getFactorPoints(factor, Number(suggestion[factor]), intensidad);
-
     analisis_multifuente.push({
       factor,
       grado: Number(suggestion[factor]),
-      puntos,
+      puntos: POINTS_MAP[factor][Number(suggestion[factor])] || 0,
       justificacion_documental: suggestion[justKey] || '',
       cita_documental: citaDocumental,
       justificacion_entrevista: undefined,
@@ -260,15 +252,12 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
 
   let totalPuntos = 0;
   for (const factor of FACTORS) {
-    const intensidad: Intensidad = ['bajo', 'medio', 'alto'].includes(suggestion[`${factor}_intensidad`])
-      ? suggestion[`${factor}_intensidad`]
-      : 'medio';
-    totalPuntos += getFactorPoints(factor, suggestion[factor], intensidad);
+    totalPuntos += POINTS_MAP[factor][suggestion[factor]];
   }
 
   const alertasContradiccion: string[] = suggestion.alertas_contradiccion || [];
   const alertaGlobal = alertasContradiccion.length > 0
-    ? alertasContradiccion.map(alerta => `• ${alerta}`).join('\n')
+    ? `Se detectaron ${alertasContradiccion.length} alertas de contradiccion entre fuentes.`
     : undefined;
 
   return {
@@ -287,56 +276,9 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
   const genAI = new GoogleGenerativeAI(apiKey);
-  const schema = {
-    type: SchemaType.OBJECT as const,
-    properties: {
-      dificultad: { type: SchemaType.INTEGER as const },
-      dificultad_just: { type: SchemaType.STRING as const },
-      dificultad_cita_documental: { type: SchemaType.STRING as const },
-      dificultad_fuente: { type: SchemaType.STRING as const },
-      dificultad_cita_entrevista: { type: SchemaType.STRING as const },
-      dificultad_intensidad: { type: SchemaType.STRING as const },
-      supervision: { type: SchemaType.INTEGER as const },
-      supervision_just: { type: SchemaType.STRING as const },
-      supervision_cita_documental: { type: SchemaType.STRING as const },
-      supervision_fuente: { type: SchemaType.STRING as const },
-      supervision_cita_entrevista: { type: SchemaType.STRING as const },
-      supervision_intensidad: { type: SchemaType.STRING as const },
-      responsabilidad: { type: SchemaType.INTEGER as const },
-      responsabilidad_just: { type: SchemaType.STRING as const },
-      responsabilidad_cita_documental: { type: SchemaType.STRING as const },
-      responsabilidad_fuente: { type: SchemaType.STRING as const },
-      responsabilidad_cita_entrevista: { type: SchemaType.STRING as const },
-      responsabilidad_intensidad: { type: SchemaType.STRING as const },
-      condiciones: { type: SchemaType.INTEGER as const },
-      condiciones_just: { type: SchemaType.STRING as const },
-      condiciones_cita_documental: { type: SchemaType.STRING as const },
-      condiciones_fuente: { type: SchemaType.STRING as const },
-      condiciones_cita_entrevista: { type: SchemaType.STRING as const },
-      condiciones_intensidad: { type: SchemaType.STRING as const },
-      error: { type: SchemaType.INTEGER as const },
-      error_just: { type: SchemaType.STRING as const },
-      error_cita_documental: { type: SchemaType.STRING as const },
-      error_fuente: { type: SchemaType.STRING as const },
-      error_cita_entrevista: { type: SchemaType.STRING as const },
-      error_intensidad: { type: SchemaType.STRING as const },
-      requisitos: { type: SchemaType.INTEGER as const },
-      requisitos_just: { type: SchemaType.STRING as const },
-      requisitos_cita_documental: { type: SchemaType.STRING as const },
-      requisitos_fuente: { type: SchemaType.STRING as const },
-      requisitos_cita_entrevista: { type: SchemaType.STRING as const },
-      requisitos_intensidad: { type: SchemaType.STRING as const },
-      alertas_contradiccion: { type: SchemaType.ARRAY as const, items: { type: SchemaType.STRING as const } }
-    },
-    required: ["dificultad", "supervision", "responsabilidad", "condiciones", "error", "requisitos", "dificultad_intensidad", "supervision_intensidad", "responsabilidad_intensidad", "condiciones_intensidad", "error_intensidad", "requisitos_intensidad"]
-  };
   const model = genAI.getGenerativeModel({
     model: 'gemini-2.5-flash',
-    generationConfig: { 
-      responseMimeType: 'application/json', 
-      responseSchema: schema, 
-      temperature 
-    }
+    generationConfig: { responseMimeType: 'application/json', temperature }
   });
   const result = await model.generateContent(prompt);
   const jsonText = result.response.text();
@@ -345,30 +287,20 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
   return JSON.parse(cleanJson);
 }
 
-async function callGeminiEnsemble(prompt: string): Promise<any> {
-  const ENSEMBLE_CALLS = 1;
+async function callOllama(prompt: string): Promise<any> {
+  const ENSEMBLE_CALLS = 3;
   const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
   const results: any[] = [];
 
   for (let i = 0; i < ENSEMBLE_CALLS; i++) {
     try {
       if (i > 0) await new Promise(r => setTimeout(r, 500));
-      
-      let raw = null;
-      try {
-        raw = await callGemini(prompt);
-      } catch (apiError) {
-        console.warn("[AI Service] Fallo en primer intento, reintentando en 1s...");
-        await new Promise(r => setTimeout(r, 1000));
-        raw = await callGemini(prompt); // Segundo intento
-      }
+      const raw = await callGemini(prompt);
       for (const f of FACTORS) {
-        const maxG = f === 'condiciones' ? 5 : 6;
-        if (!raw[f] || raw[f] < 1 || raw[f] > maxG) raw[f] = 1;
+        if (!raw[f] || raw[f] < 1 || raw[f] > 5) raw[f] = 1;
       }
       results.push(raw);
-    } catch (e) {
-      console.error("[AI Service] Error definitivo en callGemini:", e);
+    } catch {
       continue;
     }
   }
@@ -398,14 +330,14 @@ async function callGeminiEnsemble(prompt: string): Promise<any> {
   return modeResult;
 }
 
-function calculateFactorPoints(data: any): Record<string, number> {
+function calculateFactorPoints(data: EvaluationSuggestion): Record<string, number> {
   return {
-    dificultad: getFactorPoints('dificultad', data.dificultad, data.dificultad_intensidad || 'medio'),
-    supervision: getFactorPoints('supervision', data.supervision, data.supervision_intensidad || 'medio'),
-    responsabilidad: getFactorPoints('responsabilidad', data.responsabilidad, data.responsabilidad_intensidad || 'medio'),
-    condiciones: getFactorPoints('condiciones', data.condiciones, data.condiciones_intensidad || 'medio'),
-    error: getFactorPoints('error', data.error, data.error_intensidad || 'medio'),
-    requisitos: getFactorPoints('requisitos', data.requisitos, data.requisitos_intensidad || 'medio'),
+    dificultad: POINTS_MAP.dificultad[data.dificultad],
+    supervision: POINTS_MAP.supervision[data.supervision],
+    responsabilidad: POINTS_MAP.responsabilidad[data.responsabilidad],
+    condiciones: POINTS_MAP.condiciones[data.condiciones],
+    error: POINTS_MAP.error[data.error],
+    requisitos: POINTS_MAP.requisitos[data.requisitos],
   };
 }
 
@@ -415,26 +347,52 @@ export const aiAgentService = {
     async evaluate(puesto: any, interviewCtx?: InterviewContext): Promise<AIEvaluationResult> {
         const procCtx = await enrichProc(puesto).catch(() => null);
         const procText = procCtx ? procCtx.textoCompleto : undefined;
-        const baselineResult = ruleBasedEvaluation(puesto, procCtx, interviewCtx);
         let result: AIEvaluationResult;
-        try {
-          let funcionesConProcedimientos = puesto.descripcion_funciones;
-          if (procText) {
-            funcionesConProcedimientos = `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}`;
+        if (ollamaAvailable) {
+          try {
+            let funcionesConProcedimientos = puesto.descripcion_funciones;
+            if (procText) {
+              funcionesConProcedimientos = `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}`;
+            }
+            const enrichedPuesto = { ...puesto, descripcion_funciones: funcionesConProcedimientos };
+            const prompt = buildPrompt(enrichedPuesto, interviewCtx);
+            const raw = await callOllama(prompt);
+
+            // === CLAMPPEO POR LINEA BASE (Solucion D) ===
+            const baselineResult = contextualEvaluate(enrichedPuesto, procCtx);
+            const FACTORES_CLAMP = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
+            const FACTOR_MAX: Record<string, number> = {
+              dificultad: 6, supervision: 6, responsabilidad: 6,
+              condiciones: 5, error: 6, requisitos: 6
+            };
+            const MAX_DELTA = 2;
+            for (const factor of FACTORES_CLAMP) {
+              const base = Number((baselineResult.data as any)[factor]) || 3;
+              const llmGrade = Number(raw[factor]) || base;
+              const minVal = Math.max(1, base - MAX_DELTA);
+              const maxVal = Math.min(FACTOR_MAX[factor], base + MAX_DELTA);
+              if (llmGrade > maxVal) {
+                raw[factor] = maxVal;
+                raw[factor + '_intensidad'] = 'alto';
+              } else if (llmGrade < minVal) {
+                raw[factor] = minVal;
+              }
+              if (raw[factor + '_intensidad'] === undefined || raw[factor + '_intensidad'] === null) {
+                raw[factor + '_intensidad'] = 'medio';
+              }
+            }
+
+            result = validateAndCalculate(raw, puesto.id, 'llm');
+            result.factorPoints = calculateFactorPoints(result.data);
+            if (procCtx) result.procedimientosCount = procCtx.totalProcedimientos;
+            result.buildVersion = BUILD_VERSION;
+            result.interviewContext = interviewCtx;
+          } catch (error: any) {
+            console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
+            result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Gemini fallu00F3, revisa tu API KEY en Vercel). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
           }
-          const enrichedPuesto = { ...puesto, descripcion_funciones: funcionesConProcedimientos };
-          const prompt = buildPrompt(enrichedPuesto, interviewCtx, baselineResult.data);
-          const raw = await callGeminiEnsemble(prompt);
-          result = validateAndCalculate(raw, puesto.id, 'llm');
-          result.factorPoints = calculateFactorPoints(result.data);
-          if (procCtx) result.procedimientosCount = procCtx.totalProcedimientos;
-          result.buildVersion = BUILD_VERSION;
-          result.interviewContext = interviewCtx;
-        } catch (error: any) {
-          console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
-          result = baselineResult;
-          result.alerta_global = "Servicio de IA no disponible temporalmente. Se aplicó evaluación basada en reglas." +
-            (interviewCtx ? " NOTA: Hay una entrevista adjunta. Por favor asigne puntos extra manualmente si la entrevista demuestra mayor complejidad operativa." : "");
+        } else {
+          result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
         }
         return result;
     },
@@ -442,18 +400,22 @@ export const aiAgentService = {
     async suggestEvaluation(puesto: any): Promise<EvaluationSuggestion | null> {
         const procCtx = await enrichProc(puesto).catch(() => null);
         const procText = procCtx ? procCtx.textoCompleto : undefined;
-        const baselineResult = ruleBasedEvaluation(puesto, procCtx, null);
+        if (!ollamaAvailable) {
+          const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+          return result.data;
+        }
 
         try {
             const enrichedPuesto = procText
               ? { ...puesto, descripcion_funciones: `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}` }
               : puesto;
-            const prompt = buildPrompt(enrichedPuesto, undefined, baselineResult.data);
-            const raw = await callGeminiEnsemble(prompt);
+            const prompt = buildPrompt(enrichedPuesto);
+            const raw = await callOllama(prompt);
             return raw as EvaluationSuggestion;
         } catch (error: any) {
             console.warn('[AI Service] Error en suggestEvaluation, usando rule-based:', error.message);
-            return baselineResult.data;
+            const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+            return result.data;
         }
     }
 };
