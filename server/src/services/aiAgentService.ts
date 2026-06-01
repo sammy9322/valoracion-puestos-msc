@@ -177,36 +177,42 @@ El sistema experto basado en reglas ya ha evaluado la Ficha Oficial y asignó lo
   "dificultad_cita_documental": "<cita textual de las funciones>",
   "dificultad_fuente": "documental|entrevista|mixta",
   "dificultad_cita_entrevista": "<cita textual de la entrevista si aplica o ''>",
+  "dificultad_intensidad": "alto|medio|bajo",
 
   "supervision": <1-5>,
   "supervision_just": "<justificacion tecnica>",
   "supervision_cita_documental": "<cita textual>",
   "supervision_fuente": "documental|entrevista|mixta",
   "supervision_cita_entrevista": "<cita o ''>",
+  "supervision_intensidad": "alto|medio|bajo",
 
   "responsabilidad": <1-5>,
   "responsabilidad_just": "<justificacion tecnica>",
   "responsabilidad_cita_documental": "<cita textual>",
   "responsabilidad_fuente": "documental|entrevista|mixta",
   "responsabilidad_cita_entrevista": "<cita o ''>",
+  "responsabilidad_intensidad": "alto|medio|bajo",
 
   "condiciones": <1-5>,
   "condiciones_just": "<justificacion tecnica>",
   "condiciones_cita_documental": "<cita textual>",
   "condiciones_fuente": "documental|entrevista|mixta",
   "condiciones_cita_entrevista": "<cita o ''>",
+  "condiciones_intensidad": "alto|medio|bajo",
 
   "error": <1-5>,
   "error_just": "<justificacion tecnica>",
   "error_cita_documental": "<cita textual>",
   "error_fuente": "documental|entrevista|mixta",
   "error_cita_entrevista": "<cita o ''>",
+  "error_intensidad": "alto|medio|bajo",
 
   "requisitos": <1-5>,
   "requisitos_just": "<justificacion tecnica>",
   "requisitos_cita_documental": "<cita textual>",
   "requisitos_fuente": "documental|entrevista|mixta",
   "requisitos_cita_entrevista": "<cita o ''>",
+  "requisitos_intensidad": "alto|medio|bajo",
 
   "alertas_contradiccion": ["<alerta si hay contradiccion entre fuentes>"]
 }
@@ -313,9 +319,7 @@ async function callOllama(prompt: string): Promise<any> {
         if (!raw[f] || raw[f] < 1 || raw[f] > 5) raw[f] = 1;
       }
       results.push(raw);
-    } catch {
-      continue;
-    }
+    } catch (e: any) { console.error('[callOllama] Error interno en Gemini:', e.message || e); continue; }
   }
 
   if (results.length === 0) {
