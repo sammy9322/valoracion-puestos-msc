@@ -159,12 +159,12 @@ El sistema experto basado en reglas ya ha evaluado la Ficha Oficial y asignó lo
 
 === INSTRUCCIONES CRITICAS ===
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
+- REGLA DE CONSERVADURISMO OBLIGATORIA: Cuando la evidencia sea ambigua entre dos grados adyacentes (por ejemplo, G5 o G6), SIEMPRE debes asignar el grado INFERIOR y usar intensidad='alto' para reflejar la fuerza de la evidencia. Solo asigna el grado superior si la evidencia es ABSOLUTAMENTE IRREFUTABLE y no cabe en el grado inferior ni siquiera con intensidad alta. Esta regla es critica para garantizar la estabilidad y reproducibilidad del sistema de valoracion. Un analista conservador siempre elige el grado menor cuando hay duda.
 - Cada grado debe ser un numero entero entre 1 y 5.
 - Cada justificacion debe tener entre 2 y 4 oraciones. Es OBLIGATORIO incluir al menos una cita textual exacta usando comillas dobles ("cita") de cualquiera de las 3 fuentes de verdad.
 - OBLIGATORIO MULTIFUENTE: Si existe EVIDENCIA DE ENTREVISTA para el factor, ESTAS OBLIGADO a cambiar el campo "_fuente" a "mixta" o "entrevista". ¡NUNCA uses "documental" si la entrevista aporto contexto!
 - OBLIGATORIO CITAS MIXTAS: Si usas "mixta", ESTAS OBLIGADO a llenar el campo "_cita_entrevista" con la cita textual de la entrevista y explicar en tu justificacion si la entrevista refuerza o contradice el documento.
 - Si no hay evidencia clara, asigna el grado mas conservador (1).
-- REGLA DE CONSERVADURISMO OBLIGATORIA: Cuando la evidencia sea ambigua entre dos grados adyacentes, SIEMPRE debes asignar el grado INFERIOR y usar intensidad='alto' para reflejar la fuerza de la evidencia. Solo asigna el grado superior si la evidencia es ABSOLUTAMENTE IRREFUTABLE.
 - Devuelve UNICAMENTE el objeto JSON, sin texto adicional ni codigo.
 
 === EJEMPLO DE JUSTIFICACION TECNICA ADECUADA ===
@@ -372,26 +372,23 @@ export const aiAgentService = {
             const prompt = buildPrompt(enrichedPuesto, interviewCtx, baselineResult.data);
             const raw = await callOllama(prompt);
 
-            // === CLAMPPEO POR LINEA BASE (Solucion D) ===
+            // === CLAMPEO POR LÍNEA BASE (Anti-Variabilidad) ===
             const FACTORES_CLAMP = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
-            const FACTOR_MAX: Record<string, number> = {
-              dificultad: 6, supervision: 6, responsabilidad: 6,
-              condiciones: 5, error: 6, requisitos: 6
-            };
-            const MAX_DELTA = 2;
+            const MAX_DELTA = 2; // máximo ±2 grados de desviación de la línea base
             for (const factor of FACTORES_CLAMP) {
-              const base = Number((baselineResult.data as any)[factor]) || 3;
-              const llmGrade = Number(raw[factor]) || base;
-              const minVal = Math.max(1, base - MAX_DELTA);
-              const maxVal = Math.min(FACTOR_MAX[factor], base + MAX_DELTA);
-              if (llmGrade > maxVal) {
-                raw[factor] = maxVal;
-                raw[factor + '_intensidad'] = 'alto';
-              } else if (llmGrade < minVal) {
-                raw[factor] = minVal;
-              }
-              if (raw[factor + '_intensidad'] === undefined || raw[factor + '_intensidad'] === null) {
-                raw[factor + '_intensidad'] = 'medio';
+              const baseGrado = (baselineResult.data as any)[factor];
+              const llmGrado = raw[factor];
+              if (typeof baseGrado === 'number' && typeof llmGrado === 'number') {
+                const minAllowed = Math.max(1, baseGrado - MAX_DELTA);
+                const maxAllowed = Math.min(factor === 'condiciones' ? 5 : 6, baseGrado + MAX_DELTA);
+                if (llmGrado < minAllowed || llmGrado > maxAllowed) {
+                  console.warn(`[AI Service] Clampeo: ${factor} LLM=${llmGrado}, Base=${baseGrado}, Rango=[${minAllowed},${maxAllowed}] → Clampeado a ${Math.max(minAllowed, Math.min(maxAllowed, llmGrado))}`);
+                  raw[factor] = Math.max(minAllowed, Math.min(maxAllowed, llmGrado));
+                  // Si fue clampeado hacia abajo, compensar con intensidad alta
+                  if (llmGrado > maxAllowed) {
+                    raw[`${factor}_intensidad`] = 'alto';
+                  }
+                }
               }
             }
 

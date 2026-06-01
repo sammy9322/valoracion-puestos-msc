@@ -189,7 +189,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
             <div class="bg-gray-50 border-b border-gray-200 p-4 flex justify-between items-center">
               <div>
                 <h3 class="font-bold text-gray-800 uppercase text-sm">${f.factor}</h3>
-                <p class="text-xs text-blue-600 mt-0.5">Nivel Asignado: Grado ${f.grado} (${f.puntos} pts) &mdash; Intensidad: ${(evaluacion[`intensidad_${f.dbField}`] || 'medio').replace(/^./, (c: string) => c.toUpperCase())}</p>
+                <p class="text-sm font-bold text-blue-800 uppercase">Nivel Asignado: Grado ${f.grado} (${f.puntos} pts) — Intensidad: ${(evaluacion[`intensidad_${f.dbField}`] || 'medio').charAt(0).toUpperCase() + (evaluacion[`intensidad_${f.dbField}`] || 'medio').slice(1)}</p>
               </div>
               <div class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-black">
                 ${f.puntos} pts
