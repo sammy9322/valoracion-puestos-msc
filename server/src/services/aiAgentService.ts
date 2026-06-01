@@ -43,7 +43,7 @@ function sanitizeInput(text: string): string {
     .trim();
 }
 
-function buildPrompt(puesto: any, interviewCtx?: InterviewContext): string {
+function buildPrompt(puesto: any, interviewCtx?: InterviewContext, baseline?: any): string {
   const gradeTable = Object.entries({
     dificultad: [
       'Grado 1 (40 pts): Tareas simples y repetitivas, poca iniciativa.',
@@ -140,9 +140,22 @@ Para CADA factor, realiza un analisis multidimensional cruzando nuestras 3 fuent
 
 4. **Asignacion de Grado y Puntos**: Selecciona el grado que MEJOR refleje la totalidad de la evidencia cruzada. Si la entrevista y la participacion en procedimientos elevan la responsabilidad real del puesto por encima de lo documentado, prioriza la realidad operativa. Cada grado debe estar plenamente justificado.
 
+=== LÍNEA BASE DETERMINISTA ===
+El sistema experto basado en reglas ya ha evaluado la Ficha Oficial y asignó los siguientes grados base:
+- Dificultad: Grado ${baseline?.dificultad}
+- Supervisión: Grado ${baseline?.supervision}
+- Responsabilidad: Grado ${baseline?.responsabilidad}
+- Condiciones: Grado ${baseline?.condiciones}
+- Error: Grado ${baseline?.error}
+- Requisitos: Grado ${baseline?.requisitos}
+
 === TU UNICA MISION ===
-5. **MAXIMO DE DESVIACION**: No puedes alejarte mas de 2 grados de la linea base en NINGUN factor. Si la linea base dice G3, tu rango permitido es G1 a G5.
-6. **REGLA DE EMPATE**: Si dudas entre dos grados adyacentes, SIEMPRE elige el grado inferior y compensa con intensidad='alto'.
+1. Eres un auditor de entrevistas.
+2. Compara la EVIDENCIA DE LA ENTREVISTA con la LÍNEA BASE.
+3. Si la entrevista NO aporta nada nuevo o no existe, DEBES devolver exactamente los mismos grados de la línea base.
+4. SOLO puedes elevar o modificar un grado si la entrevista demuestra responsabilidades operativas irrefutablemente mayores al documento base.
+5. MAXIMO DE DESVIACION: No puedes alejarte mas de 2 grados de la linea base en NINGUN factor. Si la linea base dice G3, tu rango permitido es G1 a G5.
+6. REGLA DE EMPATE: Si dudas entre dos grados adyacentes, SIEMPRE elige el grado inferior y compensa con intensidad='alto'.
 
 === INSTRUCCIONES CRITICAS ===
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
@@ -288,7 +301,7 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
 }
 
 async function callOllama(prompt: string): Promise<any> {
-  const ENSEMBLE_CALLS = 3;
+  const ENSEMBLE_CALLS = 1;
   const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
   const results: any[] = [];
 
@@ -355,11 +368,11 @@ export const aiAgentService = {
               funcionesConProcedimientos = `${puesto.descripcion_funciones}\n\n--- PROCEDIMIENTOS ASOCIADOS ---\n${procText}`;
             }
             const enrichedPuesto = { ...puesto, descripcion_funciones: funcionesConProcedimientos };
-            const prompt = buildPrompt(enrichedPuesto, interviewCtx);
+            const baselineResult = contextualEvaluate(enrichedPuesto, procCtx);
+            const prompt = buildPrompt(enrichedPuesto, interviewCtx, baselineResult.data);
             const raw = await callOllama(prompt);
 
             // === CLAMPPEO POR LINEA BASE (Solucion D) ===
-            const baselineResult = contextualEvaluate(enrichedPuesto, procCtx);
             const FACTORES_CLAMP = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
             const FACTOR_MAX: Record<string, number> = {
               dificultad: 6, supervision: 6, responsabilidad: 6,
