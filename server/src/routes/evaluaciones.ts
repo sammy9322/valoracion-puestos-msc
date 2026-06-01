@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import prisma from '../db';
 import { aiAgentService, POINTS_MAP, BUILD_VERSION } from '../services/aiAgentService';
+import { getFactorPoints } from '../config/factorTables';
 import { generateEvaluationReport } from '../services/reportGenerator';
 import { generateHtmlReport } from '../services/htmlReportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
@@ -48,12 +49,12 @@ router.post('/', async (req, res) => {
         }
 
         const calculatedPoints =
-            POINTS_MAP.dificultad[Number(data.dificultad)] +
-            POINTS_MAP.supervision[Number(data.supervision)] +
-            POINTS_MAP.responsabilidad[Number(data.responsabilidad)] +
-            POINTS_MAP.condiciones[Number(data.condiciones)] +
-            POINTS_MAP.error[Number(data.error)] +
-            POINTS_MAP.requisitos[Number(data.requisitos)];
+            getFactorPoints('dificultad', Number(data.dificultad), data.dificultad_intensidad || 'medio') +
+            getFactorPoints('supervision', Number(data.supervision), data.supervision_intensidad || 'medio') +
+            getFactorPoints('responsabilidad', Number(data.responsabilidad), data.responsabilidad_intensidad || 'medio') +
+            getFactorPoints('condiciones', Number(data.condiciones), data.condiciones_intensidad || 'medio') +
+            getFactorPoints('error', Number(data.error), data.error_intensidad || 'medio') +
+            getFactorPoints('requisitos', Number(data.requisitos), data.requisitos_intensidad || 'medio');
 
         const evaluacion = await prisma.evaluacion.create({
             data: {
@@ -62,27 +63,27 @@ router.post('/', async (req, res) => {
                 evaluador_id: user.id,
 
                 grado_dificultad: Number(data.dificultad),
-                puntos_dificultad: POINTS_MAP.dificultad[data.dificultad],
+                puntos_dificultad: getFactorPoints('dificultad', Number(data.dificultad), data.dificultad_intensidad || 'medio'),
                 justif_dificultad: data.difficulty_just || '',
 
                 grado_supervision: Number(data.supervision),
-                puntos_supervision: POINTS_MAP.supervision[data.supervision],
+                puntos_supervision: getFactorPoints('supervision', Number(data.supervision), data.supervision_intensidad || 'medio'),
                 justif_supervision: data.supervision_just || '',
 
                 grado_responsabilidad: Number(data.responsabilidad),
-                puntos_responsabilidad: POINTS_MAP.responsabilidad[data.responsabilidad],
+                puntos_responsabilidad: getFactorPoints('responsabilidad', Number(data.responsabilidad), data.responsabilidad_intensidad || 'medio'),
                 justif_responsabilidad: data.responsabilidad_just || '',
 
                 grado_condiciones: Number(data.condiciones),
-                puntos_condiciones: POINTS_MAP.condiciones[data.condiciones],
+                puntos_condiciones: getFactorPoints('condiciones', Number(data.condiciones), data.condiciones_intensidad || 'medio'),
                 justif_condiciones: data.condiciones_just || '',
 
                 grado_consecuencia_error: Number(data.error),
-                puntos_consecuencia_error: POINTS_MAP.error[data.error],
+                puntos_consecuencia_error: getFactorPoints('error', Number(data.error), data.error_intensidad || 'medio'),
                 justif_consecuencia_error: data.error_just || '',
 
                 grado_requisitos: Number(data.requisitos),
-                puntos_requisitos: POINTS_MAP.requisitos[data.requisitos],
+                puntos_requisitos: getFactorPoints('requisitos', Number(data.requisitos), data.requisitos_intensidad || 'medio'),
                 justif_requisitos: data.requisitos_just || '',
 
                 puntos_totales: calculatedPoints,
@@ -150,7 +151,7 @@ router.post('/ai-evaluate', upload.single('plaudTranscript'), async (req, res) =
             });
         }
 
-        const fp = (k: string) => result.factorPoints?.[k] ?? (POINTS_MAP as any)[k][(result.data as any)[k]];
+        const fp = (k: string) => result.factorPoints?.[k] ?? getFactorPoints(k as any, Number((result.data as any)[k]), (result.data as any)[`${k}_intensidad`] || 'medio');
 
         const evaluacion = await saveEvaluacion({
             puesto_id: puesto.id,
@@ -278,22 +279,22 @@ router.put('/:id', async (req, res) => {
             where: { id },
             data: {
                 grado_dificultad: Number(data.dificultad),
-                puntos_dificultad: POINTS_MAP.dificultad[data.dificultad],
+                puntos_dificultad: getFactorPoints('dificultad', Number(data.dificultad), data.dificultad_intensidad || 'medio'),
                 justif_dificultad: data.difficulty_just || existing.justif_dificultad,
                 grado_supervision: Number(data.supervision),
-                puntos_supervision: POINTS_MAP.supervision[data.supervision],
+                puntos_supervision: getFactorPoints('supervision', Number(data.supervision), data.supervision_intensidad || 'medio'),
                 justif_supervision: data.supervision_just || existing.justif_supervision,
                 grado_responsabilidad: Number(data.responsabilidad),
-                puntos_responsabilidad: POINTS_MAP.responsabilidad[data.responsabilidad],
+                puntos_responsabilidad: getFactorPoints('responsabilidad', Number(data.responsabilidad), data.responsabilidad_intensidad || 'medio'),
                 justif_responsabilidad: data.resp_just || existing.justif_responsabilidad,
                 grado_condiciones: Number(data.condiciones),
-                puntos_condiciones: POINTS_MAP.condiciones[data.condiciones],
+                puntos_condiciones: getFactorPoints('condiciones', Number(data.condiciones), data.condiciones_intensidad || 'medio'),
                 justif_condiciones: data.condiciones_just || existing.justif_condiciones,
                 grado_consecuencia_error: Number(data.error),
-                puntos_consecuencia_error: POINTS_MAP.error[data.error],
+                puntos_consecuencia_error: getFactorPoints('error', Number(data.error), data.error_intensidad || 'medio'),
                 justif_consecuencia_error: data.error_just || existing.justif_consecuencia_error,
                 grado_requisitos: Number(data.requisitos),
-                puntos_requisitos: POINTS_MAP.requisitos[data.requisitos],
+                puntos_requisitos: getFactorPoints('requisitos', Number(data.requisitos), data.requisitos_intensidad || 'medio'),
                 justif_requisitos: data.requisitos_just || existing.justif_requisitos,
                 puntos_totales: calculatedPoints,
                 estado: data.estado || existing.estado

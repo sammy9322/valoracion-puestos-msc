@@ -2,8 +2,9 @@ import dotenv from 'dotenv';
 dotenv.config();
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { enrich as enrichProc } from './procedimientosService';
-import { contextualEvaluate, POINTS_MAP, CONTINUOUS_MAX, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
+import { contextualEvaluate, CONTINUOUS_MAX, FACTOR_NAMES, EvaluationSuggestion, FactorKeywordDetail, AIEvaluationResult, MultiFuenteEntry } from './contextualAnalyzer';
 import type { InterviewContext } from './interviewParser';
+import { getFactorPoints, POINTS_MAP } from '../config/factorTables';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
@@ -19,7 +20,8 @@ checkOllama().then(() => {
   console.log('[AI Service] Conectado a Google Gemini API — usando motor LLM en la nube');
 });
 
-export { POINTS_MAP, CONTINUOUS_MAX, FactorKeywordDetail } from './contextualAnalyzer';
+export { CONTINUOUS_MAX, FactorKeywordDetail } from './contextualAnalyzer';
+export { POINTS_MAP, getFactorPoints } from '../config/factorTables';
 export type { InterviewContext };
 
 export function getEngineStatus(): { ollamaAvailable: boolean; activeEngine: 'llm' | 'rule-based' } {
@@ -161,7 +163,8 @@ El sistema experto basado en reglas ya ha evaluado la Ficha Oficial y asignó lo
 - Este informe tiene CARACTER VINCULANTE y puede ser usado en procesos administrativos, recursos de revision y reclamaciones legales. Actua con la maxima responsabilidad tecnica.
 - REGLA DE CONSERVADURISMO OBLIGATORIA: Cuando la evidencia sea ambigua entre dos grados adyacentes (por ejemplo, G5 o G6), SIEMPRE debes asignar el grado INFERIOR y usar intensidad='alto' para reflejar la fuerza de la evidencia. Solo asigna el grado superior si la evidencia es ABSOLUTAMENTE IRREFUTABLE y no cabe en el grado inferior ni siquiera con intensidad alta. Esta regla es critica para garantizar la estabilidad y reproducibilidad del sistema de valoracion. Un analista conservador siempre elige el grado menor cuando hay duda.
 - Cada grado debe ser un numero entero entre 1 y 5.
-- Cada justificacion debe tener entre 2 y 4 oraciones. Es OBLIGATORIO incluir al menos una cita textual exacta usando comillas dobles ("cita") de cualquiera de las 3 fuentes de verdad.
+- Cada justificacion debe ser un analisis tecnico profundo, robusto y detallado de entre 4 y 6 oraciones. Es OBLIGATORIO incluir al menos una cita textual exacta usando comillas dobles ("cita") de cualquiera de las 3 fuentes de verdad.
+- ALERTAS DE CONTRADICCION: Redacta las alertas de forma clara, directa y estructurada. Usa este formato: "[Nombre del Factor] Discrepancia: La Ficha Oficial indica 'X', pero la Entrevista evidencia 'Y'. Impacto: Se elevo el nivel por mayor complejidad real." No uses redacciones confusas ni redundantes.
 - OBLIGATORIO MULTIFUENTE: Si existe EVIDENCIA DE ENTREVISTA para el factor, ESTAS OBLIGADO a cambiar el campo "_fuente" a "mixta" o "entrevista". ¡NUNCA uses "documental" si la entrevista aporto contexto!
 - OBLIGATORIO CITAS MIXTAS: Si usas "mixta", ESTAS OBLIGADO a llenar el campo "_cita_entrevista" con la cita textual de la entrevista y explicar en tu justificacion si la entrevista refuerza o contradice el documento.
 - Si no hay evidencia clara, asigna el grado mas conservador (1).
@@ -178,42 +181,42 @@ El sistema experto basado en reglas ya ha evaluado la Ficha Oficial y asignó lo
   "dificultad_fuente": "documental|entrevista|mixta",
   "dificultad_cita_entrevista": "<cita textual de la entrevista si aplica o ''>",
   "dificultad_intensidad": "alto|medio|bajo",
-
+  "dificultad_contradiccion": true|false,
   "supervision": <1-5>,
   "supervision_just": "<justificacion tecnica>",
   "supervision_cita_documental": "<cita textual>",
   "supervision_fuente": "documental|entrevista|mixta",
   "supervision_cita_entrevista": "<cita o ''>",
   "supervision_intensidad": "alto|medio|bajo",
-
+  "supervision_contradiccion": true|false,
   "responsabilidad": <1-5>,
   "responsabilidad_just": "<justificacion tecnica>",
   "responsabilidad_cita_documental": "<cita textual>",
   "responsabilidad_fuente": "documental|entrevista|mixta",
   "responsabilidad_cita_entrevista": "<cita o ''>",
   "responsabilidad_intensidad": "alto|medio|bajo",
-
+  "responsabilidad_contradiccion": true|false,
   "condiciones": <1-5>,
   "condiciones_just": "<justificacion tecnica>",
   "condiciones_cita_documental": "<cita textual>",
   "condiciones_fuente": "documental|entrevista|mixta",
   "condiciones_cita_entrevista": "<cita o ''>",
   "condiciones_intensidad": "alto|medio|bajo",
-
+  "condiciones_contradiccion": true|false,
   "error": <1-5>,
   "error_just": "<justificacion tecnica>",
   "error_cita_documental": "<cita textual>",
   "error_fuente": "documental|entrevista|mixta",
   "error_cita_entrevista": "<cita o ''>",
   "error_intensidad": "alto|medio|bajo",
-
+  "error_contradiccion": true|false,
   "requisitos": <1-5>,
   "requisitos_just": "<justificacion tecnica>",
   "requisitos_cita_documental": "<cita textual>",
   "requisitos_fuente": "documental|entrevista|mixta",
   "requisitos_cita_entrevista": "<cita o ''>",
   "requisitos_intensidad": "alto|medio|bajo",
-
+  "requisitos_contradiccion": true|false,
   "alertas_contradiccion": ["<alerta si hay contradiccion entre fuentes>"]
 }
 `;
@@ -256,7 +259,7 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
     analisis_multifuente.push({
       factor,
       grado: Number(suggestion[factor]),
-      puntos: POINTS_MAP[factor][Number(suggestion[factor])] || 0,
+      puntos: getFactorPoints(factor as any, Number(suggestion[factor]), (suggestion as any)[`${factor}_intensidad`] || 'medio'),
       justificacion_documental: suggestion[justKey] || '',
       cita_documental: citaDocumental,
       justificacion_entrevista: undefined,
@@ -271,7 +274,7 @@ function validateAndCalculate(suggestion: any, puesto_id: string, motor: 'llm' |
 
   let totalPuntos = 0;
   for (const factor of FACTORS) {
-    totalPuntos += POINTS_MAP[factor][suggestion[factor]];
+    totalPuntos += getFactorPoints(factor as any, Number(suggestion[factor]), (suggestion as any)[`${factor}_intensidad`] || 'medio');
   }
 
   const alertasContradiccion: string[] = suggestion.alertas_contradiccion || [];
@@ -348,14 +351,12 @@ async function callOllama(prompt: string): Promise<any> {
 }
 
 function calculateFactorPoints(data: EvaluationSuggestion): Record<string, number> {
-  return {
-    dificultad: POINTS_MAP.dificultad[data.dificultad],
-    supervision: POINTS_MAP.supervision[data.supervision],
-    responsabilidad: POINTS_MAP.responsabilidad[data.responsabilidad],
-    condiciones: POINTS_MAP.condiciones[data.condiciones],
-    error: POINTS_MAP.error[data.error],
-    requisitos: POINTS_MAP.requisitos[data.requisitos],
-  };
+  const FACTORS = ['dificultad', 'supervision', 'responsabilidad', 'condiciones', 'error', 'requisitos'];
+  const result: Record<string, number> = {};
+  for (const factor of FACTORS) {
+    result[factor] = getFactorPoints(factor as any, Number((data as any)[factor]), (data as any)[`${factor}_intensidad`] || 'medio');
+  }
+  return result;
 }
 
 export const aiAgentService = {
