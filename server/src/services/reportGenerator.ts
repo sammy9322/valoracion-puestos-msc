@@ -189,13 +189,16 @@ export function getClaseSugerida(puntos: number, nombrePuesto?: string, educacio
     });
   }
 
-  const np = candidatos
-    .filter(e => e.puntos <= puntos && !e.nombre.includes('(Prohib.)'))
-    .sort((a, b) => b.puntos - a.puntos);
-  if (np.length) return np[0];
+  const filtered = candidatos
+    .filter(e => e.puntos <= puntos)
+    .sort((a, b) => {
+      if (b.puntos !== a.puntos) return b.puntos - a.puntos;
+      return a.nombre.includes('(Prohib.)') ? 1 : -1;
+    });
 
-  const pr = candidatos.filter(e => e.puntos <= puntos).sort((a, b) => b.puntos - a.puntos);
-  if (pr.length) return pr[0];
+  if (filtered.length > 0) {
+    return filtered[0];
+  }
 
   if (seriePermitida) {
     const claseMinima = ESTRATOS_MUNICIPALES.find(e => e.serie === seriePermitida);
