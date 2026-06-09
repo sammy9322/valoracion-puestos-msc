@@ -296,7 +296,7 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
   if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash-latest',
+    model: 'gemini-3.5-flash',
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0,
