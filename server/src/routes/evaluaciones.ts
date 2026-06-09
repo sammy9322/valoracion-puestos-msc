@@ -268,12 +268,12 @@ router.put('/:id', async (req, res) => {
         }
 
         const calculatedPoints =
-            POINTS_MAP.dificultad[Number(data.dificultad)] +
-            POINTS_MAP.supervision[Number(data.supervision)] +
-            POINTS_MAP.responsabilidad[Number(data.responsabilidad)] +
-            POINTS_MAP.condiciones[Number(data.condiciones)] +
-            POINTS_MAP.error[Number(data.error)] +
-            POINTS_MAP.requisitos[Number(data.requisitos)];
+            getFactorPoints('dificultad', Number(data.dificultad), data.dificultad_intensidad || 'medio') +
+            getFactorPoints('supervision', Number(data.supervision), data.supervision_intensidad || 'medio') +
+            getFactorPoints('responsabilidad', Number(data.responsabilidad), data.responsabilidad_intensidad || 'medio') +
+            getFactorPoints('condiciones', Number(data.condiciones), data.condiciones_intensidad || 'medio') +
+            getFactorPoints('error', Number(data.error), data.error_intensidad || 'medio') +
+            getFactorPoints('requisitos', Number(data.requisitos), data.requisitos_intensidad || 'medio');
 
         const evaluacion = await prisma.evaluacion.update({
             where: { id },

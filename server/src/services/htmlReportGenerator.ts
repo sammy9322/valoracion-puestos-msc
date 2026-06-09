@@ -1,6 +1,7 @@
 import type { ProcedimientosContext } from './procedimientosService';
 import { extraerAcciones, evalProcedimientos, TaggedAccion } from './contextualAnalyzer';
 import { getClaseSugerida } from './reportGenerator';
+import { getFactorPoints } from '../config/factorTables';
 
 const FACTOR_DISPLAY: Record<string, { desc: string, grades: string[] }> = {
   dificultad: { desc: 'Complejidad de las tareas, iniciativa y juicio requerido.', grades: ['', 'Tareas simples y repetitivas.', 'Tareas variadas estandarizadas.', 'Requiere análisis y juicio técnico.', 'Alta complejidad y planeación.', 'Dirección estratégica y decisiones críticas.'] },
@@ -15,6 +16,17 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
   const puesto = evaluacion.puesto || {};
   const totalPuntos = evaluacion.puntos_totales || 0;
   const proc = procedimientos || evaluacion._procedimientos;
+
+  if (!evaluacion.factores) {
+    evaluacion.factores = [
+      { factor: 'Dificultad de las Funciones', dbField: 'dificultad', grado: Number(evaluacion.grado_dificultad), puntos: Number(evaluacion.puntos_dificultad ?? getFactorPoints('dificultad', Number(evaluacion.grado_dificultad), evaluacion.intensidad_dificultad || 'medio')), justificacion: evaluacion.justif_dificultad },
+      { factor: 'Supervisión Ejercida', dbField: 'supervision', grado: Number(evaluacion.grado_supervision), puntos: Number(evaluacion.puntos_supervision ?? getFactorPoints('supervision', Number(evaluacion.grado_supervision), evaluacion.intensidad_supervision || 'medio')), justificacion: evaluacion.justif_supervision },
+      { factor: 'Responsabilidad', dbField: 'responsabilidad', grado: Number(evaluacion.grado_responsabilidad), puntos: Number(evaluacion.puntos_responsabilidad ?? getFactorPoints('responsabilidad', Number(evaluacion.grado_responsabilidad), evaluacion.intensidad_responsabilidad || 'medio')), justificacion: evaluacion.justif_responsabilidad },
+      { factor: 'Condiciones de Trabajo', dbField: 'condiciones', grado: Number(evaluacion.grado_condiciones), puntos: Number(evaluacion.puntos_condiciones ?? getFactorPoints('condiciones', Number(evaluacion.grado_condiciones), evaluacion.intensidad_condiciones || 'medio')), justificacion: evaluacion.justif_condiciones },
+      { factor: 'Consecuencia de Errores', dbField: 'error', grado: Number(evaluacion.grado_consecuencia_error), puntos: Number(evaluacion.puntos_consecuencia_error ?? getFactorPoints('error', Number(evaluacion.grado_consecuencia_error), evaluacion.intensidad_error || 'medio')), justificacion: evaluacion.justif_consecuencia_error },
+      { factor: 'Requisitos', dbField: 'requisitos', grado: Number(evaluacion.grado_requisitos), puntos: Number(evaluacion.puntos_requisitos ?? getFactorPoints('requisitos', Number(evaluacion.grado_requisitos), evaluacion.intensidad_requisitos || 'medio')), justificacion: evaluacion.justif_requisitos },
+    ];
+  }
   
   // Resolver la clase exacta según el Manual de Clases y Metodología MSC
   const sugerida = getClaseSugerida(totalPuntos, puesto.nombre, puesto.educacion_requerida, puesto.codigo_clase_msc);

@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { runValuationPipeline } from '../services/valuationPipeline';
-import { FACTOR_CONFIG, POINTS_MAP } from '../config/factorTables';
+import { FACTOR_CONFIG, POINTS_MAP, getFactorPoints } from '../config/factorTables';
 import { generateHtmlReport } from '../services/htmlReportGenerator';
 import { generateEvaluationReport } from '../services/reportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
@@ -63,8 +63,9 @@ router.post('/pipeline/save', async (req, res) => {
 
     const ev = report.evaluacion;
     const fp = (k: string) => {
-      const grade = ev[k];
-      return POINTS_MAP[k]?.[grade] ?? 0;
+      const grade = Number(ev[k]);
+      const intensity = ev[`${k}_intensidad`] || 'medio';
+      return getFactorPoints(k, grade, intensity);
     };
 
     const evaluacion = await prisma.evaluacion.create({
@@ -155,7 +156,8 @@ router.post('/pipeline/report', async (req, res) => {
 
     const fp = (k: string) => {
       const grade = Number(ev[k]);
-      return POINTS_MAP[k]?.[grade] ?? 0;
+      const intensity = ev[`${k}_intensidad`] || 'medio';
+      return getFactorPoints(k, grade, intensity);
     };
 
     const evaluacionPdf: any = {

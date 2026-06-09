@@ -1,7 +1,7 @@
 import PDFDocument from 'pdfkit';
 import type { ProcedimientosContext } from './procedimientosService';
 import { extraerAcciones, evalProcedimientos, TaggedAccion } from './contextualAnalyzer';
-import { FACTOR_CONFIG, POINTS_MAP } from '../config/factorTables';
+import { FACTOR_CONFIG, POINTS_MAP, getFactorPoints } from '../config/factorTables';
 
 const FACTOR_DISPLAY: Record<string, { label: string; max: number }> = {
   dificultad: { label: 'Dificultad de Funciones', max: 200 },
@@ -493,7 +493,7 @@ class ReportGenerator {
     const rows = FACTORS.map(f => {
       const d = FACTOR_DISPLAY[f];
       const gr = g(evaluacion[`grado_${f}`] || 1);
-      const p = POINTS_MAP[f][gr] || 0;
+      const p = getFactorPoints(f, gr, evaluacion[`intensidad_${f}`] || 'medio');
       return { factor: f, label: d.label, grado: gr, puntos: p, max: d.max, pct: p / d.max };
     });
     const total = rows.reduce((s, r) => s + r.puntos, 0);
@@ -704,7 +704,7 @@ class ReportGenerator {
     for (const factor of FACTORS) {
       const d = FACTOR_DISPLAY[factor];
       const gr = g(evaluacion[`grado_${factor}`] || 1);
-      const p = POINTS_MAP[factor][gr] || 0;
+      const p = getFactorPoints(factor, gr, evaluacion[`intensidad_${factor}`] || 'medio');
       const just = (evaluacion[`justif_${factor}`] || '').trim();
       const desc = GRADES_DESC[factor]?.[gr - 1] || '';
       
