@@ -283,13 +283,7 @@ export function generateHtmlReport(evaluacion: any, procedimientos?: Procedimien
       </div>
 
       <!-- Bloque de Firmas -->
-      <div class="mt-20 pt-10 border-t border-gray-200 flex justify-between items-end">
-        <div class="w-1/2 pr-10 text-center">
-          <div class="border-b border-gray-400 w-full mb-2"></div>
-          <p class="text-xs font-bold text-gray-800 uppercase">Firma Responsable RRHH</p>
-          <p class="text-[10px] text-gray-500">Gestor(a) de Talento Humano</p>
-        </div>
-        
+      <div class="mt-20 pt-10 border-t border-gray-200 flex justify-end items-end">
         <div class="w-1/2 pl-10">
           <div class="border border-gray-200 rounded-lg p-4 flex items-center bg-gray-50">
             <div class="w-1 h-12 bg-blue-600 rounded mr-4"></div>
