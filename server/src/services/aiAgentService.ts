@@ -8,7 +8,10 @@ import { getFactorPoints, POINTS_MAP } from '../config/factorTables';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
-const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
+// gemini-3.5-flash tiene un tope de 20 peticiones por dia en el plan gratuito,
+// lo que dejaba la app cayendo al motor de reglas despues de 20 evaluaciones.
+// gemini-2.5-flash sostiene el volumen real de trabajo con la misma cuenta.
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-2.5-flash';
 export const BUILD_VERSION = 'v14-conservatism-clamp';
 
 let ollamaAvailable = true;
