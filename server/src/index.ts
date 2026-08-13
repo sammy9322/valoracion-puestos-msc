@@ -24,6 +24,12 @@ const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'http://localhost:5173,ht
   .map(o => o.trim())
   .filter(Boolean);
 
+// Vercel expone el dominio del despliegue; se agrega solo para no depender de
+// que ALLOWED_ORIGINS esté configurada en producción.
+for (const host of [process.env.VERCEL_PROJECT_PRODUCTION_URL, process.env.VERCEL_URL]) {
+  if (host) allowedOrigins.push(`https://${host}`);
+}
+
 app.use(cors({
   origin: (origin, callback) => {
     // Sin Origin = mismo origen, curl o healthchecks: se permite.

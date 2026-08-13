@@ -23,14 +23,17 @@ esté hasheada con bcrypt, así que ese usuario no sirve hasta correr el script.
 
 ### 2. Cargar las variables nuevas en Vercel
 
-Settings → Environment Variables. Sin `JWT_SECRET`, **todas** las rutas
-protegidas responden 500 y la app queda inutilizable.
+Settings → Environment Variables. **Ninguna es obligatoria**: si faltan, el
+código tiene respaldos razonables (ver abajo). Igual conviene definirlas.
 
-| Variable | Valor |
-|---|---|
-| `JWT_SECRET` | Cadena aleatoria larga. Generar con: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` |
-| `ALLOWED_ORIGINS` | El dominio de producción, p.ej. `https://valoracion-puestos-msc.vercel.app` |
-| `GEMINI_MODEL` | `gemini-3.5-flash` (opcional; es el default en código) |
+| Variable | Valor | Si falta |
+|---|---|---|
+| `JWT_SECRET` | Cadena aleatoria larga: `node -e "console.log(require('crypto').randomBytes(48).toString('base64'))"` | Se deriva por HMAC-SHA256 del `DATABASE_URL`. Funciona, pero rotar la contraseña de la base invalida las sesiones activas. |
+| `ALLOWED_ORIGINS` | Dominio de producción, p.ej. `https://valoracion-puestos-msc.vercel.app` | Se agrega solo desde `VERCEL_PROJECT_PRODUCTION_URL`. En Vercel el frontend y la API comparten dominio, así que CORS no interviene. |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | Es el default en código. |
+
+Definir `JWT_SECRET` de verdad tiene precedencia sobre el respaldo derivado, y
+es lo recomendable apenas se pueda.
 
 Las que ya existían (`DATABASE_URL`, `GEMINI_API_KEY`, `VITE_SUPABASE_URL`,
 `VITE_SUPABASE_ANON_KEY`) se quedan como están.
