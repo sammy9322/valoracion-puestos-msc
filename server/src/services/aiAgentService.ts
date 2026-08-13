@@ -8,6 +8,7 @@ import { getFactorPoints, POINTS_MAP } from '../config/factorTables';
 
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
 const DEFAULT_MODEL = process.env.OLLAMA_MODEL || 'deepseek-coder-v2:latest';
+const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash';
 export const BUILD_VERSION = 'v14-conservatism-clamp';
 
 let ollamaAvailable = true;
@@ -17,7 +18,10 @@ async function checkOllama(): Promise<boolean> {
 }
 
 checkOllama().then(() => {
-  console.log('[AI Service] Conectado a Google Gemini API — usando motor LLM en la nube');
+  console.log(`[AI Service] Motor LLM en la nube — Google Gemini, modelo "${GEMINI_MODEL}"`);
+  if (!process.env.GEMINI_API_KEY) {
+    console.warn('[AI Service] ⚠️  GEMINI_API_KEY no está configurada: TODAS las evaluaciones caerán al motor de reglas (ignora la entrevista).');
+  }
 });
 
 export { CONTINUOUS_MAX, FactorKeywordDetail } from './contextualAnalyzer';
@@ -296,7 +300,7 @@ async function callGemini(prompt: string, temperature: number = 0): Promise<any>
   if (!apiKey) throw new Error('GEMINI_API_KEY no configurada');
   const genAI = new GoogleGenerativeAI(apiKey);
   const model = genAI.getGenerativeModel({
-    model: 'gemini-3.5-flash',
+    model: GEMINI_MODEL,
     generationConfig: {
       responseMimeType: 'application/json',
       temperature: 0,
@@ -405,10 +409,10 @@ export const aiAgentService = {
             result.interviewContext = interviewCtx;
           } catch (error: any) {
             console.warn('[AI Service] Error en LLM, cayendo a rule-based:', error.message);
-            result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Gemini fallu00F3, revisa tu API KEY en Vercel). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+            result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error crítico en IA evaluadora (Gemini falló, revisa tu API KEY en Vercel). Se utilizó el motor básico basado en reglas, el cual IGNORA la entrevista.";
           }
         } else {
-          result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+          result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error crítico en IA evaluadora (el motor LLM falló o no está configurado). Se utilizó el motor básico basado en reglas, el cual IGNORA la entrevista.";
         }
         return result;
     },
@@ -417,7 +421,7 @@ export const aiAgentService = {
         const procCtx = await enrichProc(puesto).catch(() => null);
         const procText = procCtx ? procCtx.textoCompleto : undefined;
         if (!ollamaAvailable) {
-          const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+          const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error crítico en IA evaluadora (el motor LLM falló o no está configurado). Se utilizó el motor básico basado en reglas, el cual IGNORA la entrevista.";
           return result.data;
         }
 
@@ -430,7 +434,7 @@ export const aiAgentService = {
             return raw as EvaluationSuggestion;
         } catch (error: any) {
             console.warn('[AI Service] Error en suggestEvaluation, usando rule-based:', error.message);
-            const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error cru00EDtico en IA evaluadora (Ollama fallu00F3 o agotu00F3 memoria). Se utilizu00F3 el motor bu00E1sico basado en reglas, el cual IGNORA la entrevista.";
+            const result = ruleBasedEvaluation(puesto, procCtx); result.alerta_global = "Error crítico en IA evaluadora (el motor LLM falló o no está configurado). Se utilizó el motor básico basado en reglas, el cual IGNORA la entrevista.";
             return result.data;
         }
     }

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
-import { Briefcase, LayoutDashboard, FileSignature, ShieldAlert, Target, BarChart2, Calculator, BadgeDollarSign, Moon, Sun, Bell, ClipboardList, BookOpen } from 'lucide-react';
+import { Briefcase, LayoutDashboard, FileSignature, ShieldAlert, Target, BarChart2, Calculator, BadgeDollarSign, Moon, Sun, Bell, ClipboardList, BookOpen, LogOut } from 'lucide-react';
 import Dashboard from './pages/Dashboard';
 import FichasPuestos from './pages/FichasPuestos';
 import EncuestaSalario from './pages/EncuestaSalario';
@@ -10,7 +10,10 @@ import CalculoVP from './pages/CalculoVP';
 import Asignaciones from './pages/Asignaciones';
 import PanelAuditoria from './pages/PanelAuditoria';
 import ImportarManual from './pages/ImportarManual';
-const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+import Login from './pages/Login';
+import api, { getToken, clearToken } from './services/api';
+
+const Layout: React.FC<{ children: React.ReactNode; onLogout: () => void }> = ({ children, onLogout }) => {
   const [isDark, setIsDark] = useState(false);
   const location = useLocation();
 
@@ -98,11 +101,13 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
             
             <div className="h-4 w-px bg-border mx-2"></div>
 
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-muted border flex items-center justify-center text-foreground font-semibold text-xs">
-                JD
-              </div>
-            </div>
+            <button
+              onClick={onLogout}
+              className="flex items-center gap-2 px-2 py-1.5 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground transition-colors text-xs font-medium"
+              title="Cerrar sesión"
+            >
+              <LogOut size={16} /> Salir
+            </button>
           </div>
         </header>
         
@@ -117,9 +122,46 @@ const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 };
 
 const App = () => {
+  // 'checking' evita mostrar el login por un instante mientras se valida el
+  // token guardado contra el servidor.
+  const [authState, setAuthState] = useState<'checking' | 'in' | 'out'>('checking');
+
+  const verify = React.useCallback(async () => {
+    if (!getToken()) {
+      setAuthState('out');
+      return;
+    }
+    try {
+      await api.get('/auth/me');
+      setAuthState('in');
+    } catch {
+      setAuthState('out');
+    }
+  }, []);
+
+  useEffect(() => {
+    verify();
+    const onUnauthorized = () => setAuthState('out');
+    window.addEventListener('msc:unauthorized', onUnauthorized);
+    return () => window.removeEventListener('msc:unauthorized', onUnauthorized);
+  }, [verify]);
+
+  const handleLogout = () => {
+    clearToken();
+    setAuthState('out');
+  };
+
+  if (authState === 'checking') {
+    return <div className="min-h-screen flex items-center justify-center bg-background text-muted-foreground text-sm">Cargando…</div>;
+  }
+
+  if (authState === 'out') {
+    return <Login onSuccess={() => setAuthState('in')} />;
+  }
+
   return (
     <BrowserRouter>
-      <Layout>
+      <Layout onLogout={handleLogout}>
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/fichas" element={<FichasPuestos />} />

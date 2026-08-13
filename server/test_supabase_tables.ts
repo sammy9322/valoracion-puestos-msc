@@ -1,7 +1,14 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = 'https://ixfirqxhrjvnerpsetlp.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4ZmlycXhocmp2bmVycHNldGxwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU2NjEwNzAsImV4cCI6MjA5MTIzNzA3MH0.d1W6sK4rW12S3aX75cXES8IrVqmEBauLRTJvHFZt4xU';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.VITE_SUPABASE_ANON_KEY || '';
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  throw new Error('Faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY en el .env');
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
