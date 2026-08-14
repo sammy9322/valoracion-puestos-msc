@@ -6,12 +6,11 @@ import { generateEvaluationReport } from '../services/reportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
 import { parseEntrevistaMD } from '../services/interviewParser';
 import prisma from '../db';
-import multer from 'multer';
+import { subirTranscripcion } from '../config/uploads';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const router = Router();
 
-router.post('/pipeline', upload.single('plaudTranscript'), async (req, res) => {
+router.post('/pipeline', subirTranscripcion('plaudTranscript'), async (req, res) => {
   try {
     const { puesto_id } = req.body;
     if (!puesto_id) return res.status(400).json({ error: 'puesto_id es requerido' });

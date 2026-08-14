@@ -312,6 +312,7 @@ const WizardEvaluacion: React.FC = () => {
                   ref={fileInputRef}
                   type="file"
                   className="hidden"
+                  accept=".txt,.md,.markdown,.csv,.json,.vtt,.srt,text/plain"
                   onChange={e => {
                     if (e.target.files && e.target.files.length > 0) {
                       setPlaudFile(e.target.files[0]);

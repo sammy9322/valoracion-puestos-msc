@@ -6,9 +6,8 @@ import { generateEvaluationReport } from '../services/reportGenerator';
 import { generateHtmlReport } from '../services/htmlReportGenerator';
 import { enrich as enrichProc } from '../services/procedimientosService';
 import { parseEntrevistaMD } from '../services/interviewParser';
-import multer from 'multer';
+import { subirTranscripcion } from '../config/uploads';
 
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024 } });
 const router = Router();
 
 async function saveEvaluacion(data: any) {
@@ -115,7 +114,7 @@ router.post('/', async (req, res) => {
 });
 
 // POST Evaluación automática con IA (nuevo flujo objetivo + multifuente)
-router.post('/ai-evaluate', upload.single('plaudTranscript'), async (req, res) => {
+router.post('/ai-evaluate', subirTranscripcion('plaudTranscript'), async (req, res) => {
     try {
         const { puesto_id } = req.body;
         if (!puesto_id) {

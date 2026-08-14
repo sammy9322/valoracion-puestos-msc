@@ -1,8 +1,8 @@
+import { describe, it, expect } from 'vitest';
 import { validateObjectivity } from '../services/guardrails';
 import { ValuationReportSchema } from '../services/outputValidator';
 
-// Test 1: Report with uncertainty language
-const reportWithUncertainty = {
+const reporteBase = {
   puesto_id: 'test-1',
   totalPuntos: 200,
   evaluacion: {
@@ -28,57 +28,42 @@ const reportWithUncertainty = {
   }
 };
 
-const result1 = validateObjectivity(reportWithUncertainty);
-console.log('Test 1 - Uncertainty detection:', result1.isValid ? 'FAIL (should have warnings)' : 'PASS');
-if (result1.warnings.length > 0) {
-  console.log('  Warnings found:', result1.warnings);
-}
+describe('guardrails: validateObjectivity', () => {
+  it('marca el lenguaje especulativo en las justificaciones', () => {
+    // "Probablemente" no es lenguaje admisible en un dictamen vinculante.
+    const r = validateObjectivity(reporteBase);
+    expect(r.isValid).toBe(false);
+    expect(r.warnings.length).toBeGreaterThan(0);
+  });
 
-// Test 2: Clean report (no uncertainty)
-const cleanReport = {
-  ...reportWithUncertainty,
-  evaluacion: {
-    ...reportWithUncertainty.evaluacion,
-    dificultad_just: 'Realiza tareas variadas y estandarizadas según la descripción de funciones.'
-  }
-};
-const result2 = validateObjectivity(cleanReport);
-console.log('Test 2 - Clean report:', result2.isValid ? 'PASS' : 'FAIL');
+  it('acepta un reporte con justificaciones objetivas', () => {
+    const limpio = {
+      ...reporteBase,
+      evaluacion: {
+        ...reporteBase.evaluacion,
+        dificultad_just: 'Realiza tareas variadas y estandarizadas según la descripción de funciones.'
+      }
+    };
+    expect(validateObjectivity(limpio).isValid).toBe(true);
+  });
 
-// Test 3: Invalid grade (out of range)
-const invalidGradeReport = {
-  ...reportWithUncertainty,
-  evaluacion: {
-    ...reportWithUncertainty.evaluacion,
-    dificultad: 6
-  }
-};
-const result3 = validateObjectivity(invalidGradeReport);
-console.log('Test 3 - Out of range grade:', result3.isValid ? 'FAIL (should have warnings)' : 'PASS');
-if (result3.warnings.length > 0) {
-  console.log('  Warnings found:', result3.warnings);
-}
+  it('rechaza un grado fuera del rango 1-5', () => {
+    const fueraDeRango = {
+      ...reporteBase,
+      evaluacion: { ...reporteBase.evaluacion, dificultad: 6 }
+    };
+    const r = validateObjectivity(fueraDeRango);
+    expect(r.isValid).toBe(false);
+    expect(r.warnings.length).toBeGreaterThan(0);
+  });
+});
 
-// Test 4: Insufficient evidence (very short justification)
-const shortJustReport = {
-  ...reportWithUncertainty,
-  evaluacion: {
-    ...reportWithUncertainty.evaluacion,
-    dificultad_just: 'Corto.'
-  }
-};
-const zodResult = ValuationReportSchema.safeParse(shortJustReport);
-console.log('Test 4 - Insufficient evidence:', zodResult.success ? 'FAIL (should fail validation)' : 'PASS');
-
-// Summary
-console.log('\n=== Summary ===');
-const tests = [
-  { name: 'Uncertainty detection', pass: !result1.isValid },
-  { name: 'Clean report', pass: result2.isValid },
-  { name: 'Out of range grade', pass: !result3.isValid },
-  { name: 'Insufficient evidence', pass: !zodResult.success },
-];
-tests.forEach(t => console.log(`${t.pass ? '✓' : '✗'} ${t.name}`));
-const allPass = tests.every(t => t.pass);
-console.log(`\n${allPass ? 'ALL TESTS PASSED' : 'SOME TESTS FAILED'}`);
-process.exit(allPass ? 0 : 1);
+describe('outputValidator: ValuationReportSchema', () => {
+  it('rechaza justificaciones sin evidencia suficiente', () => {
+    const justificacionCorta = {
+      ...reporteBase,
+      evaluacion: { ...reporteBase.evaluacion, dificultad_just: 'Corto.' }
+    };
+    expect(ValuationReportSchema.safeParse(justificacionCorta).success).toBe(false);
+  });
+});
