@@ -23,7 +23,9 @@ const FichasPuestos: React.FC = () => {
     const [manualError, setManualError] = useState<string | null>(null);
     const [manualSuccess, setManualSuccess] = useState<string | null>(null);
     const [catalogoVigente, setCatalogoVigente] = useState<any>(null);
-    
+    const [catalogoError, setCatalogoError] = useState<string | null>(null);
+    const [mappingError, setMappingError] = useState<string | null>(null);
+
     // Form state
     const [formData, setFormData] = useState({
         nombre: '',
@@ -113,12 +115,23 @@ const FichasPuestos: React.FC = () => {
     };
 
     const fetchManualData = async () => {
+        setCatalogoError(null);
         try {
             // 1. Intentar cargar desde Supabase (Catálogo Oficial)
-            const { data: supabasePositions } = await supabase
+            const { data: supabasePositions, error: supabaseError } = await supabase
                 .from('v_catalogo_puestos')
                 .select('*')
                 .order('cargo', { ascending: true });
+
+            if (supabaseError) {
+                console.error('Error de Supabase al cargar v_catalogo_puestos:', supabaseError);
+                setCatalogoError(
+                    `No se pudo cargar el catálogo oficial (${supabaseError.message}). ` +
+                    'Verifique las variables VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY y las políticas RLS de "v_catalogo_puestos".'
+                );
+                setManualPositions([]);
+                return;
+            }
 
             const excludedIds = EXCLUDED_POSITIONS.map(p => p.id);
 
@@ -135,15 +148,28 @@ const FichasPuestos: React.FC = () => {
 
             // Ordenar alfabéticamente
             merged.sort((a, b) => (a.cargo || '').localeCompare(b.cargo || '', 'es'));
-            
+
             console.log(`Catálogo vinculado: ${merged.length} puestos totales. (Excluidos: ${excludedIds.length})`);
             setManualPositions(merged);
+
+            if (merged.length === 0) {
+                setCatalogoError(
+                    (supabasePositions || []).length === 0
+                        ? 'La vista "v_catalogo_puestos" respondió sin filas. Verifique que tenga datos y que la política RLS permita lectura al rol "anon".'
+                        : 'Todos los puestos del catálogo están marcados como anomalía y fueron excluidos. Revise "Ver Anomalías".'
+                );
+            }
 
             // Cargar departamentos para el mapeo
             const depts = await getDepartamentos();
             setAllDepartments(depts);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error general en carga de catálogo:', error);
+            setCatalogoError(
+                `No se pudo conectar con el catálogo oficial (${error?.message || 'error desconocido'}). ` +
+                'Verifique la configuración de Supabase.'
+            );
+            setManualPositions([]);
         }
     };
 
@@ -162,6 +188,7 @@ const FichasPuestos: React.FC = () => {
     const handleManualSelection = async (selectionId: string) => {
         if (!selectionId) return;
         setIsMapping(true);
+        setMappingError(null);
         try {
             const selectedItem = manualPositions.find(p => p.id?.toString() === selectionId);
             if (!selectedItem) return;
@@ -191,8 +218,12 @@ const FichasPuestos: React.FC = () => {
                         baseData.experiencia = details.requisitos_experiencia || '';
                         baseData.estrato = details.estrato || '';
                     }
-                } catch (err) {
-                    console.warn('Detalles de Supabase no disponibles para:', supabaseId);
+                } catch (err: any) {
+                    console.warn('Detalles de Supabase no disponibles para:', supabaseId, err);
+                    setMappingError(
+                        `No se pudieron traer los detalles de "${selectedItem.cargo}" (${err?.message || 'error desconocido'}). ` +
+                        'Complete área, funciones y requisitos manualmente, o revise que las tablas "cargos_puesto" y "clases_puesto" tengan la fila correspondiente y RLS permita leerla.'
+                    );
                 }
             }
             
@@ -586,8 +617,14 @@ const FichasPuestos: React.FC = () => {
                                         </button>
                                     )}
                                 </div>
+                                {catalogoError && (
+                                    <div className="bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900/50 p-3 rounded-lg flex items-start gap-2 mb-2">
+                                        <AlertCircle className="text-red-600 dark:text-red-400 mt-0.5 shrink-0" size={16} />
+                                        <span className="text-red-700 dark:text-red-300 text-xs">{catalogoError}</span>
+                                    </div>
+                                )}
                                 <div className="relative">
-                                    <select 
+                                    <select
                                         className="w-full bg-background border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 appearance-none"
                                         onChange={(e) => handleManualSelection(e.target.value)}
                                         disabled={isMapping}
@@ -604,6 +641,12 @@ const FichasPuestos: React.FC = () => {
                                     </div>
                                 </div>
                                 <p className="text-[10px] text-muted-foreground mt-2 italic">Esto completará automáticamente el área, funciones y requisitos.</p>
+                                {mappingError && (
+                                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-3 rounded-lg flex items-start gap-2 mt-2">
+                                        <AlertCircle className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" size={16} />
+                                        <span className="text-amber-700 dark:text-amber-300 text-xs">{mappingError}</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
