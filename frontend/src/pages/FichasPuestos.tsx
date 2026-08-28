@@ -24,6 +24,7 @@ const FichasPuestos: React.FC = () => {
     const [manualSuccess, setManualSuccess] = useState<string | null>(null);
     const [catalogoVigente, setCatalogoVigente] = useState<any>(null);
     const [catalogoError, setCatalogoError] = useState<string | null>(null);
+    const [mappingError, setMappingError] = useState<string | null>(null);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -187,6 +188,7 @@ const FichasPuestos: React.FC = () => {
     const handleManualSelection = async (selectionId: string) => {
         if (!selectionId) return;
         setIsMapping(true);
+        setMappingError(null);
         try {
             const selectedItem = manualPositions.find(p => p.id?.toString() === selectionId);
             if (!selectedItem) return;
@@ -216,8 +218,12 @@ const FichasPuestos: React.FC = () => {
                         baseData.experiencia = details.requisitos_experiencia || '';
                         baseData.estrato = details.estrato || '';
                     }
-                } catch (err) {
-                    console.warn('Detalles de Supabase no disponibles para:', supabaseId);
+                } catch (err: any) {
+                    console.warn('Detalles de Supabase no disponibles para:', supabaseId, err);
+                    setMappingError(
+                        `No se pudieron traer los detalles de "${selectedItem.cargo}" (${err?.message || 'error desconocido'}). ` +
+                        'Complete área, funciones y requisitos manualmente, o revise que las tablas "cargos_puesto" y "clases_puesto" tengan la fila correspondiente y RLS permita leerla.'
+                    );
                 }
             }
             
@@ -635,6 +641,12 @@ const FichasPuestos: React.FC = () => {
                                     </div>
                                 </div>
                                 <p className="text-[10px] text-muted-foreground mt-2 italic">Esto completará automáticamente el área, funciones y requisitos.</p>
+                                {mappingError && (
+                                    <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 p-3 rounded-lg flex items-start gap-2 mt-2">
+                                        <AlertCircle className="text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" size={16} />
+                                        <span className="text-amber-700 dark:text-amber-300 text-xs">{mappingError}</span>
+                                    </div>
+                                )}
                             </div>
 
                             <div className="grid grid-cols-2 gap-4">
